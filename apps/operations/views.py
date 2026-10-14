@@ -1,9 +1,10 @@
+import json
 from decimal import Decimal
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q, Count
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views import View
@@ -493,13 +494,19 @@ class WorkOrderEvidenceCreateView(ModuleAccessRequiredMixin, View):
             evidence.uploaded_by = request.user
             evidence.save()
 
+            if evidence.compressed_size_kb > 0 and evidence.original_size_kb > 0:
+                opt_note = f"Evidencia fotográfica optimizada: {evidence.original_size_kb:,} KB -> {evidence.compressed_size_kb:,} KB"
+                details = f"{evidence.notes}\n{opt_note}".strip() if evidence.notes else opt_note
+            else:
+                details = evidence.notes or f"Referencia: {evidence.file_reference}"
+
             # Registro en bitácora inmutable
             WorkOrderTimelineLog.objects.create(
                 organization=request.organization,
                 work_order=wo,
                 event_type='EVIDENCE_ADDED',
                 summary=f"Nueva evidencia técnica: {evidence.get_evidence_type_display()} · {evidence.title}",
-                details=evidence.notes or f"Referencia: {evidence.file_reference}",
+                details=details,
                 actor=request.user,
             )
 
@@ -617,3 +624,224 @@ class CrewCreateView(ModuleAccessRequiredMixin, CreateView):
         form.save_m2m()
         messages.success(self.request, f"Cuadrilla {crew.code} ({crew.name}) registrada exitosamente.")
         return redirect('operations:crew_planning')
+
+
+# ==============================================================================
+# 5. FIRMA DIGITAL EN CAMPO, SINCRONIZACIÓN OFFLINE Y ACTA OFICIAL
+# ==============================================================================
+
+class WorkOrderSignCaptureView(ModuleAccessRequiredMixin, View):
+    """
+    Captura de Firma Digital Táctil de Conformidad del Cliente (<canvas>).
+    Accesible desde Nivel 20 (TECHNICIAN) en adelante, con segregación estricta:
+    - SST_OFFICER (70): Bloqueado con HTTP 403 por segregación de funciones.
+    - TECHNICIAN (20): Debe pertenecer a la cuadrilla asignada a la OT (si no, HTTP 403).
+    """
+    required_module = 'operations'
+    min_role_level = RoleLevel.TECHNICIAN
+
+    @transaction.atomic
+    def post(self, request, pk):
+        wo = get_object_or_404(
+            WorkOrder.objects.for_org(request.organization).select_related('assigned_crew'),
+            pk=pk
+        )
+
+        role_level = request.membership.role_level
+
+        # Segregación de funciones: Oficial SST no firma actas de recepción técnica
+        if role_level == RoleLevel.SST_OFFICER:
+            return render_403_rbac(
+                request,
+                "Segregación de Funciones: El Oficial de Seguridad (SST) no está facultado para estampar firmas de entrega técnica o recepción comercial de OTs."
+            )
+
+        # Si es técnico de campo, debe pertenecer a la cuadrilla asignada
+        if role_level == RoleLevel.TECHNICIAN:
+            is_member = False
+            if wo.assigned_crew:
+                if wo.assigned_crew.leader_id == request.user.id or wo.assigned_crew.members.filter(id=request.user.id).exists():
+                    is_member = True
+            if not is_member:
+                return render_403_rbac(
+                    request,
+                    "Acceso Denegado: Como técnico de campo solo puede capturar firmas de entrega en órdenes asignadas a su cuadrilla activa."
+                )
+
+        signer_name = request.POST.get('signer_name', '').strip()
+        signer_title = request.POST.get('signer_title', '').strip()
+        signer_id = request.POST.get('signer_id', '').strip()
+        signature_base64 = (request.POST.get('client_signature_data') or request.POST.get('signature_data') or '').strip()
+
+        try:
+            hash_seal = wo.record_client_signature(
+                signer_name=signer_name,
+                signer_title=signer_title,
+                signer_id=signer_id,
+                signature_base64=signature_base64,
+                actor=request.user,
+            )
+            messages.success(
+                request,
+                f"Firma digital de conformidad estampada exitosamente. Sello SHA-256: {hash_seal[:16]}... (Inmutable)."
+            )
+        except ValidationError as e:
+            messages.error(request, str(e.message if hasattr(e, 'message') else e))
+        except Exception as e:
+            messages.error(request, f"Error al sellar firma digital: {str(e)}")
+
+        return redirect('operations:workorder_detail', pk=wo.pk)
+
+
+class FieldOfflineSyncEndpointView(ModuleAccessRequiredMixin, View):
+    """
+    Endpoint JSON de Sincronización de Campo Offline (PWA Field Mode).
+    Procesa colas de acciones capturadas localmente por el técnico sin conexión:
+    - Avances en partidas técnicas (BOM).
+    - Evidencias fotográficas comprimidas en Base64.
+    - Firma digital táctil de recepción conforme.
+    Exige autenticación y membresía activa en la organización.
+    """
+    required_module = 'operations'
+    min_role_level = RoleLevel.TECHNICIAN
+
+    def post(self, request, *args, **kwargs):
+        role_level = request.membership.role_level
+        if role_level == RoleLevel.SST_OFFICER:
+            return JsonResponse({'error': 'Segregación de funciones: SST_OFFICER no procesa ejecuciones de campo.'}, status=403)
+
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+        except Exception:
+            return JsonResponse({'error': 'Payload JSON inválido.'}, status=400)
+
+        wo_id = data.get('work_order_id')
+        if not wo_id:
+            return JsonResponse({'error': 'work_order_id es obligatorio.'}, status=400)
+
+        wo = get_object_or_404(
+            WorkOrder.objects.for_org(request.organization).select_related('assigned_crew'),
+            pk=wo_id
+        )
+
+        # Verificación de pertenencia a cuadrilla para técnicos
+        if role_level == RoleLevel.TECHNICIAN:
+            is_member = False
+            if wo.assigned_crew:
+                if wo.assigned_crew.leader_id == request.user.id or wo.assigned_crew.members.filter(id=request.user.id).exists():
+                    is_member = True
+            if not is_member:
+                return JsonResponse({'error': 'No pertenece a la cuadrilla asignada a esta orden.'}, status=403)
+
+        processed_count = 0
+        with transaction.atomic():
+            # 1. Partidas técnicas ejecutadas
+            items_executed = data.get('items_executed', [])
+            for item_data in items_executed:
+                item_pk = item_data.get('item_id')
+                qty = Decimal(str(item_data.get('executed_quantity') or item_data.get('quantity') or 0))
+                notes = item_data.get('notes', '')
+                if item_pk and qty > 0:
+                    item = wo.items.filter(pk=item_pk).first()
+                    if item:
+                        item.executed_quantity = qty
+                        if item_data.get('is_completed'):
+                            item.is_completed = True
+                        item.completed_by = request.user
+                        item.save(update_fields=['executed_quantity', 'is_completed', 'completed_by', 'updated_at'])
+                        WorkOrderTimelineLog.objects.create(
+                            organization=request.organization,
+                            work_order=wo,
+                            event_type='ITEM_EXECUTED',
+                            summary=f"Sincronización Offline: Avance en {item.description} ({qty} {item.unit})",
+                            details=notes or f"Registrado offline por {request.user.full_name}",
+                            actor=request.user,
+                        )
+                        processed_count += 1
+
+            # 2. Evidencias fotográficas
+            evidences = data.get('evidences', [])
+            for ev_data in evidences:
+                title = ev_data.get('title', 'Evidencia sincronizada offline')
+                ev_type = ev_data.get('evidence_type', WorkOrderEvidence.EvidenceType.PHOTO_PROGRESS)
+                comp_data = ev_data.get('compressed_image_data', '')
+                orig_kb = int(ev_data.get('original_size_kb', 0))
+                comp_kb = int(ev_data.get('compressed_size_kb', 0))
+                notes = ev_data.get('notes', '')
+
+                evidence = WorkOrderEvidence.objects.create(
+                    organization=request.organization,
+                    work_order=wo,
+                    evidence_type=ev_type,
+                    title=title,
+                    notes=notes,
+                    file_reference=ev_data.get('file_reference', 'CAPTURA-OFFLINE.JPG'),
+                    compressed_image_data=comp_data,
+                    original_size_kb=orig_kb,
+                    compressed_size_kb=comp_kb,
+                    uploaded_by=request.user,
+                )
+                if comp_kb > 0 and orig_kb > 0:
+                    details = f"{notes}\nEvidencia optimizada: {orig_kb:,} KB -> {comp_kb:,} KB".strip()
+                else:
+                    details = notes
+
+                WorkOrderTimelineLog.objects.create(
+                    organization=request.organization,
+                    work_order=wo,
+                    event_type='EVIDENCE_ADDED',
+                    summary=f"Sincronización Offline: Evidencia {evidence.title}",
+                    details=details,
+                    actor=request.user,
+                )
+                processed_count += 1
+
+            # 3. Firma digital de recepción
+            sig_data = data.get('signature')
+            if sig_data and isinstance(sig_data, dict):
+                signer_name = sig_data.get('signer_name', '')
+                signer_title = sig_data.get('signer_title', '')
+                signer_id = sig_data.get('signer_id', '')
+                signature_base64 = sig_data.get('signature_data') or sig_data.get('client_signature_data') or ''
+
+                if signer_name and signature_base64 and not wo.signature_hash:
+                    wo.record_client_signature(
+                        signer_name=signer_name,
+                        signer_title=signer_title,
+                        signer_id=signer_id,
+                        signature_base64=signature_base64,
+                        actor=request.user,
+                    )
+                    processed_count += 1
+
+        return JsonResponse({
+            'status': 'synced',
+            'work_order_number': wo.number,
+            'processed_count': processed_count,
+        })
+
+
+class WorkOrderCertificatePrintView(ModuleAccessRequiredMixin, View):
+    """
+    Acta Oficial de Entrega y Recepción Técnica de Obra / Mantenimiento.
+    Formato formal de alta densidad para impresión o PDF que incluye
+    la firma digital sellada por SHA-256 de conformidad del cliente.
+    """
+    required_module = 'operations'
+    min_role_level = RoleLevel.TECHNICIAN
+    template_name = 'operations/workorder_certificate_print.html'
+
+    def get(self, request, pk):
+        wo = get_object_or_404(
+            WorkOrder.objects.for_org(request.organization)
+            .select_related('account', 'assigned_crew', 'assigned_engineer', 'created_by')
+            .prefetch_related('items', 'evidences'),
+            pk=pk
+        )
+        return render(request, self.template_name, {
+            'work_order': wo,
+            'org': request.organization,
+            'items': wo.items.all(),
+            'evidences': wo.evidences.all(),
+        })
+

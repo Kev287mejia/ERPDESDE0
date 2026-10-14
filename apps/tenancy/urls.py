@@ -1,5 +1,5 @@
 from django.urls import path
-from apps.tenancy import views_modules, views_onboarding, views_team
+from apps.tenancy import views_modules, views_onboarding, views_search, views_team
 
 app_name = 'tenancy'
 
@@ -23,10 +23,15 @@ urlpatterns = [
     path('settings/team/create/', views_team.TeamCreateMemberView.as_view(), name='team_create'),
     path('settings/team/<uuid:membership_id>/update/', views_team.MemberRoleUpdateView.as_view(), name='member_update'),
     path('settings/modules/', views_team.OrganizationModulesUpdateView.as_view(), name='update_modules'),
+    path('settings/apply-preset/', views_team.ApplyBusinessProfilePresetView.as_view(), name='apply_preset'),
+    path('settings/apply-business-preset/', views_team.ApplyBusinessProfilePresetView.as_view(), name='apply_business_preset'),
 
     # Subsistemas Dinámicos Opcionales
     path('tech/', views_modules.TechDashboardView.as_view(), name='tech_dashboard'),
     path('marketing/', views_modules.MarketingDashboardView.as_view(), name='marketing_dashboard'),
+
+    # Motor de Búsqueda Global en Tiempo Real (Ctrl+K OmniSearch)
+    path('search/omnisearch/', views_search.GlobalOmniSearchView.as_view(), name='omnisearch'),
 
     # Controles de Escenario Demo / Sandbox (Exclusivo Owner 100)
     path('settings/sandbox/load/', views_onboarding.LoadSandboxDataView.as_view(), name='sandbox_load'),

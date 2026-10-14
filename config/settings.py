@@ -50,6 +50,11 @@ INSTALLED_APPS = [
     'apps.sst',
     'apps.inventory',
     'apps.finance',
+    'apps.billing',
+    'apps.purchasing',
+    'apps.repository',
+    'apps.tickets',
+    'apps.ai_agent',
 ]
 
 MIDDLEWARE = [

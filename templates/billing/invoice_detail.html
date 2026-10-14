@@ -1,0 +1,547 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}{{ invoice.number }} · {{ invoice.account.commercial_name }}{% endblock %}
+{% block breadcrumb_section %}FINANZAS & FISCAL{% endblock %}
+{% block breadcrumb_page %}FACTURACIÓN & CXC{% endblock %}
+{% block page_title %}{{ invoice.number }} · {{ invoice.account.commercial_name }}{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2">
+    <a href="{% url 'billing:invoice_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+        Volver al Listado
+    </a>
+
+    <a href="{% url 'billing:invoice_print' pk=invoice.pk %}" 
+       target="_blank" 
+       class="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24-3.411 1.76-6.195 4.53-6.195 2.77 0 4.77 2.784 4.53 6.195H6.72zM3 13.5v6.75A2.25 2.25 0 005.25 22.5h13.5A2.25 2.25 0 0021 20.25V13.5m-18 0h18M6.75 3.75h10.5M9 7.5h6"/>
+        </svg>
+        <span>Comprobante Fiscal DGI (Imprimir)</span>
+    </a>
+
+    {% if can_manage_billing and invoice.status != 'VOID' and invoice.amount_paid == 0 %}
+    <form method="POST" action="{% url 'billing:invoice_void' pk=invoice.pk %}" class="inline-flex">
+        {% csrf_token %}
+        <button type="submit" 
+                onclick="return confirm('¿Confirma la anulación formal de esta factura fiscal? Esta acción es irreversible.');"
+                class="px-3 py-1.5 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded transition-colors">
+            Anular Factura
+        </button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto">
+
+    <!-- Header Banner de Estado y Folio Fiscal -->
+    <div class="bg-white border border-slate-200 rounded p-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xl font-mono font-bold text-slate-900 tracking-tight">
+                        {{ invoice.number }}
+                    </span>
+                    {% if invoice.status == 'DRAFT' %}
+                    <span class="px-2.5 py-0.5 text-xs font-mono font-medium rounded bg-slate-100 text-slate-700 border border-slate-200">
+                        Borrador
+                    </span>
+                    {% elif invoice.status == 'ISSUED' %}
+                    <span class="px-2.5 py-0.5 text-xs font-mono font-medium rounded bg-blue-50 text-blue-800 border border-blue-200">
+                        Emitida / Cuenta por Cobrar
+                    </span>
+                    {% elif invoice.status == 'PARTIAL' %}
+                    <span class="px-2.5 py-0.5 text-xs font-mono font-medium rounded bg-amber-50 text-amber-800 border border-amber-200">
+                        Cobro Parcial Acreditado
+                    </span>
+                    {% elif invoice.status == 'PAID' %}
+                    <span class="px-2.5 py-0.5 text-xs font-mono font-medium rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        Cancelada / Pagada en Caja
+                    </span>
+                    {% elif invoice.status == 'VOID' %}
+                    <span class="px-2.5 py-0.5 text-xs font-mono font-medium rounded bg-rose-50 text-rose-800 border border-rose-200">
+                        Factura Anulada
+                    </span>
+                    {% endif %}
+                </div>
+                <p class="text-xs text-slate-500 mt-1 font-mono">
+                    Emitida: {{ invoice.issue_date|date:"Y-m-d" }} · Término: {{ invoice.get_payment_condition_display }} 
+                    {% if invoice.due_date %}· Vence: {{ invoice.due_date|date:"Y-m-d" }}{% endif %}
+                </p>
+            </div>
+
+            <!-- Balances Rápido -->
+            <div class="flex items-center gap-4 text-xs font-mono">
+                <div class="text-right">
+                    <span class="text-[10px] text-slate-500 uppercase tracking-wider block">Total Facturado</span>
+                    <span class="text-base font-bold text-slate-900 tabular-nums">
+                        {{ invoice.currency_symbol }} {{ invoice.gross_total|floatformat:2 }}
+                    </span>
+                </div>
+                <div class="text-right pl-4 border-l border-slate-200">
+                    <span class="text-[10px] text-blue-600 uppercase tracking-wider block">Neto Exigible</span>
+                    <span class="text-base font-bold text-blue-900 tabular-nums">
+                        {{ invoice.currency_symbol }} {{ invoice.net_receivable|floatformat:2 }}
+                    </span>
+                </div>
+                <div class="text-right pl-4 border-l border-slate-200">
+                    <span class="text-[10px] text-rose-600 uppercase tracking-wider block">Saldo Pendiente</span>
+                    <span class="text-base font-bold tabular-nums {% if invoice.balance_due > 0 %}text-rose-700{% else %}text-emerald-700{% endif %}">
+                        {{ invoice.currency_symbol }} {{ invoice.balance_due|floatformat:2 }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadatos de la Factura (Swiss Grid 3 Columnas) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <!-- Tarjeta 1: Cliente & RUC -->
+        <div class="bg-white border border-slate-200 rounded p-4 space-y-2">
+            <span class="text-[10px] font-mono font-semibold uppercase text-slate-400 tracking-wider block">
+                SUJETO PASIVO / CLIENTE
+            </span>
+            <div class="font-semibold text-sm text-slate-900">
+                {{ invoice.account.commercial_name }}
+            </div>
+            {% if invoice.account.legal_name %}
+            <p class="text-slate-600 text-[11px]">{{ invoice.account.legal_name }}</p>
+            {% endif %}
+            <div class="pt-2 border-t border-slate-100 font-mono text-[11px] space-y-1">
+                <div class="flex justify-between">
+                    <span class="text-slate-500">RUC Fiscal:</span>
+                    <span class="font-bold text-slate-800">{{ invoice.account.tax_id|default:"N/A" }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Régimen IVA:</span>
+                    <span class="{% if invoice.account.is_tax_exempt %}text-amber-700 font-semibold{% else %}text-slate-700{% endif %}">
+                        {% if invoice.account.is_tax_exempt %}Exento de Impuestos{% else %}Gravable 15% IVA{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta 2: Vínculo Operativo / Comercial -->
+        <div class="bg-white border border-slate-200 rounded p-4 space-y-2">
+            <span class="text-[10px] font-mono font-semibold uppercase text-slate-400 tracking-wider block">
+                TRAZABILIDAD EN CADENA
+            </span>
+            <div class="space-y-1.5 font-mono text-[11px]">
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-500">Cotización Origen:</span>
+                    {% if invoice.source_quote %}
+                    <a href="{% url 'crm:quote_detail' pk=invoice.source_quote.pk %}" class="font-bold text-blue-700 hover:underline">
+                        {{ invoice.source_quote.number }}
+                    </a>
+                    {% else %}
+                    <span class="text-slate-400">Sin cotización directa</span>
+                    {% endif %}
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-500">Orden de Trabajo:</span>
+                    {% if invoice.source_work_order %}
+                    <a href="{% url 'operations:workorder_detail' pk=invoice.source_work_order.pk %}" class="font-bold text-blue-700 hover:underline">
+                        {{ invoice.source_work_order.number }}
+                    </a>
+                    {% else %}
+                    <span class="text-slate-400">Sin OT vinculada</span>
+                    {% endif %}
+                </div>
+                <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+                    <span class="text-slate-500">Elaborada por:</span>
+                    <span class="text-slate-700">{{ invoice.created_by.get_full_name|default:invoice.created_by.username }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta 3: Configuración Cambiaria y Términos -->
+        <div class="bg-white border border-slate-200 rounded p-4 space-y-2">
+            <span class="text-[10px] font-mono font-semibold uppercase text-slate-400 tracking-wider block">
+                MONEDA & LIQUIDACIÓN BCN
+            </span>
+            <div class="space-y-1.5 font-mono text-[11px]">
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Moneda Factura:</span>
+                    <span class="font-bold text-slate-800">{{ invoice.currency_code }} ({{ invoice.currency_symbol }})</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Tasa Oficial BCN:</span>
+                    <span class="font-bold text-slate-800 tabular-nums">{{ invoice.exchange_rate }} NIO/USD</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500">Impuesto Aplicado:</span>
+                    <span class="text-slate-700">{% if invoice.apply_tax %}{{ invoice.tax_name }} ({{ invoice.tax_rate }}%){% else %}No aplica IVA{% endif %}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Partidas / Ítems de la Factura -->
+    <div class="bg-white border border-slate-200 rounded overflow-hidden">
+        <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <span class="text-xs font-mono uppercase font-semibold text-slate-700 tracking-wider">
+                Detalle de Partidas Facturadas (BOM Comercial / Servicios)
+            </span>
+            <span class="text-xs font-mono text-slate-500">
+                {{ items|length }} renglón{{ items|length|pluralize:"es" }}
+            </span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-white border-b border-slate-200 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
+                        <th class="py-2.5 px-3.5 font-semibold">Código</th>
+                        <th class="py-2.5 px-3.5 font-semibold">Descripción Técnica / Alcance</th>
+                        <th class="py-2.5 px-3.5 text-center font-semibold">Tipo</th>
+                        <th class="py-2.5 px-3.5 text-center font-semibold">U.M.</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">Cantidad</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">P. Unitario</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">Desc. (%)</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">Total Línea</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for item in items %}
+                    <tr class="hover:bg-slate-50/50">
+                        <td class="py-2.5 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                            {{ item.code|default:"-" }}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-slate-800">
+                            {{ item.description }}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-center font-mono text-[10px] text-slate-500">
+                            {{ item.item_type }}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-center font-mono text-[11px] text-slate-600">
+                            {{ item.unit }}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right font-mono tabular-nums text-slate-800">
+                            {{ item.quantity|floatformat:2 }}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right font-mono tabular-nums text-slate-700">
+                            {{ invoice.currency_symbol }} {{ item.unit_price|floatformat:2 }}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right font-mono tabular-nums text-slate-500">
+                            {{ item.discount_percent|floatformat:2 }}%
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right font-mono font-semibold tabular-nums text-slate-900">
+                            {{ invoice.currency_symbol }} {{ item.line_total|floatformat:2 }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="py-6 text-center text-slate-400 font-mono text-xs">
+                            No se han registrado líneas en esta factura.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Desglose Fiscal Exacto Ley 822 DGI & Retenciones -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Columna Izquierda: Gobernanza de Retenciones DGI / Alcaldía (Ley 822) -->
+        <div class="space-y-4">
+            <div class="bg-white border border-slate-200 rounded p-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                    <span class="text-xs font-mono uppercase font-semibold text-slate-800 tracking-wider">
+                        Retenciones en la Fuente (Ley 822 DGI & IMI Alcaldía)
+                    </span>
+                    <span class="text-[10px] font-mono text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        Base: Subtotal Gravable
+                    </span>
+                </div>
+
+                <div class="text-xs text-slate-600 mb-4 leading-relaxed">
+                    Según la legislación fiscal de Nicaragua, las retenciones de IR (DGI) y del IMI (Alcaldía) 
+                    se aplican estrictamente sobre la <strong>Base Imponible Gravable</strong> (excluyendo el IVA).
+                </div>
+
+                {% if can_manage_billing and invoice.status != 'VOID' %}
+                <form method="POST" action="{% url 'billing:apply_retentions' pk=invoice.pk %}" class="space-y-3">
+                    {% csrf_token %}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-mono font-medium text-slate-700 mb-1">
+                                Retención IR DGI (%):
+                            </label>
+                            <select name="ir_retention_rate" class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                                <option value="0.00" {% if invoice.ir_retention_rate == 0 %}selected{% endif %}>0.00% - Sin Retención</option>
+                                <option value="1.00" {% if invoice.ir_retention_rate == 1 %}selected{% endif %}>1.00% - Bienes y Comercio</option>
+                                <option value="2.00" {% if invoice.ir_retention_rate == 2 %}selected{% endif %}>2.00% - Servicios Generales / Mantenimiento</option>
+                                <option value="10.00" {% if invoice.ir_retention_rate == 10 %}selected{% endif %}>10.00% - Servicios Profesionales</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-mono font-medium text-slate-700 mb-1">
+                                Retención Alcaldía IMI (%):
+                            </label>
+                            <select name="imi_retention_rate" class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                                <option value="0.00" {% if invoice.imi_retention_rate == 0 %}selected{% endif %}>0.00% - Sin Retención Municipal</option>
+                                <option value="1.00" {% if invoice.imi_retention_rate == 1 %}selected{% endif %}>1.00% - Retención Municipal (IMI)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-mono font-medium text-slate-700 mb-1">
+                            N° Constancia de Retención del Cliente:
+                        </label>
+                        <input type="text" 
+                               name="retention_certificate_number" 
+                               value="{{ invoice.retention_certificate_number }}"
+                               placeholder="Ej: RET-2026-004592"
+                               class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    </div>
+
+                    <button type="submit" class="w-full px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded transition-colors">
+                        Actualizar Retenciones Ley 822
+                    </button>
+                </form>
+                {% else %}
+                <div class="font-mono text-xs space-y-2 bg-slate-50 p-3 rounded border border-slate-200">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Tasa IR DGI:</span>
+                        <span class="font-bold text-slate-800">{{ invoice.ir_retention_rate }}% ({{ invoice.currency_symbol }} {{ invoice.ir_retention_amount|floatformat:2 }})</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Tasa IMI Alcaldía:</span>
+                        <span class="font-bold text-slate-800">{{ invoice.imi_retention_rate }}% ({{ invoice.currency_symbol }} {{ invoice.imi_retention_amount|floatformat:2 }})</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Constancia Retención:</span>
+                        <span class="font-bold text-slate-800">{{ invoice.retention_certificate_number|default:"Sin constancia registrada" }}</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Columna Derecha: Liquidación Matemática Fiscal -->
+        <div class="bg-white border border-slate-200 rounded p-4">
+            <span class="text-xs font-mono uppercase font-semibold text-slate-800 tracking-wider block pb-3 border-b border-slate-100 mb-3">
+                Liquidación Contable & Fiscal Oficial
+            </span>
+
+            <div class="space-y-2.5 font-mono text-xs">
+                <div class="flex justify-between text-slate-600">
+                    <span>Subtotal de Líneas:</span>
+                    <span class="tabular-nums">{{ invoice.currency_symbol }} {{ invoice.subtotal|floatformat:2 }}</span>
+                </div>
+
+                <div class="flex justify-between text-slate-500">
+                    <span>Descuentos Comerciales:</span>
+                    <span class="tabular-nums">- {{ invoice.currency_symbol }} {{ invoice.discount_total|floatformat:2 }}</span>
+                </div>
+
+                <div class="flex justify-between text-slate-800 font-semibold pt-1 border-t border-slate-100">
+                    <span>Base Imponible Gravable:</span>
+                    <span class="tabular-nums">{{ invoice.currency_symbol }} {{ invoice.taxable_base|floatformat:2 }}</span>
+                </div>
+
+                <div class="flex justify-between text-slate-700">
+                    <span>{{ invoice.tax_name }} ({{ invoice.tax_rate }}%):</span>
+                    <span class="tabular-nums">+ {{ invoice.currency_symbol }} {{ invoice.tax_total|floatformat:2 }}</span>
+                </div>
+
+                <div class="flex justify-between text-slate-900 font-bold text-sm pt-2 border-t border-slate-200">
+                    <span>Total Facturado Bruto:</span>
+                    <span class="tabular-nums">{{ invoice.currency_symbol }} {{ invoice.gross_total|floatformat:2 }}</span>
+                </div>
+
+                <!-- Desglose de Deducciones por Retención -->
+                <div class="pt-2 border-t border-dashed border-slate-200 space-y-1.5 text-amber-800 text-[11px]">
+                    <div class="flex justify-between">
+                        <span>(-) Retención IR DGI ({{ invoice.ir_retention_rate }}% s/ Base):</span>
+                        <span class="tabular-nums">- {{ invoice.currency_symbol }} {{ invoice.ir_retention_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>(-) Retención Alcaldía IMI ({{ invoice.imi_retention_rate }}% s/ Base):</span>
+                        <span class="tabular-nums">- {{ invoice.currency_symbol }} {{ invoice.imi_retention_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-amber-900">
+                        <span>Total Retenciones Soportadas:</span>
+                        <span class="tabular-nums">- {{ invoice.currency_symbol }} {{ invoice.total_retentions|floatformat:2 }}</span>
+                    </div>
+                </div>
+
+                <!-- Monto Exigible y Estado de Caja -->
+                <div class="pt-2 border-t-2 border-slate-800 space-y-2">
+                    <div class="flex justify-between text-blue-900 font-bold text-sm">
+                        <span>Neto a Cobrar en Caja:</span>
+                        <span class="tabular-nums">{{ invoice.currency_symbol }} {{ invoice.net_receivable|floatformat:2 }}</span>
+                    </div>
+
+                    <div class="flex justify-between text-emerald-700 font-semibold text-xs">
+                        <span>(-) Cobros Recaudados (ROC):</span>
+                        <span class="tabular-nums">- {{ invoice.currency_symbol }} {{ invoice.amount_paid|floatformat:2 }}</span>
+                    </div>
+
+                    <div class="flex justify-between text-sm font-bold pt-2 border-t border-slate-200 {% if invoice.balance_due > 0 %}text-rose-700{% else %}text-emerald-700{% endif %}">
+                        <span>Saldo Pendiente de Cobro:</span>
+                        <span class="tabular-nums">{{ invoice.currency_symbol }} {{ invoice.balance_due|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Módulo de Caja Bimonetaria y Recibos Oficiales de Caja (ROC) -->
+    <div class="bg-white border border-slate-200 rounded overflow-hidden">
+        <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+                <span class="text-xs font-mono uppercase font-semibold text-slate-800 tracking-wider block">
+                    Caja Bimonetaria & Recibos Oficiales de Caja (ROC)
+                </span>
+                <span class="text-[11px] text-slate-500 font-mono">
+                    Aceptación en Córdobas (NIO) o Dólares (USD) con tasa de cambio oficial BCN.
+                </span>
+            </div>
+            <span class="text-xs font-mono font-bold {% if invoice.balance_due > 0 %}text-rose-700{% else %}text-emerald-700{% endif %}">
+                {% if invoice.balance_due > 0 %}Pendiente: {{ invoice.currency_symbol }} {{ invoice.balance_due|floatformat:2 }}{% else %}Factura Liquidada al 100%{% endif %}
+            </span>
+        </div>
+
+        <div class="p-4">
+            <!-- Formulario de Emisión de ROC (Solo Nivel 85+ y si hay saldo) -->
+            {% if can_manage_billing and invoice.balance_due > 0 and invoice.status != 'VOID' %}
+            <div class="mb-6 p-4 bg-slate-50 border border-slate-200 rounded">
+                <span class="text-xs font-mono uppercase font-semibold text-slate-800 block mb-3">
+                    Registrar Cobro / Emisión de Recibo Oficial de Caja (ROC)
+                </span>
+                <form method="POST" action="{% url 'billing:register_payment' pk=invoice.pk %}" class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                    {% csrf_token %}
+                    <div>
+                        <label class="block text-[11px] font-mono font-medium text-slate-700 mb-1">
+                            Moneda de Entrega:
+                        </label>
+                        <select name="currency_paid" class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                            <option value="NIO" {% if invoice.currency_code == 'NIO' %}selected{% endif %}>Córdobas (NIO - C$)</option>
+                            <option value="USD" {% if invoice.currency_code == 'USD' %}selected{% endif %}>Dólares (USD - $)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-mono font-medium text-slate-700 mb-1">
+                            Monto Recibido:
+                        </label>
+                        <input type="number" 
+                               step="0.01" 
+                               name="amount" 
+                               required 
+                               placeholder="0.00"
+                               class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-mono font-medium text-slate-700 mb-1">
+                            Medio de Pago:
+                        </label>
+                        <select name="payment_method" class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                            {% for val, label in payment_methods %}
+                            <option value="{{ val }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-mono font-medium text-slate-700 mb-1">
+                            N° Referencia Bancaria / Cheque:
+                        </label>
+                        <input type="text" 
+                               name="reference_number" 
+                               placeholder="Ej: TRF-BAC-90281"
+                               class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    </div>
+
+                    <div class="md:col-span-3">
+                        <label class="block text-[11px] font-mono font-medium text-slate-700 mb-1">
+                            Observaciones de Caja:
+                        </label>
+                        <input type="text" 
+                               name="notes" 
+                               placeholder="Detalle del comprobante de ingreso..."
+                               class="w-full text-xs p-2 border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    </div>
+
+                    <div class="flex items-end">
+                        <button type="submit" class="w-full py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded text-xs transition-colors">
+                            Emitir Recibo ROC
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+
+            <!-- Historial de Recibos ROC Inmutables -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
+                            <th class="py-2.5 px-3.5 font-semibold">Folio ROC</th>
+                            <th class="py-2.5 px-3.5 font-semibold">Fecha</th>
+                            <th class="py-2.5 px-3.5 font-semibold">Medio de Pago</th>
+                            <th class="py-2.5 px-3.5 font-semibold">N° Referencia</th>
+                            <th class="py-2.5 px-3.5 text-right font-semibold">Recibido en Moneda</th>
+                            <th class="py-2.5 px-3.5 text-right font-semibold">Tasa BCN</th>
+                            <th class="py-2.5 px-3.5 text-right font-semibold">Acreditado Factura</th>
+                            <th class="py-2.5 px-3.5 font-semibold">Cajero / Receptor</th>
+                            <th class="py-2.5 px-3.5 text-center font-semibold">Inmutabilidad</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for payment in payments %}
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="py-2.5 px-3.5 font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap">
+                                {{ payment.number }}
+                            </td>
+                            <td class="py-2.5 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                                {{ payment.payment_date|date:"Y-m-d" }}
+                            </td>
+                            <td class="py-2.5 px-3.5 text-slate-700">
+                                {{ payment.get_payment_method_display }}
+                            </td>
+                            <td class="py-2.5 px-3.5 font-mono text-[11px] text-slate-600">
+                                {{ payment.reference_number|default:"-" }}
+                            </td>
+                            <td class="py-2.5 px-3.5 text-right font-mono font-semibold tabular-nums text-slate-800">
+                                {{ payment.currency_paid }} {{ payment.amount_in_payment_currency|floatformat:2 }}
+                            </td>
+                            <td class="py-2.5 px-3.5 text-right font-mono tabular-nums text-slate-600">
+                                {{ payment.exchange_rate_applied }}
+                            </td>
+                            <td class="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-emerald-700">
+                                {{ invoice.currency_symbol }} {{ payment.amount_applied_to_invoice|floatformat:2 }}
+                            </td>
+                            <td class="py-2.5 px-3.5 text-slate-600">
+                                {{ payment.received_by.get_full_name|default:payment.received_by.username }}
+                            </td>
+                            <td class="py-2.5 px-3.5 text-center">
+                                <span class="px-2 py-0.5 text-[9px] font-mono rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                    AUDITADO
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="py-6 text-center text-slate-400 font-mono text-xs">
+                                No se han registrado abonos ni Recibos Oficiales de Caja (ROC) para esta factura.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

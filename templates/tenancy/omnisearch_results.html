@@ -1,0 +1,146 @@
+<div class="p-2 space-y-4 max-h-[460px] overflow-y-auto text-xs">
+    {% if too_short %}
+    <div class="py-6 text-center text-slate-400">
+        <p class="font-mono text-xs">Escriba al menos 2 caracteres para buscar en el ERP...</p>
+        <p class="text-[11px] text-slate-400 mt-1">Busque folios (OT-2026, COT-2026, DOC-2026, TCK-2026), clientes, materiales o tickets.</p>
+    </div>
+    {% elif total_results == 0 %}
+    <div class="py-6 text-center text-slate-400">
+        <p class="font-medium text-slate-600">No se encontraron resultados para "{{ query }}"</p>
+        <p class="text-[11px] text-slate-400 mt-1">Las consultas respetan el aislamiento de Tenant y su nivel jerárquico asignado.</p>
+    </div>
+    {% else %}
+        <!-- 1. Órdenes de Trabajo -->
+        {% if work_orders %}
+        <div class="space-y-1">
+            <div class="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-100 flex items-center justify-between">
+                <span>ÓRDENES DE TRABAJO (OPERACIONES)</span>
+                <span>{{ work_orders|length }}</span>
+            </div>
+            {% for wo in work_orders %}
+            <a href="{% url 'operations:workorder_detail' wo.pk %}" class="flex items-center justify-between p-2 rounded hover:bg-slate-50 transition border border-transparent hover:border-slate-200 group">
+                <div class="flex items-center gap-2 truncate">
+                    <span class="font-mono font-semibold text-slate-900 group-hover:underline tabular-nums">{{ wo.code }}</span>
+                    <span class="text-slate-700 truncate font-medium">{{ wo.title }}</span>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                    <span class="text-[10px] px-1.5 py-0.5 rounded font-mono bg-slate-100 text-slate-700 border border-slate-200">{{ wo.get_phase_display }}</span>
+                    {% if wo.is_high_risk %}
+                    <span class="text-[10px] px-1.5 py-0.5 rounded font-mono bg-rose-50 text-rose-700 border border-rose-200">ALTO RIESGO</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- 2. Clientes CRM -->
+        {% if accounts %}
+        <div class="space-y-1">
+            <div class="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-100 flex items-center justify-between">
+                <span>CLIENTES & CUENTAS (CRM)</span>
+                <span>{{ accounts|length }}</span>
+            </div>
+            {% for acc in accounts %}
+            <a href="{% url 'crm:account_detail' acc.pk %}" class="flex items-center justify-between p-2 rounded hover:bg-slate-50 transition border border-transparent hover:border-slate-200 group">
+                <div class="flex items-center gap-2 truncate">
+                    <span class="font-mono font-semibold text-slate-900 group-hover:underline tabular-nums">{{ acc.code }}</span>
+                    <span class="text-slate-700 truncate font-medium">{{ acc.commercial_name }}</span>
+                </div>
+                <span class="font-mono text-[10px] text-slate-400 flex-shrink-0 ml-2">{{ acc.tax_id }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- 3. Cotizaciones -->
+        {% if quotes %}
+        <div class="space-y-1">
+            <div class="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-100 flex items-center justify-between">
+                <span>COTIZACIONES (CRM)</span>
+                <span>{{ quotes|length }}</span>
+            </div>
+            {% for q in quotes %}
+            <a href="{% url 'crm:quote_detail' q.pk %}" class="flex items-center justify-between p-2 rounded hover:bg-slate-50 transition border border-transparent hover:border-slate-200 group">
+                <div class="flex items-center gap-2 truncate">
+                    <span class="font-mono font-semibold text-slate-900 group-hover:underline tabular-nums">{{ q.number }}</span>
+                    <span class="text-slate-700 truncate font-medium">{{ q.title }}</span>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0 ml-2 font-mono tabular-nums text-[11px] text-slate-700">
+                    <span>{{ q.account.commercial_name|truncatechars:18 }}</span>
+                    <span class="font-semibold">{{ q.currency_symbol }} {{ q.total_amount|floatformat:2 }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- 4. Repositorio Documental ISO -->
+        {% if documents %}
+        <div class="space-y-1">
+            <div class="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-100 flex items-center justify-between">
+                <span>DOCUMENTACIÓN TÉCNICA (ISO 9001)</span>
+                <span>{{ documents|length }}</span>
+            </div>
+            {% for doc in documents %}
+            <a href="{% url 'repository:document_detail' doc.pk %}" class="flex items-center justify-between p-2 rounded hover:bg-slate-50 transition border border-transparent hover:border-slate-200 group">
+                <div class="flex items-center gap-2 truncate">
+                    <span class="font-mono font-semibold text-slate-900 group-hover:underline tabular-nums">{{ doc.code }}</span>
+                    <span class="text-slate-700 truncate font-medium">{{ doc.title }}</span>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                    <span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200 font-semibold">v{{ doc.current_version_number }}</span>
+                    <span class="text-[10px] text-slate-400 font-mono">{{ doc.folder.code }}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- 5. Materiales en Almacén -->
+        {% if inventory_items %}
+        <div class="space-y-1">
+            <div class="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-100 flex items-center justify-between">
+                <span>CATÁLOGO DE MATERIALES (KARDEX)</span>
+                <span>{{ inventory_items|length }}</span>
+            </div>
+            {% for itm in inventory_items %}
+            <a href="{% url 'inventory:dashboard' %}" class="flex items-center justify-between p-2 rounded hover:bg-slate-50 transition border border-transparent hover:border-slate-200 group">
+                <div class="flex items-center gap-2 truncate">
+                    <span class="font-mono font-semibold text-slate-900 group-hover:underline tabular-nums">{{ itm.code }}</span>
+                    <span class="text-slate-700 truncate font-medium">{{ itm.name }}</span>
+                </div>
+                <span class="font-mono text-[11px] text-slate-600 flex-shrink-0 ml-2">{{ itm.unit }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- 6. Mesa de Ayuda y Tickets SLA -->
+        {% if tickets %}
+        <div class="space-y-1">
+            <div class="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-100 flex items-center justify-between">
+                <span>MESA DE AYUDA (SLA)</span>
+                <span>{{ tickets|length }}</span>
+            </div>
+            {% for tck in tickets %}
+            <a href="{% url 'tickets:ticket_detail' tck.pk %}" class="flex items-center justify-between p-2 rounded hover:bg-slate-50 transition border border-transparent hover:border-slate-200 group">
+                <div class="flex items-center gap-2 truncate">
+                    <span class="font-mono font-semibold text-slate-900 group-hover:underline tabular-nums">{{ tck.number }}</span>
+                    <span class="text-slate-700 truncate font-medium">{{ tck.title }}</span>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                    {% if tck.sla_status == 'COMPLETED' %}
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">RESUELTO</span>
+                    {% elif tck.sla_status == 'BREACHED' %}
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 font-semibold">SLA VENCIDO</span>
+                    {% else %}
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200">SLA {{ tck.sla_hours }}h</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endif %}
+</div>

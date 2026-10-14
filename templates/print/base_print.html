@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Documento Oficial | {{ current_org.name }}{% endblock %}</title>
+    <!-- Tipografía Suiza: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { font-size: 11px; color: #0f172a; background: white !important; padding: 0 !important; }
+            @page {
+                size: letter;
+                margin: 12mm 15mm 15mm 15mm;
+            }
+        }
+        .tabular-nums { font-variant-numeric: tabular-nums; }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen p-4 sm:p-8">
+
+    <!-- Barra de Control de Impresión (Oculta en Impresión) -->
+    <div class="no-print max-w-4xl mx-auto mb-6 flex items-center justify-between bg-white border border-slate-200 rounded p-3">
+        <div class="flex items-center gap-2 text-xs font-mono text-slate-600">
+            <span class="font-bold text-slate-900">{% block document_folio %}DOCUMENTO OFICIAL{% endblock %}</span>
+            <span>&bull;</span>
+            <span>{{ current_org.name }} · {{ current_country.name|upper }}</span>
+        </div>
+        <div class="flex items-center gap-2">
+            {% block back_link %}
+            <a href="javascript:history.back()" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+                &larr; Volver
+            </a>
+            {% endblock %}
+            <button onclick="window.print()" class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded transition-colors flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24-3.411 1.76-6.195 4.53-6.195 2.77 0 4.77 2.784 4.53 6.195H6.72zM3 13.5v6.75A2.25 2.25 0 005.25 22.5h13.5A2.25 2.25 0 0021 20.25V13.5m-18 0h18M6.75 3.75h10.5M9 7.5h6"/>
+                </svg>
+                <span>Imprimir / Guardar PDF</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Contenedor Oficial Imprimible (Letter / A4 Swiss Grid) -->
+    <div class="max-w-4xl mx-auto bg-white border border-slate-300 p-8 sm:p-10 space-y-6">
+        <!-- Membrete Corporativo y Fiscal -->
+        <div class="flex flex-col sm:flex-row sm:items-start justify-between border-b border-slate-300 pb-6 gap-4">
+            <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                    <span class="font-mono text-sm px-2 py-0.5 rounded bg-slate-900 text-white font-bold">ERP</span>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-900">{{ current_org.name }}</h1>
+                </div>
+                <div class="text-xs text-slate-600 font-medium">{{ current_org.legal_name|default:current_org.name }}</div>
+                <div class="text-xs text-slate-500 font-mono">
+                    {{ current_country.tax_id_label|default:"RUC" }}: <span class="font-semibold text-slate-800">{{ current_org.tax_id }}</span>
+                </div>
+                <div class="text-[11px] text-slate-500">
+                    {{ current_country.name }} · Régimen Fiscal DGI General
+                </div>
+            </div>
+
+            <div class="sm:text-right space-y-1 font-mono text-xs">
+                {% block document_meta %}
+                <div class="text-slate-400 uppercase text-[10px] tracking-wider">FOLIO OFICIAL</div>
+                <div class="text-base font-bold text-slate-900">DOC-2026-0001</div>
+                <div class="text-slate-500 text-[11px]">FECHA: {% now "d/m/Y" %}</div>
+                {% endblock %}
+            </div>
+        </div>
+
+        {% block document_body %}
+        <!-- Cuerpo del documento específico -->
+        {% endblock %}
+
+        {% block signature_block %}
+        <!-- Bloque de Firmas Técnicas -->
+        <div class="pt-8 border-t border-slate-200 grid grid-cols-2 gap-8 text-center text-xs">
+            <div class="border-t border-slate-400 pt-2">
+                <div class="font-semibold text-slate-900">Por la Empresa Emisora</div>
+                <div class="text-[11px] text-slate-500">Firma Autorizada & Sello</div>
+            </div>
+            <div class="border-t border-slate-400 pt-2">
+                <div class="font-semibold text-slate-900">Por el Cliente / Aceptación</div>
+                <div class="text-[11px] text-slate-500">Recibido Conforme</div>
+            </div>
+        </div>
+        {% endblock %}
+    </div>
+
+</body>
+</html>

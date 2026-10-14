@@ -9,8 +9,16 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
+import hashlib
+from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt
 from apps.core.models import CountryConfig
 from apps.crm.models import Account, AccountContact, Opportunity, Quote, QuoteItem
+from apps.purchasing.models import PurchaseOrder, PurchaseOrderItem, Supplier, SupplierPayment
+from apps.repository.models import RepositoryFolder, CorporateDocument, DocumentVersion
+from apps.repository.services import publish_new_document_version
+from apps.tickets.models import SupportTicket, TicketComment
+from apps.ai_agent.models import McpAccessToken, McpAuditLog
+from apps.ai_agent.services import generate_mcp_token
 from apps.finance.models import (
     BankAccount,
     FinancialTransaction,
@@ -19,6 +27,7 @@ from apps.finance.models import (
     PettyCashReplenishment,
 )
 from apps.inventory.models import InventoryItem, StockBalance, StockMovement, Warehouse
+from apps.inventory.services import record_stock_entry
 from apps.operations.models import (
     Crew,
     WorkOrder,
@@ -53,39 +62,61 @@ class SandboxScenarioSeeder:
         de la organización indicada, preservando únicamente la entidad Organization
         y la membresía Nivel 100 del Owner/Admin actual.
         """
-        # 1. Finanzas y Tesorería
+        # 0. Servidor MCP y Agentes IA (apps/ai_agent)
+        McpAuditLog.objects.filter(organization=organization).delete()
+        McpAccessToken.objects.filter(organization=organization).delete()
+
+        # 0.1 Repositorio Documental y Mesa de Ayuda (apps/repository & apps/tickets)
+        TicketComment.objects.filter(organization=organization).delete()
+        SupportTicket.objects.filter(organization=organization).delete()
+        DocumentVersion.objects.filter(organization=organization).delete()
+        CorporateDocument.objects.filter(organization=organization).delete()
+        RepositoryFolder.objects.filter(organization=organization).delete()
+
+        # 1. Compras, Proveedores y Cuentas por Pagar (apps/purchasing)
+        SupplierPayment.objects.filter(organization=organization).delete()
+        PurchaseOrderItem.objects.filter(organization=organization).delete()
+        PurchaseOrder.objects.filter(organization=organization).delete()
+        Supplier.objects.filter(organization=organization).delete()
+
+        # 2. Facturación Fiscal, Retenciones DGI y Recibos Oficiales de Caja (ROC)
+        PaymentReceipt.objects.filter(organization=organization).delete()
+        InvoiceItem.objects.filter(organization=organization).delete()
+        Invoice.objects.filter(organization=organization).delete()
+
+        # 3. Finanzas y Tesorería
         FinancialTransaction.objects.filter(organization=organization).delete()
         PettyCashExpense.objects.filter(organization=organization).delete()
         PettyCashReplenishment.objects.filter(organization=organization).delete()
         PettyCashFund.objects.filter(organization=organization).delete()
         BankAccount.objects.filter(organization=organization).delete()
 
-        # 2. Inventario, Bodegas y Kardex
+        # 4. Inventario, Bodegas y Kardex
         StockMovement.objects.filter(organization=organization).delete()
         StockBalance.objects.filter(organization=organization).delete()
         InventoryItem.objects.filter(organization=organization).delete()
         Warehouse.objects.filter(organization=organization).delete()
 
-        # 3. Seguridad y Salud en el Trabajo (SST Ley 618)
+        # 5. Seguridad y Salud en el Trabajo (SST Ley 618)
         SafetyChecklist.objects.filter(organization=organization).delete()
         EPPDelivery.objects.filter(organization=organization).delete()
         LeaveRequest.objects.filter(organization=organization).delete()
 
-        # 4. Operaciones, Cuadrillas y Órdenes de Trabajo
+        # 6. Operaciones, Cuadrillas y Órdenes de Trabajo
         WorkOrderEvidence.objects.filter(organization=organization).delete()
         WorkOrderTimelineLog.objects.filter(organization=organization).delete()
         WorkOrderItem.objects.filter(organization=organization).delete()
         WorkOrder.objects.filter(organization=organization).delete()
         Crew.objects.filter(organization=organization).delete()
 
-        # 5. Comercial, Pipeline y Cotizador Bimonetario
+        # 7. Comercial, Pipeline y Cotizador Bimonetario
         QuoteItem.objects.filter(organization=organization).delete()
         Quote.objects.filter(organization=organization).delete()
         Opportunity.objects.filter(organization=organization).delete()
         AccountContact.objects.filter(organization=organization).delete()
         Account.objects.filter(organization=organization).delete()
 
-        # 6. Miembros subordinados del equipo
+        # 8. Miembros subordinados del equipo
         OrganizationMembership.objects.filter(
             organization=organization
         ).exclude(role_level=RoleLevel.OWNER_ADMIN).delete()
@@ -97,11 +128,12 @@ class SandboxScenarioSeeder:
         Siembra un escenario operativo industrial completo para Nicaragua en una organización dada.
         La ejecución es estrictamente idempotente.
         """
-        # Habilitar los 5 módulos operativos contratados
-        all_modules = ['crm', 'operations', 'sst', 'inventory', 'finance']
+        # Habilitar los módulos operativos contratados incluyendo Facturación DGI, Compras, Repositorio, Mesa de Ayuda y MCP
+        all_modules = ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent']
         organization.enabled_modules = all_modules
+        organization.business_profile = Organization.BusinessProfile.ENGINEERING_SERVICES
         organization.onboarding_completed = True
-        organization.save(update_fields=['enabled_modules', 'onboarding_completed'])
+        organization.save(update_fields=['enabled_modules', 'business_profile', 'onboarding_completed'])
 
         # Limpiar datos previos manteniendo solo el Owner
         cls.reset_organization_data(organization)
@@ -182,18 +214,18 @@ class SandboxScenarioSeeder:
                 'emergency_contact_phone': '+505 8833-9900',
             },
             {
-                'email': 'jespinoza@imesa.ni',
-                'full_name': 'Téc. Josué David Espinoza',
+                'email': 'cruiz@imesa.ni',
+                'full_name': 'Téc. Carlos Ruiz Martínez',
                 'personal_id_number': '001-300895-0008F',
                 'phone': '+505 8511-3322',
                 'role_level': RoleLevel.TECHNICIAN,
-                'job_title': 'Técnico Liniero de Alta Tensión',
+                'job_title': 'Técnico Electromecánico & Liniero',
                 'department': Department.OPERATIONS,
                 'contract_type': ContractType.PROJECT,
                 'social_security_number': '6294810-7',
                 'hire_date': datetime.date(2024, 5, 15),
                 'blood_type': BloodType.O_POS,
-                'emergency_contact_name': 'Marta Espinoza (Madre)',
+                'emergency_contact_name': 'Marta Ruiz (Madre)',
                 'emergency_contact_phone': '+505 8422-7711',
             },
             {
@@ -700,6 +732,56 @@ class SandboxScenarioSeeder:
             notes='Torque verificado según especificación de fabricante a 12 Nm.',
             file_reference='evidencias/ot_001_baterias.jpg',
             uploaded_by=resident_eng,
+        )
+
+        # Firma digital de conformidad del cliente (Hospital Vivian Pellas)
+        sample_signature_base64 = (
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAABkCAYAAACp0JBwAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMA"
+            "AAsTAAALEwEAmpwYAAAAB3RJTUUH6AoODQwbk9rD+AAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUH"
+            "AAAZhklEQVR42u2de3xU1bX/P3vO3Jm5v5NMSAgkIQkQIKBEqFWotbW2VmuxtvVSq7X2/npr7bWtt16vt729v/b+bK19bX2t"
+            "9dr62qp9ba3Wam191FoVhVpeCiqXkIQEknnP3Jk58/vjHJJMQjITCEmQd3+fz0eSOWfP2fucfX577bX23mshhBBCCCGEEEII"
+            "IYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGE"
+            "EEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBC"
+            "CCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQgghhBBCCCGEEEIIIYQQQggh"
+            "xKHHgA0QQgghhBDSl+j2GgghhBBCCDlsYLAIIYQQQghx2MBgEUIIIYQQ4rCBwSKEEEIIIcRhA4NFCCGEEEKIwwYGi1BfEY1G"
+            "8/YaCCGEEEII2aUj9hoIIV6i1WrP22sghBBCCCHksIDBIuSgwOFw1O61EEIIIYQQcsjAYBFyUGAymZq210IIIYQQQshhAYNF"
+            "yEEBh8Ph2GshhBBCCCDksIDBIuSgwOFw1O61EEIIIYQQcsjAYBFyUGAymZq210IIIYQQQshhAYNFyEEBh8Ph2GshhBBCCCDk"
+            "sIDBIuSgwOFw1O61EEIIIYQQcsjAYBFyUGAymZq210IIIYQQQshhAYNFyEEBh8Ph2GshhBBCCCDksIDBIuSg4L8BAyXq0l3q"
+            "LgAAAABJRU5ErkJggg=="
+        )
+        wo1.record_client_signature(
+            signer_name='Ing. Fernando Morales Silva',
+            signer_title='Director de Infraestructura Hospitalaria',
+            signer_id='001-240879-0002A',
+            signature_base64=sample_signature_base64,
+            actor=resident_eng,
+        )
+
+        # Evidencia fotográfica de entrega comprimida en cliente (4,120 KB -> 138 KB)
+        sample_jpeg_base64 = (
+            "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////"
+            "/////////////////////////////////////////////////wgALCAAEAAQA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/a"
+            "AAgBAQABPxA="
+        )
+        ev_after = WorkOrderEvidence.objects.create(
+            organization=organization,
+            work_order=wo1,
+            evidence_type=WorkOrderEvidence.EvidenceType.PHOTO_AFTER,
+            title='Inspección final de banco de baterías y módulo UPS energizado',
+            notes='Prueba de conmutación 0ms completada satisfactoriamente ante comitiva hospitalaria.',
+            file_reference='evidencias/ot_001_entrega_final.jpg',
+            compressed_image_data=sample_jpeg_base64,
+            original_size_kb=4120,
+            compressed_size_kb=138,
+            uploaded_by=resident_eng,
+        )
+        WorkOrderTimelineLog.objects.create(
+            organization=organization,
+            work_order=wo1,
+            event_type='EVIDENCE_ADDED',
+            summary=f"Nueva evidencia técnica: {ev_after.get_evidence_type_display()} · {ev_after.title}",
+            details=f"{ev_after.notes}\nEvidencia fotográfica optimizada: 4,120 KB -> 138 KB",
+            actor=resident_eng,
         )
 
         # OT-2: Borrador (desde COT-2026-0002 Holcim)
@@ -1228,6 +1310,377 @@ class SandboxScenarioSeeder:
             approved_at=timezone.now() - datetime.timedelta(hours=4),
         )
 
+        # =========================================================================
+        # 8. FACTURACIÓN FISCAL DGI, RETENCIONES LEY 822 Y CAJA ROC (apps/billing)
+        # =========================================================================
+        cli_enatrel = Account.objects.get(organization=organization, code='CLI-001')
+        inv1 = Invoice.objects.create(
+            organization=organization,
+            number='FAC-2026-0001',
+            account=cli_enatrel,
+            source_work_order=wo1,
+            source_quote=wo1.source_quote if wo1 else None,
+            status=Invoice.Status.PARTIAL,
+            payment_condition=Invoice.PaymentCondition.CREDIT_30,
+            issue_date=timezone.now().date() - datetime.timedelta(days=10),
+            due_date=timezone.now().date() + datetime.timedelta(days=20),
+            currency_code='NIO',
+            currency_symbol='C$',
+            exchange_rate=Decimal('36.6243'),
+            apply_tax=True,
+            tax_name='IVA',
+            tax_rate=Decimal('15.00'),
+            ir_retention_rate=Decimal('2.00'),
+            imi_retention_rate=Decimal('1.00'),
+            retention_certificate_number='RET-ENATREL-2026-0089',
+            created_by=commercial_mgr,
+            notes='Facturación correspondiente al Hito 1 de Mantenimiento Preventivo Subestación Tipitapa.',
+        )
+
+        InvoiceItem.objects.create(
+            organization=organization,
+            invoice=inv1,
+            item_type='SERVICE',
+            code='SRV-ING-001',
+            description='Servicio de pruebas dieléctricas y aislamiento a transformador de potencia 50MVA',
+            unit='SRV',
+            quantity=Decimal('1.00'),
+            unit_price=Decimal('65000.00'),
+            discount_percent=Decimal('0.00'),
+        )
+        InvoiceItem.objects.create(
+            organization=organization,
+            invoice=inv1,
+            item_type='SERVICE',
+            code='SRV-ING-002',
+            description='Calibración y termografía infrarroja en banco de interruptores de potencia SF6',
+            unit='SRV',
+            quantity=Decimal('1.00'),
+            unit_price=Decimal('30000.00'),
+            discount_percent=Decimal('0.00'),
+        )
+        inv1.recalculate_totals()
+        inv1.save()
+
+        # Recibo Oficial de Caja (ROC) bimonetario inmutable
+        PaymentReceipt.objects.create(
+            organization=organization,
+            number='ROC-2026-0001',
+            invoice=inv1,
+            payment_date=timezone.now().date() - datetime.timedelta(days=5),
+            payment_method=PaymentReceipt.PaymentMethod.TRANSFER_BAC,
+            reference_number='TRF-BAC-992014',
+            currency_paid='NIO',
+            amount_in_payment_currency=Decimal('50000.00'),
+            exchange_rate_applied=inv1.exchange_rate,
+            amount_applied_to_invoice=Decimal('50000.00'),
+            received_by=commercial_mgr,
+            notes='Abono inicial 50,000.00 C$ mediante transferencia directa BAC de ENATREL.',
+        )
+
+        # =========================================================================
+        # 8. COMPRAS, PROVEEDORES Y CUENTAS POR PAGAR (apps/purchasing)
+        # =========================================================================
+        supplier_sinsa = Supplier.objects.create(
+            organization=organization,
+            code='PRV-0001',
+            commercial_name='SINSA Industrial S.A.',
+            legal_name='SERVICIOS INDUSTRIALES S.A.',
+            tax_id='J0310000556677',
+            contact_name='Ing. Roberto Somarriba',
+            email='ventas.industriales@sinsa.com.ni',
+            phone='+505 2270-1000',
+            address='Carretera a Masaya Km 4.5',
+            city='Managua',
+            credit_days=30,
+            default_ir_rate=Decimal('1.00'),
+            default_imi_rate=Decimal('1.00'),
+            is_active=True,
+        )
+
+        supplier_comtech = Supplier.objects.create(
+            organization=organization,
+            code='PRV-0002',
+            commercial_name='Comtech de Nicaragua S.A.',
+            legal_name='COMPUTADORAS Y TECNOLOGIA S.A.',
+            tax_id='J0310000112233',
+            contact_name='Lic. Maritza Morales',
+            email='corporativo@comtech.com.ni',
+            phone='+505 2251-5000',
+            address='Rotonda El Periodista 200m al Sur',
+            city='Managua',
+            credit_days=15,
+            default_ir_rate=Decimal('1.00'),
+            default_imi_rate=Decimal('1.00'),
+            is_active=True,
+        )
+
+        # Orden de Compra Recibida en Bodega con Entrada a Kardex y Constancia RET
+        po1 = PurchaseOrder.objects.create(
+            organization=organization,
+            number='OC-2026-0001',
+            supplier=supplier_sinsa,
+            target_warehouse=bod1,
+            supplier_invoice_number='FAC-SIN-99120',
+            status=PurchaseOrder.Status.RECEIVED,
+            issue_date=timezone.now().date() - datetime.timedelta(days=7),
+            due_date=timezone.now().date() + datetime.timedelta(days=23),
+            received_at=timezone.now() - datetime.timedelta(days=6),
+            currency_code='NIO',
+            currency_symbol='C$',
+            exchange_rate=Decimal('36.6243'),
+            apply_tax=True,
+            tax_rate=Decimal('15.00'),
+            ir_withholding_rate=Decimal('1.00'),
+            imi_withholding_rate=Decimal('1.00'),
+            withholding_certificate_number='RET-2026-0001',
+            stock_received=True,
+            created_by=commercial_mgr,
+            received_by=ops_coord,
+        )
+
+        # Partida de compra: 5.00 MTS de cable a C$ 20,000.00 c/u = Subtotal C$ 100,000.00
+        PurchaseOrderItem.objects.create(
+            organization=organization,
+            purchase_order=po1,
+            inventory_item=items['MAT-CAB-02'],
+            description='Cable de Potencia XLP 15kV Calibre 2/0 AWG Apantallado',
+            unit='MTS',
+            quantity=Decimal('5.00'),
+            unit_cost=Decimal('20000.00'),
+            line_total=Decimal('100000.00'),
+        )
+        po1.recalculate_totals()
+        po1.withholding_certificate_number = 'RET-2026-0001'
+        po1.save()
+
+        # Entrada física en Bodega Central y generación de folio inmutable en Kardex
+        record_stock_entry(
+            organization=organization,
+            warehouse=bod1,
+            item=items['MAT-CAB-02'],
+            quantity=Decimal('5.00'),
+            unit_cost=Decimal('20000.00'),
+            reference_note=f"Recepción {po1.number} · Factura {po1.supplier_invoice_number}",
+            user=ops_coord,
+        )
+
+        # =========================================================================
+        # 8. REPOSITORIO DOCUMENTAL INSTITUCIONAL (apps/repository)
+        # =========================================================================
+        fld_ing = RepositoryFolder.objects.create(
+            organization=organization,
+            code='FLD-ING-01',
+            name='Planos y Manuales de Campo',
+            department=RepositoryFolder.Department.ENGINEERING,
+            min_role_level_view=RoleLevel.TECHNICIAN,
+            min_role_level_upload=RoleLevel.ENGINEER,
+        )
+
+        fld_fin = RepositoryFolder.objects.create(
+            organization=organization,
+            code='FLD-FIN-01',
+            name='Contratos y Solvencias Fiscales DGI',
+            department=RepositoryFolder.Department.FINANCE_LEGAL,
+            min_role_level_view=RoleLevel.COMMERCIAL_MGR,
+            min_role_level_upload=RoleLevel.COMMERCIAL_MGR,
+        )
+
+        # Documento 1: Diagrama Unifilar v1 -> v2 (en FLD-ING-01)
+        doc1 = CorporateDocument.objects.create(
+            organization=organization,
+            code='DOC-2026-0001',
+            folder=fld_ing,
+            work_order=wo1,
+            title='Diagrama Unifilar Subestación 15kV - Ingenio San Antonio',
+            document_type=CorporateDocument.DocumentType.CAD_PLAN,
+            current_version_number=1,
+            latest_filename='UNIFILAR-ISA-15KV-V1.CAD',
+            latest_checksum='',
+            is_locked=False,
+            created_by=resident_eng,
+        )
+        payload_v1 = "Esquema unifilar 15kV preliminar aprobado para inicio de montaje."
+        raw_v1 = f"{doc1.code}|1|UNIFILAR-ISA-15KV-V1.CAD|{payload_v1}".encode('utf-8')
+        sha_v1 = hashlib.sha256(raw_v1).hexdigest()
+        doc1.latest_checksum = sha_v1
+        doc1.save(update_fields=['latest_checksum'])
+
+        DocumentVersion.objects.create(
+            organization=organization,
+            document=doc1,
+            version_number=1,
+            filename='UNIFILAR-ISA-15KV-V1.CAD',
+            file_size_kb=2450,
+            content_summary_or_payload=payload_v1,
+            checksum_sha256=sha_v1,
+            change_log='Emisión preliminar de ingeniería aprobada para procura y montaje.',
+            uploaded_by=resident_eng,
+        )
+
+        # Publicar versión v2 concurrente con servicio ISO
+        publish_new_document_version(
+            organization=organization,
+            document_id=doc1.pk,
+            filename='UNIFILAR-ISA-15KV-V2.PDF',
+            file_size_kb=3120,
+            change_log='Revisión v2 aprobada para construcción: ajuste de coordinación de protecciones y relevador diferencial conforme observaciones DGI/ENATREL.',
+            content_payload='Plano ejecutivo final con firma de residente y visto bueno de interconexión ENATREL.',
+            user=resident_eng,
+            role_level=RoleLevel.ENGINEER,
+        )
+
+        # Documento 2: Solvencia Fiscal DGI (en FLD-FIN-01)
+        doc2 = CorporateDocument.objects.create(
+            organization=organization,
+            code='DOC-2026-0002',
+            folder=fld_fin,
+            title='Constancia de Inscripción y Solvencia Fiscal DGI 2026',
+            document_type=CorporateDocument.DocumentType.TAX_LEGAL,
+            current_version_number=1,
+            latest_filename='SOLVENCIA-FISCAL-DGI-IMESA-2026.PDF',
+            latest_checksum='',
+            is_locked=True,
+            created_by=commercial_mgr,
+        )
+        payload_doc2 = "Constancia DGI con validez para licitaciones públicas del Estado de Nicaragua."
+        raw_doc2 = f"{doc2.code}|1|SOLVENCIA-FISCAL-DGI-IMESA-2026.PDF|{payload_doc2}".encode('utf-8')
+        sha_doc2 = hashlib.sha256(raw_doc2).hexdigest()
+        doc2.latest_checksum = sha_doc2
+        doc2.save(update_fields=['latest_checksum'])
+
+        DocumentVersion.objects.create(
+            organization=organization,
+            document=doc2,
+            version_number=1,
+            filename='SOLVENCIA-FISCAL-DGI-IMESA-2026.PDF',
+            file_size_kb=480,
+            content_summary_or_payload=payload_doc2,
+            checksum_sha256=sha_doc2,
+            change_log='Emisión fiscal trimestral emitida por Administración de Rentas Managua.',
+            uploaded_by=commercial_mgr,
+        )
+
+        # =========================================================================
+        # 9. MESA DE AYUDA Y CONTROL DE SLA (apps/tickets)
+        # =========================================================================
+        # Ticket 1: Crítico en Curso (SLA 4h) reportado por Técnico Carlos Ruiz
+        tck1 = SupportTicket.objects.create(
+            organization=organization,
+            number='TCK-2026-0001',
+            title='Mantenimiento urgente camioneta Hilux M 345-890',
+            category=SupportTicket.Category.VEHICLE_FLEET,
+            priority=SupportTicket.Priority.CRITICAL,
+            status=SupportTicket.Status.OPEN,
+            related_work_order=wo1,
+            reported_by=field_tech,
+            assigned_to=ops_coord,
+            description='Durante el retorno de campo de la cuadrilla A en Carretera Vieja a León, la camioneta Toyota Hilux placa M 345-890 presentó vibración severa en eje delantero y pérdida de presión en frenos. Requiere revisión mecánica inmediata para no paralizar salida de mañana a Subestación San Antonio.',
+        )
+        TicketComment.objects.create(
+            organization=organization,
+            ticket=tck1,
+            author=field_tech,
+            message='Se dejó la camioneta estacionada en el patio de maniobras de Bodega Central. Llaves entregadas en garita de vigilancia.',
+        )
+
+        # Ticket 2: Resuelto dentro de plazo
+        tck2 = SupportTicket.objects.create(
+            organization=organization,
+            number='TCK-2026-0002',
+            title='Calibración y certificación anual de multímetro industrial Fluke 87V',
+            category=SupportTicket.Category.TOOL_EQUIPMENT,
+            priority=SupportTicket.Priority.NORMAL,
+            status=SupportTicket.Status.RESOLVED,
+            reported_by=field_tech,
+            assigned_to=ops_coord,
+            description='El equipo multímetro Fluke 87V serie FLK-9921 requiere calibración y emisión de certificado metrológico trazable para auditoría de calidad.',
+            resolved_at=timezone.now() - datetime.timedelta(hours=6),
+            resolution_summary='Equipo calibrado con patrón trazable de laboratorio metrológico. Certificado CERT-MET-2026-088 archivado en repositorio técnico. Apto para uso en campo.',
+        )
+        TicketComment.objects.create(
+            organization=organization,
+            ticket=tck2,
+            author=ops_coord,
+            message='Calibración completada satisfactoriamente. Equipo entregado a la cuadrilla de instrumentación.',
+        )
+
+        # =========================================================================
+        # 10. SERVIDOR MODEL CONTEXT PROTOCOL (MCP) Y AGENTES IA (apps/ai_agent)
+        # =========================================================================
+        # Token 1: Claude Desktop - Dirección Operativa (Nivel 80)
+        mcp_token_ops, _raw1 = generate_mcp_token(
+            organization=organization,
+            name="Claude Desktop - Dirección Operativa",
+            scoped_role_level=RoleLevel.OPERATIONS_COORD,
+            allowed_tools=[
+                'query_workorders',
+                'query_inventory_stock',
+                'query_sst_compliance',
+                'query_sla_tickets',
+                'query_financial_summary',
+            ],
+            created_by=owner_user,
+            expires_at=timezone.now() + datetime.timedelta(days=90),
+        )
+        mcp_token_ops.total_calls = 2
+        mcp_token_ops.last_used_at = timezone.now() - datetime.timedelta(minutes=15)
+        mcp_token_ops.save(update_fields=['total_calls', 'last_used_at'])
+
+        # Token 2: Agente Auditoría SST Ley 618 (Nivel 70)
+        mcp_token_sst, _raw2 = generate_mcp_token(
+            organization=organization,
+            name="Agente Auditoría SST Ley 618",
+            scoped_role_level=RoleLevel.SST_OFFICER,
+            allowed_tools=[
+                'query_workorders',
+                'query_sst_compliance',
+                'query_sla_tickets',
+            ],
+            created_by=owner_user,
+            expires_at=timezone.now() + datetime.timedelta(days=60),
+        )
+        mcp_token_sst.total_calls = 2
+        mcp_token_sst.last_used_at = timezone.now() - datetime.timedelta(minutes=5)
+        mcp_token_sst.save(update_fields=['total_calls', 'last_used_at'])
+
+        # 3 Registros de Auditoría Inmutables
+        # Log 1: Consulta exitosa de OTs activas por Dirección Operativa
+        McpAuditLog.objects.create(
+            organization=organization,
+            token=mcp_token_ops,
+            tool_name='query_workorders',
+            request_payload={'phase': 'IN_PROGRESS'},
+            response_status=McpAuditLog.ResponseStatus.SUCCESS,
+            execution_ms=45,
+            ip_address='192.168.1.50',
+            error_message='',
+        )
+
+        # Log 2: Consulta exitosa de cumplimiento SST por Agente SST Ley 618
+        McpAuditLog.objects.create(
+            organization=organization,
+            token=mcp_token_sst,
+            tool_name='query_sst_compliance',
+            request_payload={'status': 'BLOCKED'},
+            response_status=McpAuditLog.ResponseStatus.SUCCESS,
+            execution_ms=38,
+            ip_address='192.168.1.105',
+            error_message='',
+        )
+
+        # Log 3: Intento DENEGADO por RBAC (Agente SST intentó consultar saldos financieros Nivel 80+)
+        McpAuditLog.objects.create(
+            organization=organization,
+            token=mcp_token_sst,
+            tool_name='query_financial_summary',
+            request_payload={},
+            response_status=McpAuditLog.ResponseStatus.DENIED,
+            execution_ms=12,
+            ip_address='192.168.1.105',
+            error_message='Violación RBAC: scoped_role_level 70 insuficiente para invocar query_financial_summary (mínimo 80)',
+        )
+
         return {
             'organization': organization,
             'members_count': 7,
@@ -1241,4 +1694,16 @@ class SandboxScenarioSeeder:
             'bank_accounts_count': 2,
             'petty_cash_funds_count': 1,
             'expenses_count': 3,
+            'invoices_count': 1,
+            'receipts_count': 1,
+            'suppliers_count': 2,
+            'purchase_orders_count': 1,
+            'folders_count': 2,
+            'documents_count': 2,
+            'tickets_count': 2,
+            'mcp_tokens_count': 2,
+            'mcp_logs_count': 3,
         }
+
+
+

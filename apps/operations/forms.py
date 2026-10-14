@@ -142,10 +142,22 @@ class WorkOrderEvidenceForm(forms.ModelForm):
             'title',
             'notes',
             'file_reference',
+            'compressed_image_data',
+            'original_size_kb',
+            'compressed_size_kb',
         ]
         widgets = {
             'evidence_type': forms.Select(attrs={'class': SELECT_BASE_CLS}),
             'title': forms.TextInput(attrs={'class': INPUT_BASE_CLS, 'placeholder': 'ej: Estado inicial del banco de transformadores'}),
             'notes': forms.Textarea(attrs={'class': INPUT_BASE_CLS, 'rows': '2', 'placeholder': 'Detalles técnicos observados en campo...'}),
-            'file_reference': forms.TextInput(attrs={'class': INPUT_MONO_CLS, 'placeholder': 'ej: FOTO-01-SUBESTACION.JPG o enlace interno'}),
+            'file_reference': forms.TextInput(attrs={'class': INPUT_MONO_CLS, 'placeholder': 'ej: FOTO-01-SUBESTACION.JPG o captura directa'}),
+            'compressed_image_data': forms.HiddenInput(),
+            'original_size_kb': forms.HiddenInput(),
+            'compressed_size_kb': forms.HiddenInput(),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['compressed_image_data'].required = False
+        self.fields['original_size_kb'].required = False
+        self.fields['compressed_size_kb'].required = False

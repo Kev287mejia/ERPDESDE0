@@ -22,6 +22,13 @@ urlpatterns = [
     path('from-quote/<uuid:quote_pk>/', views.ConvertQuoteToWorkOrderView.as_view(), name='convert_quote'),
     path('from-quote/<uuid:quote_pk>/convert/', views.ConvertQuoteToWorkOrderView.as_view(), name='convert_from_quote'),
 
+    # Firma Digital Táctil, Acta de Entrega y Sincronización Offline PWA
+    path('orders/<uuid:pk>/sign/', views.WorkOrderSignCaptureView.as_view(), name='workorder_sign'),
+    path('orders/<uuid:pk>/certificate/', views.WorkOrderCertificatePrintView.as_view(), name='workorder_certificate_print'),
+    path('orders/<uuid:pk>/print/', views.WorkOrderCertificatePrintView.as_view(), name='workorder_print_alias'),
+    path('workorders/<uuid:pk>/print/', views.WorkOrderCertificatePrintView.as_view(), name='workorder_print'),
+    path('field-sync/', views.FieldOfflineSyncEndpointView.as_view(), name='field_offline_sync'),
+
     # Planeación de Cuadrillas y Vehículos
     path('crews/', views.CrewPlanningMatrixView.as_view(), name='crew_planning'),
     path('crews/create/', views.CrewCreateView.as_view(), name='crew_create'),

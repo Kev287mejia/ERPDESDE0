@@ -1,0 +1,330 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Repositorio Documental ISO | {{ current_org.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ showFolderModal: false, showDocModal: false }">
+    <!-- Header Técnico de Repositorio -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4 gap-3">
+        <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-500 font-mono mb-1">
+                <span>GESTIÓN DOCUMENTAL</span>
+                <span>/</span>
+                <span class="text-slate-700 font-semibold">REPOSITORIO TÉCNICO & ISO 9001</span>
+            </div>
+            <h1 class="text-xl font-bold tracking-tight text-slate-900">
+                Repositorio Documental Institucional
+            </h1>
+            <p class="text-xs text-slate-500 mt-0.5">
+                Custodia centralizada, control de versiones concurrente con sello SHA-256 y permisos por nivel de confidencialidad.
+            </p>
+        </div>
+
+        <!-- Botones de Acción según RBAC -->
+        <div class="flex flex-wrap items-center gap-2">
+            {% if can_create_folder %}
+            <button type="button" @click="showFolderModal = true" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition">
+                <svg class="w-3.5 h-3.5 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+                </svg>
+                Nueva Carpeta
+            </button>
+            {% endif %}
+
+            {% if can_upload_doc %}
+            <button type="button" @click="showDocModal = true" class="inline-flex items-center px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 transition">
+                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Registrar Documento
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Layout Dividido: Árbol de Carpetas + Grid/Tabla de Documentos -->
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        <!-- Panel Izquierdo: Directorio de Carpetas RBAC -->
+        <div class="lg:col-span-1 bg-white border border-slate-200 rounded-md p-4 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span class="text-xs font-mono uppercase tracking-wider text-slate-500 font-semibold">Carpetas Corporativas</span>
+                <span class="font-mono text-[11px] text-slate-400 tabular-nums">{{ folders|length }} accesibles</span>
+            </div>
+
+            <div class="space-y-1">
+                <a href="{% url 'repository:browser' %}" class="flex items-center justify-between px-2.5 py-2 rounded text-xs transition {% if not active_folder %}bg-slate-100 text-slate-900 font-semibold border border-slate-200{% else %}text-slate-600 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+                    <div class="flex items-center gap-2 truncate">
+                        <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                        </svg>
+                        <span class="truncate">Todos los Documentos</span>
+                    </div>
+                    <span class="font-mono text-[11px] text-slate-400 tabular-nums ml-2">{{ total_docs_count }}</span>
+                </a>
+
+                {% for f in folders %}
+                <a href="{% url 'repository:browser' %}?folder={{ f.pk }}" class="flex items-center justify-between px-2.5 py-2 rounded text-xs transition {% if active_folder and active_folder.pk == f.pk %}bg-slate-100 text-slate-900 font-semibold border border-slate-200{% else %}text-slate-600 hover:bg-slate-50 hover:text-slate-900{% endif %}">
+                    <div class="flex items-center gap-2 truncate min-w-0">
+                        <svg class="w-4 h-4 {% if active_folder and active_folder.pk == f.pk %}text-slate-700{% else %}text-slate-400{% endif %} flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                        </svg>
+                        <div class="truncate">
+                            <div class="truncate">{{ f.name }}</div>
+                            <div class="font-mono text-[10px] text-slate-400">{{ f.code }} · {{ f.get_department_display }}</div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end flex-shrink-0 ml-2">
+                        <span class="font-mono text-[10px] text-slate-500 tabular-nums">Sub: {{ f.min_role_level_upload }}+</span>
+                    </div>
+                </a>
+                {% empty %}
+                <div class="text-center py-6 text-xs text-slate-400">
+                    No hay carpetas con autorización de lectura para su nivel.
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Resumen de Política RBAC -->
+            <div class="pt-3 border-t border-slate-100 text-[11px] text-slate-500 space-y-1">
+                <div class="font-medium text-slate-700">Políticas de Acceso:</div>
+                <div>• Su nivel jerárquico actual: <span class="font-mono font-semibold text-slate-800">{{ request.role_level }}</span></div>
+                <div>• Subida restringida por carpeta según matriz técnica.</div>
+            </div>
+        </div>
+
+        <!-- Panel Derecho: Tabla de Documentos -->
+        <div class="lg:col-span-3 space-y-4">
+            <!-- Barra informativa de la carpeta activa -->
+            {% if active_folder %}
+            <div class="bg-white border border-slate-200 rounded-md p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-semibold border border-slate-200">{{ active_folder.code }}</span>
+                        <h2 class="text-sm font-bold text-slate-900">{{ active_folder.name }}</h2>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Área: <span class="font-medium text-slate-700">{{ active_folder.get_department_display }}</span> |
+                        Nivel de Lectura Requerido: <span class="font-mono font-semibold text-slate-700">{{ active_folder.min_role_level_view }}+</span> |
+                        Nivel de Publicación Requerido: <span class="font-mono font-semibold text-slate-700">{{ active_folder.min_role_level_upload }}+</span>
+                    </p>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if can_upload_doc %}
+                    <span class="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded font-medium">
+                        Habilitado para Publicar
+                    </span>
+                    {% else %}
+                    <span class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded font-medium">
+                        Solo Lectura (Exige nivel {{ active_folder.min_role_level_upload }}+)
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Tabla de Documentos -->
+            <div class="bg-white border border-slate-200 rounded-md overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
+                                <th class="py-2.5 px-3">Código</th>
+                                <th class="py-2.5 px-3">Título & Tipo</th>
+                                <th class="py-2.5 px-3">Carpeta / OT</th>
+                                <th class="py-2.5 px-3">Revisión Vigente</th>
+                                <th class="py-2.5 px-3">Archivo & Checksum SHA-256</th>
+                                <th class="py-2.5 px-3">Estado</th>
+                                <th class="py-2.5 px-3 text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for doc in documents %}
+                            <tr class="hover:bg-slate-50 transition">
+                                <td class="py-2.5 px-3 font-mono font-semibold text-slate-900 whitespace-nowrap">
+                                    <a href="{% url 'repository:document_detail' doc.pk %}" class="text-slate-900 hover:underline">
+                                        {{ doc.code }}
+                                    </a>
+                                </td>
+                                <td class="py-2.5 px-3">
+                                    <div class="font-medium text-slate-900">{{ doc.title }}</div>
+                                    <div class="text-[11px] text-slate-500">{{ doc.get_document_type_display }}</div>
+                                </td>
+                                <td class="py-2.5 px-3 whitespace-nowrap">
+                                    <div class="text-slate-800">{{ doc.folder.name }}</div>
+                                    {% if doc.work_order %}
+                                    <a href="{% url 'operations:workorder_detail' doc.work_order.pk %}" class="font-mono text-[11px] text-blue-600 hover:underline">
+                                        {{ doc.work_order.code }}
+                                    </a>
+                                    {% else %}
+                                    <span class="text-[11px] text-slate-400 font-mono">Institucional</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-2.5 px-3 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded font-mono font-semibold text-xs bg-slate-100 text-slate-800 border border-slate-200 tabular-nums">
+                                        v{{ doc.current_version_number }}
+                                    </span>
+                                </td>
+                                <td class="py-2.5 px-3">
+                                    <div class="font-mono text-[11px] text-slate-800 truncate max-w-[180px]">{{ doc.latest_filename }}</div>
+                                    <div class="font-mono text-[10px] text-slate-400 truncate max-w-[180px]" title="{{ doc.latest_checksum }}">
+                                        SHA: {{ doc.latest_checksum|slice:":16" }}...
+                                    </div>
+                                </td>
+                                <td class="py-2.5 px-3 whitespace-nowrap">
+                                    {% if doc.is_locked %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200">
+                                        Bloqueado
+                                    </span>
+                                    {% else %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        Activo
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-2.5 px-3 text-right whitespace-nowrap">
+                                    <a href="{% url 'repository:document_detail' doc.pk %}" class="inline-flex items-center px-2.5 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-50 transition">
+                                        Ver Ficha & Historial
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="py-8 text-center text-slate-400 text-xs">
+                                    No se encontraron documentos en esta carpeta.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Crear Carpeta -->
+    {% if can_create_folder and folder_form %}
+    <div x-show="showFolderModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-slate-900 bg-opacity-40" @click="showFolderModal = false"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-md text-left overflow-hidden shadow-sm transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-slate-200">
+                <form action="{% url 'repository:folder_create' %}" method="post" class="p-6 space-y-4">
+                    {% csrf_token %}
+                    <div class="border-b border-slate-100 pb-3">
+                        <h3 class="text-sm font-bold text-slate-900">Crear Carpeta Corporativa</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Establezca los niveles mínimos de consulta y carga para restringir el acceso.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Nombre de la Carpeta *</label>
+                        {{ folder_form.name }}
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Departamento Responsable</label>
+                            {{ folder_form.department }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Carpeta Superior (Opcional)</label>
+                            {{ folder_form.parent }}
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3 rounded border border-slate-200">
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-700 mb-1">Nivel Mínimo Lectura (Ver)</label>
+                            {{ folder_form.min_role_level_view }}
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-700 mb-1">Nivel Mínimo Publicación</label>
+                            {{ folder_form.min_role_level_upload }}
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button type="button" @click="showFolderModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-50">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800">
+                            Guardar Carpeta
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Modal Registrar Documento Inicial -->
+    {% if can_upload_doc and doc_form %}
+    <div x-show="showDocModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-slate-900 bg-opacity-40" @click="showDocModal = false"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-md text-left overflow-hidden shadow-sm transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full border border-slate-200">
+                <form action="{% url 'repository:document_create' %}" method="post" class="p-6 space-y-4">
+                    {% csrf_token %}
+                    <div class="border-b border-slate-100 pb-3">
+                        <h3 class="text-sm font-bold text-slate-900">Registrar Nuevo Documento Técnico</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Se inicializará como versión 1 con su respectivo sello criptográfico SHA-256.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Título del Documento *</label>
+                        {{ doc_form.title }}
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Carpeta Destino *</label>
+                            {{ doc_form.folder }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Tipo de Documento</label>
+                            {{ doc_form.document_type }}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Orden de Trabajo Vinculada (Opcional)</label>
+                        {{ doc_form.work_order }}
+                    </div>
+
+                    <div class="bg-slate-50 p-3 rounded border border-slate-200 space-y-3">
+                        <div class="font-mono text-[11px] font-semibold text-slate-700 uppercase">Metadatos de Revisión Inicial (v1)</div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div class="sm:col-span-2">
+                                <label class="block text-[11px] font-medium text-slate-600 mb-1">Nombre de Archivo *</label>
+                                {{ doc_form.initial_filename }}
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-medium text-slate-600 mb-1">Tamaño (KB)</label>
+                                {{ doc_form.initial_file_size_kb }}
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-600 mb-1">Notas de Emisión / Cambio</label>
+                            {{ doc_form.change_log }}
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-600 mb-1">Resumen Técnico / Payload Criptográfico</label>
+                            {{ doc_form.content_payload }}
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button type="button" @click="showDocModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-50">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800">
+                            Registrar Documento (v1)
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

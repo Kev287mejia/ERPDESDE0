@@ -1,3 +1,4 @@
+import hashlib
 from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -203,6 +204,38 @@ class WorkOrder(TenantScopedModel):
         blank=True,
         verbose_name="Fecha y Hora de Cierre Definitivo",
     )
+    # Conformidad y Firma Digital en Campo (PWA)
+    client_signer_name = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Nombre de Quien Recibe (Cliente)",
+    )
+    client_signer_title = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Cargo del Receptor",
+    )
+    client_signer_id = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Cédula / ID del Receptor",
+    )
+    client_signature_data = models.TextField(
+        blank=True,
+        help_text="Imagen PNG en Base64 (data:image/png;base64,...) trazada en el lienzo táctil",
+    )
+    client_signed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha y Hora de Firma",
+    )
+    signature_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        editable=False,
+        help_text="Sello criptográfico SHA-256 de integridad de firma",
+    )
+
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -226,6 +259,21 @@ class WorkOrder(TenantScopedModel):
     def __str__(self) -> str:
         return f"{self.number} · {self.title} ({self.get_phase_display()})"
 
+    @property
+    def code(self) -> str:
+        return self.number
+
+    @property
+    def sst_status(self) -> str:
+        if not self.is_high_risk:
+            return 'CLEARED'
+        return 'CLEARED' if self.sst_cleared else 'BLOCKED'
+
+    def get_sst_status_display(self) -> str:
+        if not self.is_high_risk:
+            return 'Bajo Riesgo / Liberado'
+        return 'Liberado por SST' if self.sst_cleared else 'Bloqueado por SST (Alto Riesgo)'
+
     def can_start_field_execution(self) -> tuple[bool, str]:
         """
         Regla de Seguridad SST:
@@ -236,12 +284,80 @@ class WorkOrder(TenantScopedModel):
             return False, "La labor está clasificada como de Alto Riesgo y requiere la Liberación formal de Seguridad (SST Nivel 70+) antes de iniciar en campo."
         return True, "Liberado para labores de campo."
 
+    def record_client_signature(self, signer_name: str, signer_title: str, signer_id: str, signature_base64: str, actor=None) -> str:
+        """
+        Estampa la firma digital táctil de conformidad del cliente en la Orden de Trabajo.
+        Garantiza la inmutabilidad sellando con estampa de tiempo y hash criptográfico SHA-256.
+        Avanza la OT automáticamente a QUALITY_CHECK y genera un registro en la bitácora inmutable.
+        """
+        if self.client_signature_data or self.signature_hash:
+            raise ValidationError("El acta de esta Orden de Trabajo ya cuenta con una firma digital inmutable.")
+
+        sig_data = (signature_base64 or '').strip()
+        if not sig_data.startswith('data:image/png;base64,') or len(sig_data) < 50:
+            raise ValidationError("La firma digital debe ser una imagen PNG en formato Base64 válida.")
+
+        clean_name = (signer_name or '').strip()
+        clean_title = (signer_title or '').strip()
+        clean_id = (signer_id or '').strip()
+
+        if not clean_name:
+            raise ValidationError("El nombre del receptor es obligatorio para estampar la firma de conformidad.")
+
+        # Generación del sello SHA-256 de integridad: number|name|id|signature
+        raw_payload = f"{self.number}|{clean_name}|{clean_id}|{sig_data}".encode('utf-8')
+        computed_hash = hashlib.sha256(raw_payload).hexdigest()
+
+        self.client_signer_name = clean_name
+        self.client_signer_title = clean_title
+        self.client_signer_id = clean_id
+        self.client_signature_data = sig_data
+        self.client_signed_at = timezone.now()
+        self.signature_hash = computed_hash
+
+        if self.phase == self.Phase.IN_PROGRESS:
+            self.phase = self.Phase.QUALITY_CHECK
+
+        self.save(update_fields=[
+            'client_signer_name',
+            'client_signer_title',
+            'client_signer_id',
+            'client_signature_data',
+            'client_signed_at',
+            'signature_hash',
+            'phase',
+            'updated_at',
+        ])
+
+        WorkOrderTimelineLog.objects.create(
+            organization=self.organization,
+            work_order=self,
+            event_type='CLIENT_SIGNED',
+            summary=f"Firma digital de conformidad estampada por {clean_name} ({clean_title or 'Cliente'})",
+            details=f"Cédula/ID: {clean_id or 'N/R'} · Sello SHA-256: {computed_hash}",
+            actor=actor,
+        )
+        return computed_hash
+
     def clean(self):
         super().clean()
         if self.phase == self.Phase.IN_PROGRESS:
             can_start, reason = self.can_start_field_execution()
             if not can_start:
                 raise ValidationError({'phase': reason})
+
+        if self.pk and not self._state.adding:
+            original = WorkOrder.objects.filter(pk=self.pk).values(
+                'signature_hash', 'client_signature_data', 'client_signer_name', 'client_signer_id'
+            ).first()
+            if original and original['signature_hash']:
+                if (
+                    self.signature_hash != original['signature_hash']
+                    or self.client_signature_data != original['client_signature_data']
+                    or self.client_signer_name != original['client_signer_name']
+                    or self.client_signer_id != original['client_signer_id']
+                ):
+                    raise ValidationError("El acta de esta Orden de Trabajo ya cuenta con una firma digital inmutable y no puede modificarse.")
 
     def save(self, *args, **kwargs):
         if self.account_id and not self.organization_id:
@@ -376,6 +492,18 @@ class WorkOrderEvidence(TenantScopedModel):
         blank=True,
         verbose_name="Referencia o Ruta del Archivo",
         help_text="Nombre de archivo o identificador de almacenamiento",
+    )
+    compressed_image_data = models.TextField(
+        blank=True,
+        help_text="Imagen de evidencia comprimida en cliente (JPEG/WebP Base64 <= 250KB)",
+    )
+    original_size_kb = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Peso Original (KB)",
+    )
+    compressed_size_kb = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Peso Optimizado (KB)",
     )
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

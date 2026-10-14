@@ -1,0 +1,312 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Compras, Abastecimiento & Cuentas por Pagar (CxP) · DGI Nicaragua{% endblock %}
+{% block breadcrumb_section %}ABASTECIMIENTO & LOGÍSTICA{% endblock %}
+{% block breadcrumb_page %}ÓRDENES DE COMPRA & CXP{% endblock %}
+{% block page_title %}Compras Locales, Recepción en Kardex & Cuentas por Pagar{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2" x-data="{ showNewModal: false }">
+    <a href="{% url 'purchasing:supplier_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+        Directorio de Proveedores
+    </a>
+
+    <button type="button" 
+            @click="showNewModal = true"
+            class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded transition-colors flex items-center gap-1.5 shadow-none">
+        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        <span>Nueva Orden de Compra</span>
+    </button>
+
+    <!-- Modal Apertura de Orden de Compra -->
+    <div x-show="showNewModal" 
+         x-cloak 
+         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-lg w-full p-6 space-y-4 shadow-none"
+             @click.away="showNewModal = false">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                <span class="text-xs font-mono font-bold uppercase text-slate-900">
+                    Apertura de Orden de Compra Técnica
+                </span>
+                <button type="button" @click="showNewModal = false" class="text-slate-400 hover:text-slate-600 text-sm font-mono">&times;</button>
+            </div>
+
+            <form method="POST" action="{% url 'purchasing:order_create' %}" class="space-y-3 text-xs">
+                {% csrf_token %}
+                <div>
+                    <label class="block font-mono font-medium text-slate-700 mb-1">Proveedor:</label>
+                    <select name="supplier_id" required class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                        <option value="">— Seleccionar Proveedor Autorizado —</option>
+                        {% for s in suppliers %}
+                        <option value="{{ s.id }}">{{ s.code }} · {{ s.commercial_name }} (RUC: {{ s.tax_id }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-mono font-medium text-slate-700 mb-1">Bodega de Destino:</label>
+                        <select name="target_warehouse_id" required class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                            {% for w in warehouses %}
+                            <option value="{{ w.id }}">{{ w.code }} · {{ w.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-mono font-medium text-slate-700 mb-1">Moneda:</label>
+                        <select name="currency_code" class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                            <option value="NIO">Córdobas (NIO - C$)</option>
+                            <option value="USD">Dólares (USD - $)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-mono font-medium text-slate-700 mb-1">N° Factura del Proveedor (Opcional):</label>
+                    <input type="text" 
+                           name="supplier_invoice_number" 
+                           placeholder="Ej: FAC-98412"
+                           class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                </div>
+
+                <div>
+                    <label class="block font-mono font-medium text-slate-700 mb-1">Términos / Observaciones:</label>
+                    <textarea name="notes" rows="2" placeholder="Detalle de destino, frente de obra o condiciones de entrega..." class="w-full text-xs p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" @click="showNewModal = false" class="px-3 py-1.5 border border-slate-200 text-slate-600 rounded">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded">
+                        Crear Orden
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-5 max-w-7xl mx-auto">
+
+    <!-- KPI Counters de Abastecimiento & Cuentas por Pagar (Ley 822) -->
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+        <div class="p-3.5 bg-white border border-slate-200 rounded border-t-2 border-t-slate-800">
+            <span class="text-[10px] font-mono uppercase text-slate-500 block tracking-wider font-semibold">TOTAL COMPRAS</span>
+            <span class="text-lg font-mono font-bold text-slate-900 tabular-nums mt-0.5 block">
+                C$ {{ kpi_gross_total|floatformat:2 }}
+            </span>
+            <span class="text-[10px] text-slate-500 font-mono mt-0.5 block">Base + IVA Crédito</span>
+        </div>
+
+        <div class="p-3.5 bg-white border border-slate-200 rounded border-t-2 border-t-blue-600">
+            <span class="text-[10px] font-mono uppercase text-blue-700 block tracking-wider font-semibold">IVA CRÉDITO FISCAL</span>
+            <span class="text-lg font-mono font-bold text-blue-900 tabular-nums mt-0.5 block">
+                C$ {{ kpi_tax_total|floatformat:2 }}
+            </span>
+            <span class="text-[10px] text-blue-600 font-mono mt-0.5 block">Deducible en DGI</span>
+        </div>
+
+        <div class="p-3.5 bg-white border border-slate-200 rounded border-t-2 border-t-amber-600">
+            <span class="text-[10px] font-mono uppercase text-amber-700 block tracking-wider font-semibold">RETENCIONES PRACTICADAS</span>
+            <span class="text-lg font-mono font-bold text-amber-800 tabular-nums mt-0.5 block">
+                C$ {{ kpi_retentions|floatformat:2 }}
+            </span>
+            <span class="text-[10px] text-amber-700 font-mono mt-0.5 block">IR 1%/2% + IMI Alcaldía</span>
+        </div>
+
+        <div class="p-3.5 bg-white border border-slate-200 rounded border-t-2 border-t-emerald-600">
+            <span class="text-[10px] font-mono uppercase text-emerald-700 block tracking-wider font-semibold">NETO A PAGAR PROVEEDOR</span>
+            <span class="text-lg font-mono font-bold text-emerald-800 tabular-nums mt-0.5 block">
+                C$ {{ kpi_net_payable|floatformat:2 }}
+            </span>
+            <span class="text-[10px] text-emerald-600 font-mono mt-0.5 block">Pasivo exigible real</span>
+        </div>
+
+        <div class="p-3.5 bg-white border border-slate-200 rounded border-t-2 border-t-rose-600">
+            <span class="text-[10px] font-mono uppercase text-rose-700 block tracking-wider font-semibold">SALDO PENDIENTE (CXP)</span>
+            <span class="text-lg font-mono font-bold text-rose-800 tabular-nums mt-0.5 block">
+                C$ {{ kpi_balance_due|floatformat:2 }}
+            </span>
+            <span class="text-[10px] text-rose-600 font-mono mt-0.5 block">Cuentas por liquidar</span>
+        </div>
+    </div>
+
+    <!-- Filters & Search -->
+    <div class="bg-white border border-slate-200 rounded p-3.5">
+        <form method="GET" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div class="relative flex-1">
+                <svg class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+                </svg>
+                <input type="text" 
+                       name="q" 
+                       value="{{ search_query }}"
+                       placeholder="Buscar por Folio OC, Proveedor, RUC, Factura o N° Constancia Retención..."
+                       class="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 font-sans text-slate-800 placeholder-slate-400 transition-colors">
+            </div>
+
+            <div class="flex items-center gap-2">
+                <select name="status" class="text-xs py-2 px-2.5 border border-slate-200 rounded bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono">
+                    <option value="">— Todos los Estados —</option>
+                    {% for code, label in status_choices %}
+                    <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+
+                <select name="warehouse" class="text-xs py-2 px-2.5 border border-slate-200 rounded bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono">
+                    <option value="">— Todas las Bodegas —</option>
+                    {% for w in warehouses %}
+                    <option value="{{ w.id }}" {% if warehouse_filter == w.id|stringformat:"s" %}selected{% endif %}>{{ w.code }} · {{ w.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <button type="submit" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded transition-colors">
+                    Filtrar
+                </button>
+
+                {% if search_query or status_filter or warehouse_filter %}
+                <a href="{% url 'purchasing:order_list' %}" class="px-3 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs rounded transition-colors">
+                    Limpiar
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Purchase Orders Table -->
+    <div class="bg-white border border-slate-200 rounded overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
+                        <th class="py-2.5 px-3.5 font-semibold">Folio OC</th>
+                        <th class="py-2.5 px-3.5 font-semibold">Proveedor / RUC</th>
+                        <th class="py-2.5 px-3.5 font-semibold">Bodega Destino</th>
+                        <th class="py-2.5 px-3.5 font-semibold">Emisión / Plazo</th>
+                        <th class="py-2.5 px-3.5 text-center font-semibold">Estado</th>
+                        <th class="py-2.5 px-3.5 text-center font-semibold">Kardex</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">Total Facturado</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">Retenciones</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">Neto a Pagar</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">Saldo CxP</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for po in orders %}
+                    <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="py-2.5 px-3.5 font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap">
+                            <a href="{% url 'purchasing:order_detail' pk=po.pk %}" class="hover:underline">
+                                {{ po.number }}
+                            </a>
+                        </td>
+                        <td class="py-2.5 px-3.5 max-w-[200px]">
+                            <span class="font-semibold text-slate-800 block truncate" title="{{ po.supplier.commercial_name }}">
+                                {{ po.supplier.commercial_name }}
+                            </span>
+                            <span class="text-[10px] font-mono text-slate-500 block">
+                                RUC: {{ po.supplier.tax_id }}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3.5 font-mono text-[11px] whitespace-nowrap">
+                            <span class="text-slate-700 block">{{ po.target_warehouse.name }}</span>
+                            <span class="text-[10px] text-slate-400 font-mono">Fact: {{ po.supplier_invoice_number|default:"Sin registrar" }}</span>
+                        </td>
+                        <td class="py-2.5 px-3.5 font-mono text-[11px] whitespace-nowrap">
+                            <span class="text-slate-700 block">{{ po.issue_date|date:"Y-m-d" }}</span>
+                            {% if po.due_date %}
+                            <span class="text-[10px] text-slate-500 block">Vence: {{ po.due_date|date:"Y-m-d" }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-center whitespace-nowrap">
+                            {% if po.status == 'DRAFT' %}
+                            <span class="inline-block px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                Borrador
+                            </span>
+                            {% elif po.status == 'APPROVED' %}
+                            <span class="inline-block px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                Emitida
+                            </span>
+                            {% elif po.status == 'RECEIVED' %}
+                            <span class="inline-block px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-amber-50 text-amber-800 border border-amber-200">
+                                Recibida en Bodega
+                            </span>
+                            {% elif po.status == 'PARTIAL_PAID' %}
+                            <span class="inline-block px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                Pago Parcial
+                            </span>
+                            {% elif po.status == 'PAID' %}
+                            <span class="inline-block px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Cancelada
+                            </span>
+                            {% elif po.status == 'CANCELLED' %}
+                            <span class="inline-block px-2 py-0.5 text-[10px] font-mono font-medium rounded bg-rose-50 text-rose-700 border border-rose-200">
+                                Anulada
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-center whitespace-nowrap font-mono text-[10px]">
+                            {% if po.stock_received %}
+                            <span class="text-emerald-700 font-semibold">INGRESADO</span>
+                            {% else %}
+                            <span class="text-slate-400">PENDIENTE</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right font-mono font-semibold text-slate-900 tabular-nums whitespace-nowrap">
+                            {{ po.currency_symbol }} {{ po.gross_total|floatformat:2 }}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right font-mono text-amber-700 tabular-nums whitespace-nowrap">
+                            {{ po.currency_symbol }} {{ po.total_withheld|floatformat:2 }}
+                            {% if po.withholding_certificate_number %}
+                            <span class="block text-[9px] text-slate-400 font-mono">{{ po.withholding_certificate_number }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right font-mono font-semibold text-slate-800 tabular-nums whitespace-nowrap">
+                            {{ po.currency_symbol }} {{ po.net_payable|floatformat:2 }}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums whitespace-nowrap">
+                            {% if po.balance_due > 0 %}
+                            <span class="text-rose-700">{{ po.currency_symbol }} {{ po.balance_due|floatformat:2 }}</span>
+                            {% else %}
+                            <span class="text-emerald-700">{{ po.currency_symbol }} 0.00</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right font-mono whitespace-nowrap">
+                            <div class="inline-flex items-center gap-1">
+                                <a href="{% url 'purchasing:order_detail' pk=po.pk %}" 
+                                   class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded text-[11px] transition-colors">
+                                    Expediente
+                                </a>
+                                {% if po.withholding_certificate_number %}
+                                <a href="{% url 'purchasing:retention_certificate_print' pk=po.pk %}" 
+                                   target="_blank"
+                                   title="Imprimir Constancia Retención DGI"
+                                   class="p-1 text-slate-500 hover:text-slate-800 rounded transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24-3.411 1.76-6.195 4.53-6.195 2.77 0 4.77 2.784 4.53 6.195H6.72zM3 13.5v6.75A2.25 2.25 0 005.25 22.5h13.5A2.25 2.25 0 0021 20.25V13.5m-18 0h18M6.75 3.75h10.5M9 7.5h6"/>
+                                    </svg>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="11" class="py-8 text-center text-slate-400 font-mono text-xs">
+                            No se encontraron órdenes de compra registradas para el filtro seleccionado.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

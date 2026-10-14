@@ -1,0 +1,242 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Directorio de Proveedores & Subcontratistas · ERP{% endblock %}
+{% block breadcrumb_section %}ABASTECIMIENTO & LOGÍSTICA{% endblock %}
+{% block breadcrumb_page %}PROVEEDORES B2B{% endblock %}
+{% block page_title %}Directorio de Proveedores & Subcontratistas Autorizados{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2" x-data="{ showNewModal: false }">
+    <a href="{% url 'purchasing:order_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+        Ver Órdenes de Compra
+    </a>
+
+    {% if can_manage_suppliers %}
+    <button type="button" 
+            @click="showNewModal = true"
+            class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded transition-colors flex items-center gap-1.5 shadow-none">
+        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        <span>Nuevo Proveedor</span>
+    </button>
+    {% endif %}
+
+    <!-- Modal Registro de Proveedor -->
+    <div x-show="showNewModal" 
+         x-cloak 
+         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-lg w-full p-6 space-y-4 shadow-none"
+             @click.away="showNewModal = false">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                <span class="text-xs font-mono font-bold uppercase text-slate-900">
+                    Registro de Proveedor Institucional
+                </span>
+                <button type="button" @click="showNewModal = false" class="text-slate-400 hover:text-slate-600 text-sm font-mono">&times;</button>
+            </div>
+
+            <form method="POST" action="{% url 'purchasing:supplier_list' %}" class="space-y-3 text-xs">
+                {% csrf_token %}
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="col-span-2">
+                        <label class="block font-mono font-medium text-slate-700 mb-1">Nombre Comercial *:</label>
+                        <input type="text" 
+                               name="commercial_name" 
+                               required 
+                               placeholder="Ej: SINSA Industrial S.A."
+                               class="w-full text-xs p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    </div>
+
+                    <div>
+                        <label class="block font-mono font-medium text-slate-700 mb-1">RUC Fiscal *:</label>
+                        <input type="text" 
+                               name="tax_id" 
+                               required 
+                               placeholder="Ej: J0310000556677"
+                               class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    </div>
+
+                    <div>
+                        <label class="block font-mono font-medium text-slate-700 mb-1">Días de Crédito:</label>
+                        <input type="number" 
+                               name="credit_days" 
+                               value="30" 
+                               class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-mono font-medium text-slate-700 mb-1">Contacto Principal:</label>
+                        <input type="text" 
+                               name="contact_name" 
+                               placeholder="Ej: Ing. René Morales"
+                               class="w-full text-xs p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    </div>
+
+                    <div>
+                        <label class="block font-mono font-medium text-slate-700 mb-1">Teléfono:</label>
+                        <input type="text" 
+                               name="phone" 
+                               placeholder="+505 2270-0000"
+                               class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-mono font-medium text-slate-700 mb-1">Correo Electrónico:</label>
+                        <input type="email" 
+                               name="email" 
+                               placeholder="ventas@proveedor.com"
+                               class="w-full text-xs p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    </div>
+
+                    <div>
+                        <label class="block font-mono font-medium text-slate-700 mb-1">Ciudad:</label>
+                        <input type="text" 
+                               name="city" 
+                               value="Managua" 
+                               class="w-full text-xs p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 pt-1 border-t border-slate-100">
+                    <div>
+                        <label class="block font-mono font-medium text-slate-700 mb-1">Retención IR Habitual (%):</label>
+                        <select name="default_ir_rate" class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                            <option value="1.00">1.00% - Bienes / Materiales</option>
+                            <option value="2.00">2.00% - Servicios / Mantenimiento</option>
+                            <option value="10.00">10.00% - Servicios Profesionales</option>
+                            <option value="0.00">0.00% - No Sujeto</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-mono font-medium text-slate-700 mb-1">Retención Municipal IMI (%):</label>
+                        <select name="default_imi_rate" class="w-full text-xs font-mono p-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600">
+                            <option value="1.00">1.00% - Retención Municipal Alcaldía</option>
+                            <option value="0.00">0.00% - Sin Retención IMI</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button type="button" @click="showNewModal = false" class="px-3 py-1.5 border border-slate-200 text-slate-600 rounded">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded">
+                        Registrar Proveedor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-5 max-w-7xl mx-auto">
+
+    <!-- Search Form -->
+    <div class="bg-white border border-slate-200 rounded p-3.5">
+        <form method="GET" class="flex items-center gap-2.5">
+            <div class="relative flex-1">
+                <svg class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+                </svg>
+                <input type="text" 
+                       name="q" 
+                       value="{{ search_query }}"
+                       placeholder="Buscar por Código PRV, Proveedor, RUC o Contacto..."
+                       class="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 font-sans text-slate-800 placeholder-slate-400 transition-colors">
+            </div>
+
+            <button type="submit" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded transition-colors">
+                Buscar
+            </button>
+
+            {% if search_query %}
+            <a href="{% url 'purchasing:supplier_list' %}" class="px-3 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs rounded transition-colors">
+                Limpiar
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Suppliers Table -->
+    <div class="bg-white border border-slate-200 rounded overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
+                        <th class="py-2.5 px-3.5 font-semibold">Código</th>
+                        <th class="py-2.5 px-3.5 font-semibold">Proveedor / Razón Social</th>
+                        <th class="py-2.5 px-3.5 font-semibold">RUC Fiscal</th>
+                        <th class="py-2.5 px-3.5 font-semibold">Contacto / Teléfono</th>
+                        <th class="py-2.5 px-3.5 font-semibold">Ciudad</th>
+                        <th class="py-2.5 px-3.5 text-center font-semibold">Crédito</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">Retención IR</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">Retención IMI</th>
+                        <th class="py-2.5 px-3.5 text-center font-semibold">Estado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for s in suppliers %}
+                    <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="py-2.5 px-3.5 font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap">
+                            {{ s.code }}
+                        </td>
+                        <td class="py-2.5 px-3.5">
+                            <span class="font-semibold text-slate-800 block">{{ s.commercial_name }}</span>
+                            {% if s.legal_name %}
+                            <span class="text-[10px] text-slate-400 block">{{ s.legal_name }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                            {{ s.tax_id }}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-slate-700">
+                            <span>{{ s.contact_name|default:"-" }}</span>
+                            {% if s.phone %}
+                            <span class="text-[10px] text-slate-400 block font-mono">{{ s.phone }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-slate-600">
+                            {{ s.city }}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-center font-mono text-[11px] text-slate-700">
+                            {{ s.credit_days }} días
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right font-mono text-amber-700">
+                            {{ s.default_ir_rate }}%
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right font-mono text-amber-700">
+                            {{ s.default_imi_rate }}%
+                        </td>
+                        <td class="py-2.5 px-3.5 text-center">
+                            {% if s.is_active %}
+                            <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                ACTIVO
+                            </span>
+                            {% else %}
+                            <span class="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-100 text-slate-500 border border-slate-200">
+                                INACTIVO
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="py-8 text-center text-slate-400 font-mono text-xs">
+                            No se encontraron proveedores registrados.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

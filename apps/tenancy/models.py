@@ -29,6 +29,19 @@ class Organization(TimeStampedModel):
         MARKETING = 'MARKETING', 'Marketing Digital, Medios & Publicidad'
         OTHER = 'OTHER', 'Otros Giros Comerciales / Corporativo'
 
+    class BusinessProfile(models.TextChoices):
+        ENGINEERING_SERVICES = 'ENGINEERING_SERVICES', 'Servicios Técnicos, Mantenimiento e Ingeniería'
+        COMMERCIAL_RETAIL = 'COMMERCIAL_RETAIL', 'Comercio, Ferretería y Distribución'
+        FIELD_CONTRACTOR = 'FIELD_CONTRACTOR', 'Contratista de Campo y Obras'
+        HYBRID_ENTERPRISE = 'HYBRID_ENTERPRISE', 'Operación Integral Multi-Giro'
+
+    BUSINESS_PROFILE_PRESETS = {
+        'ENGINEERING_SERVICES': ['crm', 'operations', 'sst', 'inventory', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
+        'COMMERCIAL_RETAIL': ['crm', 'inventory', 'billing', 'purchasing', 'repository', 'tickets'],
+        'FIELD_CONTRACTOR': ['operations', 'sst', 'inventory', 'purchasing', 'repository', 'tickets'],
+        'HYBRID_ENTERPRISE': ['crm', 'operations', 'sst', 'inventory', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
+    }
+
     class AccountingTemplate(models.TextChoices):
         NIIF_PYMES = 'NIIF_PYMES', 'Catálogo Estándar NIIF para PYMES (Nicaragua DGI)'
         SIMPLIFIED = 'SIMPLIFIED', 'Catálogo Simplificado de Servicios y Flujo de Fondos'
@@ -78,6 +91,13 @@ class Organization(TimeStampedModel):
         default=Industry.SERVICES,
         verbose_name="Giro / Rubro Comercial",
         help_text="Sector o actividad económica principal"
+    )
+    business_profile = models.CharField(
+        max_length=40,
+        choices=BusinessProfile.choices,
+        default=BusinessProfile.HYBRID_ENTERPRISE,
+        verbose_name="Perfil de Giro de Negocio",
+        help_text="Configuración predeterminada de arquitectura modular según el giro comercial"
     )
     accounting_template = models.CharField(
         max_length=30,
@@ -139,6 +159,13 @@ class Organization(TimeStampedModel):
         if not self.is_active or not self.enabled_modules:
             return False
         return module_code.lower().strip() in [m.lower().strip() for m in self.enabled_modules]
+
+    def apply_business_profile_preset(self, profile_code: str):
+        """Aplica la configuración modular predefinida según el giro de negocio."""
+        if profile_code in self.BusinessProfile.values:
+            self.business_profile = profile_code
+            self.enabled_modules = list(self.BUSINESS_PROFILE_PRESETS.get(profile_code, self.enabled_modules))
+            self.save(update_fields=['business_profile', 'enabled_modules', 'updated_at'])
 
 
 class RoleLevel(models.IntegerChoices):

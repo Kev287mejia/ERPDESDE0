@@ -1,3 +1,5 @@
+import hashlib
+import json
 import re
 import uuid
 from decimal import Decimal
@@ -565,3 +567,298 @@ class OperationsModuleEndToEndTestCase(TestCase):
         url_intruder = reverse('operations:workorder_detail', kwargs={'pk': wo_intruder.pk})
         resp = client_coord.get(url_intruder)
         self.assertEqual(resp.status_code, 404)
+
+    # --------------------------------------------------------------------------
+    # TEST 6: Firma Digital de Conformidad, Sello SHA-256 e Inmutabilidad
+    # --------------------------------------------------------------------------
+    def test_client_digital_signature_and_sha256_immutability(self):
+        """
+        Verifica:
+        1. Técnico (20) asignado a la cuadrilla captura la firma táctil del cliente en Base64.
+        2. Se calcula el sello criptográfico SHA-256 (64 hex) y se estampa la fecha client_signed_at.
+        3. La OT avanza automáticamente de IN_PROGRESS a QUALITY_CHECK.
+        4. Se registra el evento 'CLIENT_SIGNED' en WorkOrderTimelineLog.
+        5. Cualquier intento de sobrescribir la firma o modificar campos sellados es bloqueado
+           con ValidationError por la regla de inmutabilidad estricta.
+        """
+        crew = Crew.objects.create(
+            organization=self.org,
+            code="CUAD-SIG",
+            name="Cuadrilla de Montaje Especial",
+            leader=self.user_engineer,
+            is_active=True,
+        )
+        crew.members.add(self.user_tech1)
+
+        wo = WorkOrder.objects.create(
+            organization=self.org,
+            account=self.account,
+            title="Mantenimiento de Línea de Distribución",
+            assigned_crew=crew,
+            phase=WorkOrder.Phase.IN_PROGRESS,
+            created_by=self.user_ops_coord,
+        )
+
+        sig_b64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        signer_name = "Ing. Roberto Calero"
+        signer_title = "Gerente de Planta"
+        signer_id = "001-120580-0002A"
+
+        # Captura legítima vía POST por el Técnico asignado (20)
+        client_tech = self._get_client_for_user(self.user_tech1)
+        url_sign = reverse('operations:workorder_sign', kwargs={'pk': wo.pk})
+        response = client_tech.post(url_sign, data={
+            'signer_name': signer_name,
+            'signer_title': signer_title,
+            'signer_id': signer_id,
+            'client_signature_data': sig_b64,
+        })
+        self.assertEqual(response.status_code, 302)
+
+        wo.refresh_from_db()
+        self.assertEqual(wo.client_signer_name, signer_name)
+        self.assertEqual(wo.client_signer_title, signer_title)
+        self.assertEqual(wo.client_signer_id, signer_id)
+        self.assertEqual(wo.client_signature_data, sig_b64)
+        self.assertIsNotNone(wo.client_signed_at)
+        self.assertEqual(wo.phase, WorkOrder.Phase.QUALITY_CHECK)
+
+        # Verificar hash SHA-256
+        expected_hash = hashlib.sha256(
+            f"{wo.number}|{signer_name}|{signer_id}|{sig_b64}".encode()
+        ).hexdigest()
+        self.assertEqual(wo.signature_hash, expected_hash)
+        self.assertEqual(len(wo.signature_hash), 64)
+
+        # Verificar Timeline Log
+        log_sig = wo.timeline_logs.filter(event_type='CLIENT_SIGNED').first()
+        self.assertIsNotNone(log_sig)
+        self.assertEqual(log_sig.actor, self.user_tech1)
+        self.assertIn("Firma digital de conformidad", log_sig.summary)
+
+        # 5. Inmutabilidad: Intento directo en modelo de sobrescribir firma
+        with self.assertRaises(ValidationError) as ctx:
+            wo.record_client_signature(
+                signer_name="Intruso",
+                signer_title="Hacker",
+                signer_id="000-000000-0000X",
+                signature_base64=sig_b64,
+                actor=self.user_ops_coord,
+            )
+        self.assertIn("inmutable", str(ctx.exception).lower())
+
+        # Inmutabilidad en clean() al intentar alterar datos con firma sellada
+        wo.client_signer_name = "Nombre Alterado"
+        with self.assertRaises(ValidationError):
+            wo.clean()
+
+    # --------------------------------------------------------------------------
+    # TEST 7: Aislamiento RBAC y Segregación de Funciones en Firma Digital
+    # --------------------------------------------------------------------------
+    def test_client_signature_rbac_segregation(self):
+        """
+        Verifica:
+        1. Un Técnico (20) que NO pertenece a la cuadrilla asignada recibe HTTP 403 Forbidden.
+        2. Un Oficial SST (70) que intente estampar la firma de recepción técnica recibe HTTP 403
+           por segregación estricta de funciones de auditoría vs ejecución.
+        """
+        crew_alpha = Crew.objects.create(
+            organization=self.org,
+            code="CUAD-ALFA",
+            name="Cuadrilla Alfa",
+            leader=self.user_engineer,
+            is_active=True,
+        )
+        crew_alpha.members.add(self.user_tech1)
+
+        wo = WorkOrder.objects.create(
+            organization=self.org,
+            account=self.account,
+            title="Instalación Industrial",
+            assigned_crew=crew_alpha,
+            phase=WorkOrder.Phase.IN_PROGRESS,
+        )
+
+        sig_data = {
+            'signer_name': 'Cliente Test',
+            'signer_title': 'Supervisor',
+            'signer_id': '001-000000-0000A',
+            'signature_data': "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        }
+        url_sign = reverse('operations:workorder_sign', kwargs={'pk': wo.pk})
+
+        # Intento por Técnico 2 (de otra cuadrilla) -> 403 Forbidden
+        client_tech2 = self._get_client_for_user(self.user_tech2)
+        resp_tech2 = client_tech2.post(url_sign, data=sig_data)
+        self.assertEqual(resp_tech2.status_code, 403)
+
+        # Intento por Oficial SST (Nivel 70) -> 403 Forbidden
+        client_sst = self._get_client_for_user(self.user_sst)
+        resp_sst = client_sst.post(url_sign, data=sig_data)
+        self.assertEqual(resp_sst.status_code, 403)
+
+    # --------------------------------------------------------------------------
+    # TEST 8: Endpoint de Sincronización Offline de Campo (/operations/field-sync/)
+    # --------------------------------------------------------------------------
+    def test_field_offline_sync_endpoint(self):
+        """
+        Verifica que el endpoint /operations/field-sync/ procese de forma atómica:
+        1. Actualizaciones de partidas ejecutadas en modo offline.
+        2. Carga de evidencias fotográficas con métricas de compresión en cliente.
+        3. Firma digital capturada sin conexión.
+        4. Bloqueo 403 a usuarios no autorizados (SST o técnicos no asignados).
+        """
+        crew = Crew.objects.create(
+            organization=self.org,
+            code="CUAD-SYNC",
+            name="Cuadrilla Sync",
+            leader=self.user_engineer,
+            is_active=True,
+        )
+        crew.members.add(self.user_tech1)
+
+        wo = WorkOrder.objects.create(
+            organization=self.org,
+            account=self.account,
+            title="Mantenimiento en Subestación Aislada",
+            assigned_crew=crew,
+            phase=WorkOrder.Phase.IN_PROGRESS,
+        )
+
+        item = WorkOrderItem.objects.create(
+            organization=self.org,
+            work_order=wo,
+            code="ITEM-SYNC-01",
+            description="Revisión de aisladores",
+            unit="UND",
+            planned_quantity=Decimal('4.00'),
+            executed_quantity=Decimal('0.00'),
+        )
+
+        sync_payload = {
+            'work_order_id': str(wo.pk),
+            'items_executed': [
+                {
+                    'item_id': str(item.pk),
+                    'executed_quantity': '4.00',
+                    'is_completed': True,
+                    'notes': 'Completado sin señal en sitio',
+                }
+            ],
+            'evidences': [
+                {
+                    'title': 'Foto Aislador Limpio',
+                    'evidence_type': WorkOrderEvidence.EvidenceType.PHOTO_PROGRESS,
+                    'compressed_image_data': 'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
+                    'original_size_kb': 3800,
+                    'compressed_size_kb': 125,
+                    'notes': 'Compresión en cliente 96.7%',
+                }
+            ],
+            'signature': {
+                'signer_name': 'Donaldo Triminio',
+                'signer_title': 'Jefe de Mantenimiento',
+                'signer_id': '081-220475-0001B',
+                'signature_data': "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+            }
+        }
+
+        client_tech1 = self._get_client_for_user(self.user_tech1)
+        url_sync = reverse('operations:field_offline_sync')
+        resp = client_tech1.post(
+            url_sync,
+            data=json.dumps(sync_payload),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data.get('status'), 'synced')
+        self.assertGreaterEqual(data.get('processed_count', 0), 2)
+
+        # Verificar actualización del ítem
+        item.refresh_from_db()
+        self.assertEqual(item.executed_quantity, Decimal('4.00'))
+        self.assertTrue(item.is_completed)
+        self.assertEqual(item.completed_by, self.user_tech1)
+
+        # Verificar evidencia creada con compresión
+        evidence = wo.evidences.filter(title='Foto Aislador Limpio').first()
+        self.assertIsNotNone(evidence)
+        self.assertEqual(evidence.original_size_kb, 3800)
+        self.assertEqual(evidence.compressed_size_kb, 125)
+
+        # Verificar firma sellada y fase
+        wo.refresh_from_db()
+        self.assertEqual(wo.client_signer_name, 'Donaldo Triminio')
+        self.assertEqual(len(wo.signature_hash), 64)
+        self.assertEqual(wo.phase, WorkOrder.Phase.QUALITY_CHECK)
+
+        # Verificar rechazo 403 si un Oficial SST intenta usar el endpoint de campo
+        client_sst = self._get_client_for_user(self.user_sst)
+        resp_sst = client_sst.post(
+            url_sync,
+            data=json.dumps(sync_payload),
+            content_type='application/json',
+        )
+        self.assertEqual(resp_sst.status_code, 403)
+
+    # --------------------------------------------------------------------------
+    # TEST 9: Rutas de Infraestructura PWA (/manifest.json y /service-worker.js)
+    # --------------------------------------------------------------------------
+    def test_pwa_manifest_and_service_worker(self):
+        """
+        Verifica que los endpoints de PWA respondan con HTTP 200, los tipos MIME
+        adecuados y las cabeceras requeridas para instalación en móviles.
+        """
+        client = Client()
+
+        # 1. Manifest PWA
+        resp_manifest = client.get(reverse('pwa_manifest'))
+        self.assertEqual(resp_manifest.status_code, 200)
+        self.assertEqual(resp_manifest['Content-Type'], 'application/manifest+json')
+        manifest_data = json.loads(resp_manifest.content.decode('utf-8'))
+        self.assertEqual(manifest_data.get('short_name'), 'ERP SAS')
+        self.assertEqual(manifest_data.get('display'), 'standalone')
+        self.assertEqual(manifest_data.get('theme_color'), '#0F172A')
+
+        # 2. Service Worker
+        resp_sw = client.get(reverse('pwa_service_worker'))
+        self.assertEqual(resp_sw.status_code, 200)
+        self.assertIn('application/javascript', resp_sw['Content-Type'])
+        self.assertEqual(resp_sw['Service-Worker-Allowed'], '/')
+        sw_code = resp_sw.content.decode('utf-8')
+        self.assertIn('erp-sas-v1', sw_code)
+        self.assertIn('fetch', sw_code)
+
+    # --------------------------------------------------------------------------
+    # TEST 10: Acta Oficial de Entrega Imprimible con Firma y Sello SHA-256
+    # --------------------------------------------------------------------------
+    def test_workorder_certificate_print_view(self):
+        """
+        Verifica que la vista de Acta Oficial de Entrega (/operations/orders/<pk>/certificate/)
+        renderice los datos técnicos, la firma digital y el sello SHA-256 inmutable.
+        """
+        wo = WorkOrder.objects.create(
+            organization=self.org,
+            account=self.account,
+            title="Construcción de Malla de Puesta a Tierra",
+            phase=WorkOrder.Phase.QUALITY_CHECK,
+            client_signer_name="Lic. Marcio Blandón",
+            client_signer_title="Auditor de Calidad",
+            client_signer_id="001-150482-0003M",
+            client_signature_data="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+            signature_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            client_signed_at=timezone.now(),
+        )
+
+        client_eng = self._get_client_for_user(self.user_engineer)
+        url_cert = reverse('operations:workorder_certificate_print', kwargs={'pk': wo.pk})
+        resp = client_eng.get(url_cert)
+        self.assertEqual(resp.status_code, 200)
+
+        html = resp.content.decode('utf-8')
+        self.assertIn("ACTA DE ENTREGA TÉCNICA", html)
+        self.assertIn(wo.number, html)
+        self.assertIn("Lic. Marcio Blandón", html)
+        self.assertIn("001-150482-0003M", html)
+        self.assertIn("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", html)

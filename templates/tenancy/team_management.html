@@ -73,7 +73,41 @@
             <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
                 <span class="text-[10px] text-zinc-400 block">NÓMINA ACTIVA:</span>
                 <span class="font-medium text-zinc-900 tabular-nums">{{ members|length }} COLABORADORES</span>
+        </div>
+
+        <!-- Conmutador de Perfiles de Giro de Negocio (Business Presets) -->
+        <div class="pt-3 border-t border-zinc-100">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2.5">
+                <div>
+                    <span class="text-xs font-semibold text-zinc-900 block font-sans">Perfil de Giro de Negocio &amp; Arquitectura Modular</span>
+                    <span class="text-[10px] font-mono text-zinc-500 block">
+                        Conmute en 1 clic los subsistemas contratados según el giro comercial de la organización en Nicaragua.
+                    </span>
+                </div>
+                <span class="text-[10px] font-mono uppercase font-semibold text-zinc-700 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    PERFIL ACTUAL: {{ current_org.get_business_profile_display }}
+                </span>
             </div>
+
+            <form method="POST" action="{% url 'tenancy:apply_preset' %}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                {% csrf_token %}
+                {% for prof in business_profiles %}
+                <button type="submit" 
+                        name="business_profile" 
+                        value="{{ prof.code }}"
+                        class="p-2.5 text-left border rounded-[4px] transition-colors cursor-pointer group {% if prof.is_active %}border-zinc-900 bg-zinc-50/80 ring-1 ring-zinc-900{% else %}border-zinc-200 bg-white hover:bg-zinc-50{% endif %}">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[11px] font-semibold text-zinc-900 group-hover:text-black">{{ prof.name }}</span>
+                        {% if prof.is_active %}
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                        {% endif %}
+                    </div>
+                    <div class="text-[10px] font-mono text-zinc-500">
+                        Módulos: <span class="text-zinc-700 font-medium">{% for m in prof.modules %}{{ m|upper }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                    </div>
+                </button>
+                {% endfor %}
+            </form>
         </div>
 
         <!-- Formulario de Activación de Módulos en Caliente -->

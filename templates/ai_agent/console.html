@@ -1,0 +1,375 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Servidor MCP & Agentes IA | {{ current_org.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ 
+    showTokenModal: false, 
+    simTool: 'query_workorders',
+    simParams: '{}',
+    simLoading: false,
+    simResponse: null,
+    runSimulator() {
+        this.simLoading = true;
+        this.simResponse = null;
+        fetch('{% url 'ai_agent:simulator_execute' %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: new URLSearchParams({
+                'tool_name': this.simTool,
+                'params': this.simParams
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            this.simResponse = JSON.stringify(data, null, 2);
+            this.simLoading = false;
+        })
+        .catch(err => {
+            this.simResponse = JSON.stringify({error: err.toString()}, null, 2);
+            this.simLoading = false;
+        });
+    }
+}">
+    <!-- Header Técnico MCP -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4 gap-3">
+        <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-500 font-mono mb-1">
+                <span>INFRAESTRUCTURA & IA</span>
+                <span>/</span>
+                <span class="text-slate-700 font-semibold">MODEL CONTEXT PROTOCOL (MCP)</span>
+            </div>
+            <h1 class="text-xl font-bold tracking-tight text-slate-900">
+                Servidor MCP y Gobierno de Agentes IA
+            </h1>
+            <p class="text-xs text-slate-500 mt-0.5">
+                Emisión de tokens criptográficos revocables, interoperabilidad con Claude/LLMs y auditoría técnica inmutable de consultas al ERP.
+            </p>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex flex-wrap items-center gap-2">
+            {% if can_create_token %}
+            <button type="button" @click="showTokenModal = true" class="inline-flex items-center px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 transition">
+                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Emitir Token MCP
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Banner Criptográfico de Token Recién Creado (Solo se muestra una vez) -->
+    {% if newly_created_token %}
+    <div class="bg-amber-50 border border-amber-300 rounded-md p-4 space-y-2">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 text-amber-900 font-semibold text-xs">
+                <svg class="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <span>¡TOKEN GENERADO EXITOSAMENTE! COPIE EL SECRETO AHORA</span>
+            </div>
+            <span class="font-mono text-[11px] text-amber-700 font-medium">{{ newly_created_token.scoped_role }}</span>
+        </div>
+        <p class="text-xs text-amber-800">
+            Cliente: <strong>{{ newly_created_token.name }}</strong> ({{ newly_created_token.prefix }}).
+            Por razones de seguridad estricta, este token nunca se almacena en texto plano y no podrá volver a consultarse.
+        </p>
+        <div class="flex items-center gap-2 pt-1">
+            <input type="text" readonly value="{{ newly_created_token.secret }}" id="secretTokenInput" class="w-full font-mono text-xs bg-white border border-amber-300 rounded px-3 py-1.5 text-slate-900 select-all font-semibold">
+            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('secretTokenInput').value); alert('Token secreto copiado al portapapeles.');" class="px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-200 border border-amber-300 rounded hover:bg-amber-300 transition whitespace-nowrap">
+                Copiar Secreto
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 4 Métricas de Telemetría MCP -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white border border-slate-200 rounded-md p-4">
+            <div class="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-medium">Tokens Activos</div>
+            <div class="mt-1 flex items-baseline justify-between">
+                <div class="text-2xl font-bold font-mono tabular-nums text-slate-900">{{ active_tokens_count }}</div>
+                <span class="text-[10px] text-slate-500 font-mono">{{ tokens|length }} emitidos</span>
+            </div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-md p-4">
+            <div class="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-medium">Llamadas Acumuladas</div>
+            <div class="mt-1 flex items-baseline justify-between">
+                <div class="text-2xl font-bold font-mono tabular-nums text-slate-900">{{ total_calls }}</div>
+                <span class="text-[10px] text-slate-500 font-mono">Telemetría Org</span>
+            </div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-md p-4">
+            <div class="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-medium">Herramientas MCP</div>
+            <div class="mt-1 flex items-baseline justify-between">
+                <div class="text-2xl font-bold font-mono tabular-nums text-slate-900">5</div>
+                <span class="text-[10px] text-slate-500 font-mono">OTs, Inv, SST, SLA, Fin</span>
+            </div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-md p-4">
+            <div class="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-medium">Endpoint Oficial</div>
+            <div class="mt-1 flex items-baseline justify-between">
+                <div class="text-xs font-bold font-mono text-slate-800 truncate">/mcp/v1/execute/</div>
+                <span class="text-[10px] text-emerald-700 bg-emerald-50 px-1 rounded font-mono">REST / JSON-RPC</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección 1: Tokens Emitidos y Gobierno de Acceso -->
+    <div class="bg-white border border-slate-200 rounded-md overflow-hidden">
+        <div class="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div>
+                <h2 class="text-xs font-mono uppercase tracking-wider text-slate-700 font-semibold">Credenciales Criptográficas de Agentes (Tokens)</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Cada token delimita el nivel máximo de autoridad y las herramientas disponibles para el cliente LLM.</p>
+            </div>
+            <span class="font-mono text-xs text-slate-500 tabular-nums">{{ tokens|length }} credenciales</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-white border-b border-slate-200 text-slate-600 font-medium">
+                        <th class="py-2.5 px-3">Cliente / Agente</th>
+                        <th class="py-2.5 px-3">Prefijo Visible</th>
+                        <th class="py-2.5 px-3">Techo Jerárquico (RBAC)</th>
+                        <th class="py-2.5 px-3">Herramientas Habilitadas</th>
+                        <th class="py-2.5 px-3">Llamadas / Último Uso</th>
+                        <th class="py-2.5 px-3">Estado</th>
+                        <th class="py-2.5 px-3 text-right">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for t in tokens %}
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="py-2.5 px-3">
+                            <div class="font-medium text-slate-900">{{ t.name }}</div>
+                            <div class="text-[11px] text-slate-400">Por {{ t.created_by.get_full_name|default:t.created_by.email }}</div>
+                        </td>
+                        <td class="py-2.5 px-3 font-mono font-semibold text-slate-800 whitespace-nowrap">
+                            {{ t.token_prefix }}
+                        </td>
+                        <td class="py-2.5 px-3 whitespace-nowrap">
+                            <span class="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200 font-medium">
+                                Nivel {{ t.scoped_role_level }} · {{ t.get_scoped_role_level_display }}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <div class="flex flex-wrap gap-1 max-w-[280px]">
+                                {% for tool in t.allowed_tools %}
+                                <span class="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-50 border border-slate-200 text-slate-600">
+                                    {{ tool }}
+                                </span>
+                                {% empty %}
+                                <span class="text-slate-400 text-[11px]">Ninguna</span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td class="py-2.5 px-3 whitespace-nowrap font-mono tabular-nums">
+                            <div class="text-slate-800 font-semibold">{{ t.total_calls }} llamadas</div>
+                            <div class="text-[10px] text-slate-400">{{ t.last_used_at|date:"d/m/Y H:i"|default:"Nunca utilizado" }}</div>
+                        </td>
+                        <td class="py-2.5 px-3 whitespace-nowrap">
+                            {% if t.is_active and not t.is_expired %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                ACTIVO
+                            </span>
+                            {% elif t.is_expired %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                EXPIRADO
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200">
+                                REVOCADO
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3 text-right whitespace-nowrap">
+                            <form action="{% url 'ai_agent:token_toggle' t.pk %}" method="post" class="inline">
+                                {% csrf_token %}
+                                {% if t.is_active %}
+                                <button type="submit" class="px-2.5 py-1 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded hover:bg-rose-100 transition">
+                                    Revocar
+                                </button>
+                                {% else %}
+                                <button type="submit" class="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded hover:bg-emerald-100 transition">
+                                    Reactivar
+                                </button>
+                                {% endif %}
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="py-8 text-center text-slate-400 text-xs">
+                            No se han emitido credenciales MCP en esta organización.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Sección 2: Simulador Técnico en Vivo & Bitácora de Auditoría -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <!-- Panel de Simulación MCP en Vivo -->
+        <div class="bg-white border border-slate-200 rounded-md p-4 space-y-4">
+            <div class="border-b border-slate-100 pb-2">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-mono uppercase tracking-wider text-slate-700 font-semibold">Simulador de Herramientas MCP</h3>
+                    <span class="font-mono text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">MODO INTERACTIVO</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">Ejecuta consultas de prueba contra los datos vivos del Tenant para verificar respuestas JSON.</p>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Seleccionar Herramienta</label>
+                    <select x-model="simTool" class="w-full text-xs bg-slate-50 border border-slate-200 rounded px-3 py-2 text-slate-800">
+                        <option value="query_workorders">query_workorders · Órdenes de Trabajo & Cuadrillas</option>
+                        <option value="query_inventory_stock">query_inventory_stock · Existencias & Alertas de Material</option>
+                        <option value="query_sst_compliance">query_sst_compliance · Auditoría SST Ley 618 MITRAB</option>
+                        <option value="query_sla_tickets">query_sla_tickets · Mesa de Ayuda & Tiempos SLA</option>
+                        <option value="query_financial_summary">query_financial_summary · Resumen Financiero Ejecutivo</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Parámetros JSON de Entrada</label>
+                    <textarea x-model="simParams" rows="3" class="w-full font-mono text-xs bg-slate-50 border border-slate-200 rounded px-3 py-2 text-slate-800"></textarea>
+                </div>
+
+                <div class="flex justify-between items-center pt-1">
+                    <span class="text-[11px] text-slate-500 font-mono">Ejecuta con la autoridad de su usuario</span>
+                    <button type="button" @click="runSimulator()" :disabled="simLoading" class="px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition disabled:opacity-50">
+                        <span x-show="!simLoading">Ejecutar Herramienta</span>
+                        <span x-show="simLoading">Consultando...</span>
+                    </button>
+                </div>
+
+                <!-- Salida del Simulador -->
+                <div x-show="simResponse" class="pt-2">
+                    <label class="block text-[11px] font-mono text-slate-500 mb-1">Respuesta JSON:</label>
+                    <pre class="w-full max-h-60 overflow-y-auto font-mono text-[11px] bg-slate-950 text-emerald-400 p-3 rounded border border-slate-800 select-all" x-text="simResponse"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bitácora Inmutable de Auditoría de Llamadas -->
+        <div class="bg-white border border-slate-200 rounded-md p-4 space-y-4">
+            <div class="border-b border-slate-100 pb-2 flex items-center justify-between">
+                <div>
+                    <h3 class="text-xs font-mono uppercase tracking-wider text-slate-700 font-semibold">Bitácora de Auditoría Inmutable</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Registro cronológico estricto de cada invocación al servidor MCP.</p>
+                </div>
+                <span class="font-mono text-xs text-slate-500 tabular-nums">{{ audit_logs|length }} logs recientes</span>
+            </div>
+
+            <div class="space-y-2 max-h-[380px] overflow-y-auto">
+                {% for log in audit_logs %}
+                <div class="p-2.5 rounded border border-slate-200 bg-slate-50/50 text-xs space-y-1">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono font-semibold text-slate-900">{{ log.tool_name }}</span>
+                            {% if log.response_status == 'SUCCESS' %}
+                            <span class="font-mono text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
+                                SUCCESS ({{ log.execution_ms }}ms)
+                            </span>
+                            {% elif log.response_status == 'DENIED' %}
+                            <span class="font-mono text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded">
+                                DENIED (RBAC)
+                            </span>
+                            {% else %}
+                            <span class="font-mono text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                                ERROR
+                            </span>
+                            {% endif %}
+                        </div>
+                        <span class="font-mono text-[10px] text-slate-400 tabular-nums">{{ log.created_at|date:"d/m/Y H:i:s" }}</span>
+                    </div>
+
+                    <div class="flex items-center justify-between text-[11px] text-slate-500">
+                        <span>Token: <span class="font-mono text-slate-700 font-medium">{{ log.token.name|default:"Simulador Web" }}</span></span>
+                        <span class="font-mono text-slate-400">IP: {{ log.ip_address|default:"127.0.0.1" }}</span>
+                    </div>
+
+                    {% if log.error_message %}
+                    <div class="text-[10px] text-rose-700 bg-rose-50/60 p-1 rounded font-mono break-all">
+                        {{ log.error_message }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="text-center py-6 text-xs text-slate-400">
+                    No se registran llamadas en la bitácora de auditoría.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Emitir Token MCP -->
+    {% if can_create_token and token_form %}
+    <div x-show="showTokenModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-slate-900 bg-opacity-40" @click="showTokenModal = false"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-md text-left overflow-hidden shadow-sm transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-slate-200">
+                <form action="{% url 'ai_agent:token_create' %}" method="post" class="p-6 space-y-4">
+                    {% csrf_token %}
+                    <div class="border-b border-slate-100 pb-3">
+                        <h3 class="text-sm font-bold text-slate-900">Emitir Credencial MCP para Agente IA</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Se generará un token secreto 'etn_mcp_...' que solo se mostrará una vez.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Nombre del Cliente / Agente *</label>
+                        {{ token_form.name }}
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Techo Jerárquico RBAC</label>
+                            {{ token_form.scoped_role_level }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Plazo de Expiración</label>
+                            {{ token_form.expiration }}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-2">Herramientas Habilitadas en la Lista Blanca</label>
+                        <div class="space-y-1.5 bg-slate-50 p-3 rounded border border-slate-200 text-xs">
+                            {% for checkbox in token_form.allowed_tools %}
+                            <label class="flex items-center gap-2 text-slate-700 cursor-pointer">
+                                {{ checkbox.tag }}
+                                <span class="font-mono text-[11px]">{{ checkbox.choice_label }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button type="button" @click="showTokenModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-50">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800">
+                            Generar Credencial
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

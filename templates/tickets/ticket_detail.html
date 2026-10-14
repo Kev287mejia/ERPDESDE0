@@ -1,0 +1,221 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}{{ ticket.number }} · {{ ticket.title }} | Mesa de Ayuda{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Breadcrumb y Header Técnico -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4 gap-3">
+        <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-500 font-mono mb-1">
+                <a href="{% url 'tickets:ticket_list' %}" class="hover:underline">MESA DE AYUDA</a>
+                <span>/</span>
+                <span class="text-slate-800 font-semibold">{{ ticket.number }}</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <h1 class="text-xl font-bold tracking-tight text-slate-900">
+                    {{ ticket.title }}
+                </h1>
+                <span class="font-mono text-xs px-2.5 py-0.5 rounded font-semibold 
+                    {% if ticket.priority == 'CRITICAL' %}bg-rose-100 text-rose-800 border border-rose-200
+                    {% elif ticket.priority == 'HIGH' %}bg-amber-100 text-amber-800 border border-amber-200
+                    {% else %}bg-slate-100 text-slate-800 border border-slate-200{% endif %} tabular-nums">
+                    {{ ticket.get_priority_display }}
+                </span>
+                
+                {% if ticket.sla_status == 'COMPLETED' %}
+                <span class="text-xs px-2.5 py-0.5 rounded font-mono font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    SLA CUMPLIDO
+                </span>
+                {% elif ticket.sla_status == 'BREACHED' %}
+                <span class="text-xs px-2.5 py-0.5 rounded font-mono font-semibold bg-rose-50 text-rose-700 border border-rose-300">
+                    SLA VENCIDO
+                </span>
+                {% else %}
+                <span class="text-xs px-2.5 py-0.5 rounded font-mono font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                    EN PLAZO ({{ ticket.sla_hours }}h)
+                </span>
+                {% endif %}
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+                Categoría: <span class="font-medium text-slate-700">{{ ticket.get_category_display }}</span> · 
+                Estado: <span class="font-medium text-slate-700">{{ ticket.get_status_display }}</span>
+            </p>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex items-center gap-2">
+            <a href="{% url 'tickets:ticket_list' %}" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition">
+                <svg class="w-3.5 h-3.5 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Volver a Bandeja
+            </a>
+        </div>
+    </div>
+
+    <!-- Grid Principal: Detalle + Bitácora (2 cols) | Panel SLA + Resolución (1 col) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <!-- Columna Izquierda: Descripción del Incidente + Bitácora -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Ficha del Incidente -->
+            <div class="bg-white border border-slate-200 rounded-md p-4 space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <h3 class="text-xs font-mono uppercase tracking-wider text-slate-500 font-semibold">Descripción del Incidente</h3>
+                    <span class="font-mono text-[11px] text-slate-400 tabular-nums">Apertura: {{ ticket.created_at|date:"d/m/Y H:i:s" }}</span>
+                </div>
+                <div class="text-xs text-slate-800 leading-relaxed whitespace-pre-line">
+                    {{ ticket.description }}
+                </div>
+
+                {% if ticket.resolution_summary %}
+                <div class="mt-4 pt-3 border-t border-slate-100 bg-emerald-50/50 border border-emerald-200 rounded p-3">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-semibold text-emerald-900 font-mono">DICTAMEN TÉCNICO DE RESOLUCIÓN</span>
+                        <span class="text-[11px] font-mono text-emerald-700 tabular-nums">{{ ticket.resolved_at|date:"d/m/Y H:i:s" }}</span>
+                    </div>
+                    <p class="text-xs text-emerald-950 whitespace-pre-line">{{ ticket.resolution_summary }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Bitácora de Comentarios Técnicos -->
+            <div class="bg-white border border-slate-200 rounded-md p-4 space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <h3 class="text-xs font-mono uppercase tracking-wider text-slate-700 font-semibold">Bitácora de Seguimiento & Colaboración</h3>
+                    <span class="font-mono text-xs text-slate-500 tabular-nums">{{ comments|length }} notas</span>
+                </div>
+
+                <!-- Historial de Comentarios -->
+                <div class="space-y-3">
+                    {% for c in comments %}
+                    <div class="border border-slate-200 rounded p-3 bg-slate-50/40">
+                        <div class="flex items-center justify-between text-xs mb-1">
+                            <span class="font-semibold text-slate-900">{{ c.author.get_full_name|default:c.author.email }}</span>
+                            <span class="font-mono text-[11px] text-slate-400 tabular-nums">{{ c.created_at|date:"d/m/Y H:i:s" }}</span>
+                        </div>
+                        <p class="text-xs text-slate-700 whitespace-pre-line">{{ c.message }}</p>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-4 text-xs text-slate-400">
+                        No hay comentarios en la bitácora aún.
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Formulario Agregar Comentario -->
+                <form action="{% url 'tickets:ticket_comment_create' ticket.pk %}" method="post" class="pt-3 border-t border-slate-100 space-y-2">
+                    {% csrf_token %}
+                    <label class="block text-xs font-medium text-slate-700">Agregar Nota Técnica a la Bitácora</label>
+                    {{ comment_form.message }}
+                    <div class="flex justify-end">
+                        <button type="submit" class="px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
+                            Publicar Comentario
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Columna Derecha: Parámetros SLA y Resolución -->
+        <div class="lg:col-span-1 space-y-6">
+            <!-- Métricas SLA -->
+            <div class="bg-white border border-slate-200 rounded-md p-4 space-y-3">
+                <div class="border-b border-slate-100 pb-2">
+                    <h3 class="text-xs font-mono uppercase tracking-wider text-slate-500 font-semibold">Compromiso de Servicio (SLA)</h3>
+                </div>
+
+                <div class="space-y-2.5 text-xs">
+                    <div>
+                        <span class="text-slate-500 block">Horas Garantizadas:</span>
+                        <span class="font-mono font-semibold text-slate-900">{{ ticket.sla_hours }} horas</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Fecha y Hora Límite (Due):</span>
+                        <span class="font-mono font-medium text-slate-800 tabular-nums">{{ ticket.sla_due_at|date:"d/m/Y H:i:s" }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Fecha de Resolución:</span>
+                        {% if ticket.resolved_at %}
+                        <span class="font-mono text-emerald-700 font-medium tabular-nums">{{ ticket.resolved_at|date:"d/m/Y H:i:s" }}</span>
+                        {% else %}
+                        <span class="font-mono text-slate-400">En curso</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Estado del SLA:</span>
+                        {% if ticket.sla_status == 'COMPLETED' %}
+                        <span class="font-mono text-emerald-700 font-semibold">CUMPLIDO / EN HISTÓRICO</span>
+                        {% elif ticket.sla_status == 'BREACHED' %}
+                        <span class="font-mono text-rose-700 font-semibold">PLAZO VENCIDO</span>
+                        {% else %}
+                        <span class="font-mono text-blue-700 font-semibold">DENTRO DEL TIEMPO COMPROMETIDO</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Asignación e Interesados -->
+            <div class="bg-white border border-slate-200 rounded-md p-4 space-y-3">
+                <div class="border-b border-slate-100 pb-2">
+                    <h3 class="text-xs font-mono uppercase tracking-wider text-slate-500 font-semibold">Asignación & OT</h3>
+                </div>
+
+                <div class="space-y-2.5 text-xs">
+                    <div>
+                        <span class="text-slate-500 block">Reportado Por:</span>
+                        <span class="font-medium text-slate-900">{{ ticket.reported_by.get_full_name|default:ticket.reported_by.email }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Especialista Asignado:</span>
+                        {% if ticket.assigned_to %}
+                        <span class="font-medium text-slate-900">{{ ticket.assigned_to.get_full_name|default:ticket.assigned_to.email }}</span>
+                        {% else %}
+                        <span class="text-slate-400 font-mono">Sin especialista asignado</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Orden de Trabajo Vinculada:</span>
+                        {% if ticket.related_work_order %}
+                        <a href="{% url 'operations:workorder_detail' ticket.related_work_order.pk %}" class="font-mono text-blue-600 hover:underline font-semibold">
+                            {{ ticket.related_work_order.code }}
+                        </a>
+                        <div class="text-[11px] text-slate-500">{{ ticket.related_work_order.title }}</div>
+                        {% else %}
+                        <span class="text-slate-400 font-mono">No asociada a OT</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel de Resolución (Exclusivo Nivel 70+) -->
+            <div class="bg-white border border-slate-200 rounded-md p-4 space-y-3">
+                <div class="border-b border-slate-100 pb-2">
+                    <h3 class="text-xs font-mono uppercase tracking-wider text-slate-500 font-semibold">Gestión & Resolución</h3>
+                </div>
+
+                {% if can_resolve and resolve_form %}
+                <form action="{% url 'tickets:ticket_resolve' ticket.pk %}" method="post" class="space-y-3">
+                    {% csrf_token %}
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Actualizar Estado</label>
+                        {{ resolve_form.status }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Dictamen / Cierre Técnico</label>
+                        {{ resolve_form.resolution_summary }}
+                    </div>
+                    <button type="submit" class="w-full px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
+                        Actualizar Dictamen del Ticket
+                    </button>
+                </form>
+                {% else %}
+                <div class="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded border border-slate-200">
+                    La resolución o cierre formal de tickets requiere autorización jerárquica de Oficial SST (Nivel 70), Coordinador de Operaciones (Nivel 80) o Dirección.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

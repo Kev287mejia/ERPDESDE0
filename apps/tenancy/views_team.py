@@ -7,7 +7,7 @@ from django.views import View
 
 from apps.tenancy.constants import ERP_MODULES_BY_CODE, ERP_MODULES_CATALOG
 from apps.tenancy.forms import MemberRoleUpdateForm, TeamCreateMemberForm
-from apps.tenancy.models import OrganizationMembership, RoleLevel
+from apps.tenancy.models import Organization, OrganizationMembership, RoleLevel
 from apps.tenancy.permissions import RoleLevelRequiredMixin, TenantRequiredMixin
 
 User = get_user_model()
@@ -76,6 +76,15 @@ class TeamListView(RoleLevelRequiredMixin, View):
             'all_modules': [
                 {'code': mod['code'], 'name': f"{mod['tag']} · {mod['name']}", 'min_role': f"Nivel {mod['min_role_level']}+"}
                 for mod in ERP_MODULES_CATALOG
+            ],
+            'business_profiles': [
+                {
+                    'code': code,
+                    'name': label,
+                    'modules': Organization.BUSINESS_PROFILE_PRESETS.get(code, []),
+                    'is_active': request.organization.business_profile == code
+                }
+                for code, label in Organization.BusinessProfile.choices
             ],
         })
 
@@ -235,5 +244,27 @@ class MemberRoleUpdateView(RoleLevelRequiredMixin, View):
             for field, errs in form.errors.items():
                 for err in errs:
                     messages.error(request, f"Error en {field}: {err}")
+
+        return redirect('tenancy:team_management')
+
+
+class ApplyBusinessProfilePresetView(RoleLevelRequiredMixin, View):
+    """
+    Permite al Administrador General (Nivel 100) aplicar un perfil de giro de negocio predefinido
+    actualizando en caliente la arquitectura de módulos habilitados de la empresa.
+    """
+    min_role_level = RoleLevel.OWNER_ADMIN
+
+    def post(self, request, *args, **kwargs):
+        profile_code = (request.POST.get('business_profile') or request.POST.get('preset') or '').strip()
+        if profile_code in Organization.BusinessProfile.values:
+            request.organization.apply_business_profile_preset(profile_code)
+            messages.success(
+                request,
+                f"Perfil operativo actualizado a: {request.organization.get_business_profile_display()}. "
+                f"Módulos sincronizados: {', '.join(request.organization.enabled_modules).upper()}."
+            )
+        else:
+            messages.error(request, "Perfil de giro comercial no reconocido.")
 
         return redirect('tenancy:team_management')

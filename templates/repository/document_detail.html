@@ -1,0 +1,253 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}{{ doc.code }} · {{ doc.title }} | Repositorio Documental{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ showVersionModal: false }">
+    <!-- Breadcrumb y Header Técnico -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4 gap-3">
+        <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-500 font-mono mb-1">
+                <a href="{% url 'repository:browser' %}" class="hover:underline">REPOSITORIO</a>
+                <span>/</span>
+                <a href="{% url 'repository:browser' %}?folder={{ doc.folder.pk }}" class="hover:underline">{{ doc.folder.code }}</a>
+                <span>/</span>
+                <span class="text-slate-800 font-semibold">{{ doc.code }}</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-xl font-bold tracking-tight text-slate-900">
+                    {{ doc.title }}
+                </h1>
+                <span class="font-mono text-xs px-2.5 py-0.5 rounded font-semibold bg-slate-100 text-slate-800 border border-slate-200 tabular-nums">
+                    v{{ doc.current_version_number }}
+                </span>
+                {% if doc.is_locked %}
+                <span class="text-xs px-2.5 py-0.5 rounded font-medium bg-rose-50 text-rose-700 border border-rose-200">
+                    Bloqueado
+                </span>
+                {% else %}
+                <span class="text-xs px-2.5 py-0.5 rounded font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Vigente
+                </span>
+                {% endif %}
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+                Ficha Maestra Técnica · Tipo: <span class="font-medium text-slate-700">{{ doc.get_document_type_display }}</span> · 
+                Carpeta: <span class="font-medium text-slate-700">{{ doc.folder.name }}</span>
+            </p>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{% url 'repository:browser' %}?folder={{ doc.folder.pk }}" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition">
+                <svg class="w-3.5 h-3.5 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Volver al Directorio
+            </a>
+
+            {% if can_toggle_lock %}
+            <form action="{% url 'repository:document_toggle_lock' doc.pk %}" method="post" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="inline-flex items-center px-3 py-1.5 text-xs font-medium {% if doc.is_locked %}text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100{% else %}text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100{% endif %} rounded-md transition">
+                    {% if doc.is_locked %}
+                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
+                    </svg>
+                    Desbloquear Documento
+                    {% else %}
+                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                    Bloquear Revisiones
+                    {% endif %}
+                </button>
+            </form>
+            {% endif %}
+
+            {% if can_upload_version %}
+            <button type="button" @click="showVersionModal = true" class="inline-flex items-center px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 transition">
+                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                </svg>
+                Publicar Nueva Versión (v{{ doc.current_version_number|add:1 }})
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Grid de Ficha Maestra -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <!-- Tarjeta de Metadatos del Documento -->
+        <div class="lg:col-span-1 bg-white border border-slate-200 rounded-md p-4 space-y-4">
+            <div class="border-b border-slate-100 pb-2">
+                <h3 class="text-xs font-mono uppercase tracking-wider text-slate-500 font-semibold">Parámetros Maestros</h3>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div>
+                    <span class="text-slate-500 block">Folio Institucional:</span>
+                    <span class="font-mono font-semibold text-slate-900 text-sm">{{ doc.code }}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block">Archivo Vigente:</span>
+                    <span class="font-mono text-slate-800">{{ doc.latest_filename }}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block">Sello SHA-256 Vigente:</span>
+                    <div class="font-mono text-[11px] text-slate-700 bg-slate-50 border border-slate-200 p-2 rounded break-all select-all mt-0.5">
+                        {{ doc.latest_checksum }}
+                    </div>
+                </div>
+                <div>
+                    <span class="text-slate-500 block">Orden de Trabajo Vinculada:</span>
+                    {% if doc.work_order %}
+                    <a href="{% url 'operations:workorder_detail' doc.work_order.pk %}" class="font-mono text-blue-600 hover:underline font-semibold">
+                        {{ doc.work_order.code }} · {{ doc.work_order.title }}
+                    </a>
+                    {% else %}
+                    <span class="text-slate-400 font-mono">Sin vincular a OT específica</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <span class="text-slate-500 block">Registrado Por:</span>
+                    <span class="text-slate-800">{{ doc.created_by.get_full_name|default:doc.created_by.email|default:"Sistema" }}</span>
+                </div>
+                <div>
+                    <span class="text-slate-500 block">Fecha de Registro Inicial:</span>
+                    <span class="font-mono text-slate-800 tabular-nums">{{ doc.created_at|date:"d/m/Y H:i:s" }}</span>
+                </div>
+                <div class="pt-2 border-t border-slate-100">
+                    <span class="text-slate-500 block">Restricción de Publicación:</span>
+                    <span class="font-mono text-[11px] text-slate-700">Exige Nivel {{ doc.folder.min_role_level_upload }}+ ({{ doc.folder.get_department_display }})</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historial Inmutable de Versiones (Línea de Tiempo ISO) -->
+        <div class="lg:col-span-2 space-y-4">
+            <div class="bg-white border border-slate-200 rounded-md p-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                    <div>
+                        <h3 class="text-xs font-mono uppercase tracking-wider text-slate-700 font-semibold">
+                            Trazabilidad Inmutable de Revisiones (ISO 9001 / IEC)
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Historial garantizado mediante candado transaccional y hash criptográfico SHA-256 por cada versión.
+                        </p>
+                    </div>
+                    <span class="font-mono text-xs text-slate-500 tabular-nums bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">
+                        {{ versions|length }} revisiones
+                    </span>
+                </div>
+
+                <!-- Lista Cronológica Inmutable -->
+                <div class="space-y-4">
+                    {% for ver in versions %}
+                    <div class="border border-slate-200 rounded-md p-3.5 {% if forloop.first %}bg-slate-50/50 border-slate-300{% else %}bg-white{% endif %} transition">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2.5">
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded {% if forloop.first %}bg-slate-900 text-white{% else %}bg-slate-200 text-slate-800{% endif %} tabular-nums">
+                                    v{{ ver.version_number }}
+                                </span>
+                                <span class="font-mono font-medium text-xs text-slate-900">{{ ver.filename }}</span>
+                                <span class="font-mono text-[11px] text-slate-500 tabular-nums">({{ ver.file_size_kb }} KB)</span>
+                                {% if forloop.first %}
+                                <span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
+                                    ACTUAL
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="text-[11px] text-slate-500 font-mono tabular-nums">
+                                {{ ver.created_at|date:"d/m/Y H:i:s" }} · {{ ver.uploaded_by.get_full_name|default:ver.uploaded_by.email }}
+                            </div>
+                        </div>
+
+                        <!-- Notas de Cambio -->
+                        <div class="mt-2.5 text-xs text-slate-700">
+                            <span class="font-medium text-slate-900">Notas de Revisión:</span>
+                            <p class="mt-0.5 whitespace-pre-line text-slate-600">{{ ver.change_log }}</p>
+                        </div>
+
+                        {% if ver.content_summary_or_payload %}
+                        <div class="mt-2 text-[11px] text-slate-500 bg-white border border-slate-100 p-2 rounded">
+                            <span class="font-medium text-slate-700">Metadatos / Resumen Técnico:</span>
+                            <span class="text-slate-600 ml-1">{{ ver.content_summary_or_payload }}</span>
+                        </div>
+                        {% endif %}
+
+                        <!-- Sello Criptográfico SHA-256 -->
+                        <div class="mt-2.5 pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between text-[11px] font-mono gap-1">
+                            <span class="text-slate-500">SELLO SHA-256:</span>
+                            <span class="text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 break-all select-all">
+                                {{ ver.checksum_sha256 }}
+                            </span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-6 text-xs text-slate-400">
+                        No hay versiones registradas para este documento.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Publicar Nueva Versión -->
+    {% if can_upload_version and version_form %}
+    <div x-show="showVersionModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-slate-900 bg-opacity-40" @click="showVersionModal = false"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-md text-left overflow-hidden shadow-sm transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-slate-200">
+                <form action="{% url 'repository:document_new_version' doc.pk %}" method="post" class="p-6 space-y-4">
+                    {% csrf_token %}
+                    <div class="border-b border-slate-100 pb-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-slate-900">Publicar Revisión Técnica</h3>
+                            <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-900 text-white tabular-nums">
+                                v{{ doc.current_version_number|add:1 }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Documento: <span class="font-mono font-semibold text-slate-700">{{ doc.code }}</span> · La versión se registrará de forma inmutable con bloqueo concurrente.
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Nombre de Archivo Técnico *</label>
+                            {{ version_form.filename }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Tamaño (KB)</label>
+                            {{ version_form.file_size_kb }}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Notas de Cambio de la Revisión *</label>
+                        {{ version_form.change_log }}
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Resumen Técnico / Modificaciones Efectuadas</label>
+                        {{ version_form.content_payload }}
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button type="button" @click="showVersionModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-50">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800">
+                            Publicar Revisión v{{ doc.current_version_number|add:1 }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
