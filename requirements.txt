@@ -1,0 +1,22 @@
+# ==============================================================================
+# ETERNAL LABS - ENTERPRISE SOFTWARE DIVISION
+# DEPENDENCIAS OFICIALES DEL PROYECTO (requirements.txt)
+# Arquitectura: ERP SAS Multi-Tenant / Python 3.13 / PostgreSQL
+# ==============================================================================
+
+# Core Framework
+Django>=5.1.0,<5.2.0
+
+# Conector de Base de Datos Relacional ACID (PostgreSQL)
+psycopg2-binary>=2.9.9
+
+# Configuración y Variables de Entorno
+python-dotenv>=1.0.1
+dj-database-url>=2.1.0
+
+# Servidor de Archivos Estáticos de Alto Rendimiento
+whitenoise>=6.6.0
+
+# Utilidades de Zona Horaria y Tipado
+tzdata>=2025.1
+typing-extensions>=4.12.0

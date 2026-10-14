@@ -1,0 +1,93 @@
+# ==============================================================================
+# ETERNAL LABS - ENTERPRISE SOFTWARE DIVISION
+# ARCHIVO DE EXCLUSIÓN CORPORATIVO (.gitignore)
+# Entorno: Python 3.13 / Django 5 / PostgreSQL / Multi-Tenant SaaS Architecture
+# ==============================================================================
+
+# Entornos virtuales de desarrollo y dependencias
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Bytecode compilado de Python y artefactos de caché
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Base de datos local transaccional y dumps
+db.sqlite3
+db.sqlite3-journal
+*.db
+*.dump
+*.sql
+
+# Archivos de entorno y credenciales sensibles
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets/
+
+# Recopilación de estáticos y medios cargados por usuarios
+media/
+staticfiles/
+collected_static/
+
+# Configuración de entornos de desarrollo integrado (IDEs) y editores
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Archivos temporales de sistema operativo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Registros de ejecución y reportes de prueba
+*.log
+local_settings.py
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+htmlcov/
+
+# Configuración de herramientas internas y agentes de desarrollo local
+.agents/
+.scratch/
+scratch/
