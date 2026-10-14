@@ -74,73 +74,7 @@ La interfaz del sistema prescinde completamente del panel genérico administrati
 
 ---
 
-## 4. Guía de Despliegue Local (Desarrollo)
-
-### Requisitos Previos
-- Python 3.13 o superior instalado en el sistema operativo.
-- Git instalado y configurado.
-
-### Paso 1: Clonar el Repositorio
-```bash
-git clone https://github.com/Kev287mejia/ERPDESDE0.git
-cd ERPDESDE0
-```
-
-### Paso 2: Crear y Activar el Entorno Virtual
-En macOS / Linux:
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-En Windows (PowerShell):
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
-
-### Paso 3: Instalar Dependencias
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### Paso 4: Configurar Variables de Entorno
-Copie el archivo de ejemplo y defina las credenciales correspondientes:
-```bash
-cp .env.example .env
-```
-
-### Paso 5: Ejecutar Migraciones de Base de Datos
-```bash
-python manage.py migrate
-```
-
-### Paso 6: Inicializar la Configuración Regional de Países
-Ejecute el comando de poblamiento para precargar las configuraciones fiscales de Centroamérica:
-```bash
-python manage.py seed_countries
-```
-
-### Paso 7: Iniciar el Servidor de Desarrollo
-```bash
-python manage.py runserver
-```
-
-La consola operativa estará disponible en:
-```
-http://127.0.0.1:8000/
-```
-
-### Paso 8: Ejecución de la Suite de Pruebas Unitarias
-Para validar la integridad de aislamiento de datos, permisos RBAC y motor financiero:
-```bash
-python manage.py test
-```
-
----
-
-## 5. Guía Rápida para Evaluadores (UX / Marketing & Producto)
+## 4. Guía Rápida para Evaluadores (UX / Marketing & Producto)
 
 Esta sección permite a los evaluadores de diseño, mercadeo y analistas funcionales desplegar y auditar el sistema en menos de dos minutos sin requerir configuración técnica manual previa:
 
@@ -169,6 +103,6 @@ Al culminar el Onboarding, accederá a la Consola Operativa central como Adminis
 
 ---
 
-## 6. Propiedad Intelectual y Créditos
+## 5. Propiedad Intelectual y Créditos
 
 Copyright (c) 2026 Eternal Labs. Todos los derechos reservados. Arquitectura y dirección técnica desarrollada por Eternal Labs.
