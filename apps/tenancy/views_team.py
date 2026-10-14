@@ -103,6 +103,15 @@ class TeamCreateMemberView(RoleLevelRequiredMixin, View):
             role_level = form.cleaned_data['role_level']
             password = form.cleaned_data['password']
 
+            department = form.cleaned_data.get('department') or 'OPERATIONS'
+            contract_type = form.cleaned_data.get('contract_type') or 'PERMANENT'
+            social_security_number = form.cleaned_data.get('social_security_number') or ''
+            hire_date = form.cleaned_data.get('hire_date')
+            work_location = form.cleaned_data.get('work_location') or ''
+            blood_type = form.cleaned_data.get('blood_type') or 'UNKNOWN'
+            emergency_contact_name = form.cleaned_data.get('emergency_contact_name') or ''
+            emergency_contact_phone = form.cleaned_data.get('emergency_contact_phone') or ''
+
             with transaction.atomic():
                 user = User.objects.filter(email=email).first()
                 if not user:
@@ -133,6 +142,14 @@ class TeamCreateMemberView(RoleLevelRequiredMixin, View):
                     organization=request.organization,
                     role_level=role_level,
                     job_title=job_title,
+                    department=department,
+                    contract_type=contract_type,
+                    social_security_number=social_security_number,
+                    hire_date=hire_date,
+                    work_location=work_location,
+                    blood_type=blood_type,
+                    emergency_contact_name=emergency_contact_name,
+                    emergency_contact_phone=emergency_contact_phone,
                     is_active=True,
                 )
 
@@ -153,10 +170,8 @@ class TeamCreateMemberView(RoleLevelRequiredMixin, View):
             'members': members,
             'create_form': form,
             'all_modules': [
-                {'code': 'crm', 'name': 'MOD-CRM · Gestión Comercial & Cotizaciones', 'min_role': 'Nivel 80+'},
-                {'code': 'operations', 'name': 'MOD-OPS · Órdenes de Trabajo & Cuadrillas', 'min_role': 'Nivel 20+'},
-                {'code': 'sst', 'name': 'MOD-SST · Seguridad Laboral & Permisos MITRAB', 'min_role': 'Nivel 20+ / 70+'},
-                {'code': 'inventory', 'name': 'MOD-INV · Control de Materiales & Almacén', 'min_role': 'Nivel 50+'},
+                {'code': mod['code'], 'name': f"{mod['tag']} · {mod['name']}", 'min_role': f"Nivel {mod['min_role_level']}+"}
+                for mod in ERP_MODULES_CATALOG
             ],
             'show_modal_on_load': True,
         }, status=422)

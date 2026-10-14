@@ -156,6 +156,45 @@ class RoleLevel(models.IntegerChoices):
     OWNER_ADMIN = 100, 'Owner / Administrador General'
 
 
+class Department(models.TextChoices):
+    """
+    Áreas o unidades operativas y funcionales de la organización.
+    """
+    OPERATIONS = 'OPERATIONS', 'Operaciones & Ingeniería'
+    SST = 'SST', 'Seguridad y Salud en el Trabajo (SST)'
+    LOGISTICS = 'LOGISTICS', 'Logística, Bodega & Inventario'
+    COMMERCIAL = 'COMMERCIAL', 'Comercial & Licitaciones'
+    FINANCE = 'FINANCE', 'Finanzas & Administración'
+    MANAGEMENT = 'MANAGEMENT', 'Dirección General & Legal'
+    TECH = 'TECH', 'Tecnología & Sistemas'
+    OTHER = 'OTHER', 'Otros / General'
+
+
+class ContractType(models.TextChoices):
+    """
+    Modalidades contractuales estándar corporativas.
+    """
+    PERMANENT = 'PERMANENT', 'Indeterminado / Fijo'
+    PROJECT = 'PROJECT', 'Por Obra / Proyecto Determinado'
+    SERVICES = 'SERVICES', 'Servicios Profesionales / Honorarios'
+    INTERN = 'INTERN', 'Pasantía / Formación Técnica'
+
+
+class BloodType(models.TextChoices):
+    """
+    Grupo sanguíneo para ficha médica y seguridad ocupacional en frentes de obra.
+    """
+    UNKNOWN = 'UNKNOWN', 'No Registrado'
+    O_POS = 'O+', 'O Positivo (O+)'
+    O_NEG = 'O-', 'O Negativo (O-)'
+    A_POS = 'A+', 'A Positivo (A+)'
+    A_NEG = 'A-', 'A Negativo (A-)'
+    B_POS = 'B+', 'B Positivo (B+)'
+    B_NEG = 'B-', 'B Negativo (B-)'
+    AB_POS = 'AB+', 'AB Positivo (AB+)'
+    AB_NEG = 'AB-', 'AB Negativo (AB-)'
+
+
 class OrganizationMembership(TimeStampedModel):
     """
     Vínculo entre un Usuario y una Organización con un nivel de rol jerárquico asignado.
@@ -184,6 +223,57 @@ class OrganizationMembership(TimeStampedModel):
         blank=True,
         verbose_name="Cargo / Título Profesional",
         help_text="Título descriptivo del colaborador en la organización (ej: Líder de Cuadrilla)"
+    )
+    department = models.CharField(
+        max_length=30,
+        choices=Department.choices,
+        default=Department.OPERATIONS,
+        verbose_name="Departamento / Área Operativa",
+        help_text="Unidad organizativa o división funcional de asignación"
+    )
+    contract_type = models.CharField(
+        max_length=30,
+        choices=ContractType.choices,
+        default=ContractType.PERMANENT,
+        verbose_name="Modalidad Contractual",
+        help_text="Régimen de contratación laboral"
+    )
+    social_security_number = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Número de Seguro Social (INSS)",
+        help_text="Número de afiliación de seguro social del trabajador"
+    )
+    hire_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Ingreso",
+        help_text="Fecha oficial de inicio de labores en la organización"
+    )
+    work_location = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Ubicación / Base Operativa",
+        help_text="Sede central, bodega o frente de obra asignado"
+    )
+    blood_type = models.CharField(
+        max_length=10,
+        choices=BloodType.choices,
+        default=BloodType.UNKNOWN,
+        verbose_name="Grupo Sanguíneo",
+        help_text="Requerimiento de seguridad para personal en campo u obra"
+    )
+    emergency_contact_name = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Contacto de Emergencia (Nombre)",
+        help_text="Familiar o contacto inmediato en caso de incidente operativo"
+    )
+    emergency_contact_phone = models.CharField(
+        max_length=30,
+        blank=True,
+        verbose_name="Contacto de Emergencia (Teléfono)",
+        help_text="Número telefónico del contacto de emergencia"
     )
     is_active = models.BooleanField(
         default=True,

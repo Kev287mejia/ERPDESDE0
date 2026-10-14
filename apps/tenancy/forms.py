@@ -5,7 +5,14 @@ from django.utils.text import slugify
 
 from apps.core.models import CountryConfig
 from apps.tenancy.constants import AVAILABLE_MODULES, DEFAULT_ENABLED_MODULES, MODULE_CHOICES
-from apps.tenancy.models import Organization, OrganizationMembership, RoleLevel
+from apps.tenancy.models import (
+    BloodType,
+    ContractType,
+    Department,
+    Organization,
+    OrganizationMembership,
+    RoleLevel,
+)
 
 User = get_user_model()
 
@@ -254,6 +261,97 @@ class TeamCreateMemberForm(forms.Form):
             }
         ),
         help_text="Opcional. Si se deja en blanco se generará una contraseña segura por defecto.",
+    )
+
+    # --- FICHA LABORAL & CONTRACTUAL ---
+    department = forms.ChoiceField(
+        label="Departamento / Área Operativa",
+        choices=Department.choices,
+        initial=Department.OPERATIONS,
+        required=False,
+        widget=forms.Select(
+            attrs={
+                'class': 'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans',
+            }
+        ),
+    )
+    contract_type = forms.ChoiceField(
+        label="Modalidad Contractual",
+        choices=ContractType.choices,
+        initial=ContractType.PERMANENT,
+        required=False,
+        widget=forms.Select(
+            attrs={
+                'class': 'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans',
+            }
+        ),
+    )
+    social_security_number = forms.CharField(
+        label="Nº Seguro Social (INSS)",
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'class': 'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-mono tabular-nums',
+                'placeholder': 'ej: 1234567-8',
+            }
+        ),
+    )
+    hire_date = forms.DateField(
+        label="Fecha de Ingreso Laboral",
+        required=False,
+        widget=forms.DateInput(
+            attrs={
+                'type': 'date',
+                'class': 'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-mono tabular-nums',
+            }
+        ),
+    )
+    work_location = forms.CharField(
+        label="Base Operativa / Frente Asignado",
+        max_length=120,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'class': 'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans',
+                'placeholder': 'ej: Sede Central / Frente Managua Norte',
+            }
+        ),
+    )
+
+    # --- FICHA SST & SALUD OCUPACIONAL ---
+    blood_type = forms.ChoiceField(
+        label="Grupo Sanguíneo",
+        choices=BloodType.choices,
+        initial=BloodType.UNKNOWN,
+        required=False,
+        widget=forms.Select(
+            attrs={
+                'class': 'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-mono',
+            }
+        ),
+    )
+    emergency_contact_name = forms.CharField(
+        label="Contacto de Emergencia",
+        max_length=150,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'class': 'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans',
+                'placeholder': 'ej: María Elena Morales (Cónyuge)',
+            }
+        ),
+    )
+    emergency_contact_phone = forms.CharField(
+        label="Teléfono de Emergencia",
+        max_length=30,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'class': 'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-mono tabular-nums',
+                'placeholder': '+505 8765-4321',
+            }
+        ),
     )
 
     def __init__(self, organization=None, current_user_role_level=100, *args, **kwargs):

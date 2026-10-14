@@ -375,6 +375,110 @@ class TenancyOnboardingAndStrictModularTestCase(TestCase):
         response = self.client.get(reverse('tenancy:team_management'))
         self.assertEqual(response.status_code, 200)
 
+    def test_team_member_enrollment_with_expanded_profile(self):
+        """Verifica el enrolamiento integral de un colaborador con ficha laboral y SST."""
+        org = Organization.objects.create(
+            country=self.country_ni,
+            name='Ingeniería Eléctrica',
+            legal_name='Ingeniería Eléctrica S.A.',
+            tax_id='J0310000033333',
+            currency=Organization.Currency.NIO,
+            slug='ingenieria-electrica',
+            enabled_modules=['crm', 'operations', 'sst'],
+            onboarding_completed=True,
+            is_active=True,
+        )
+        OrganizationMembership.objects.create(
+            user=self.user,
+            organization=org,
+            role_level=RoleLevel.OWNER_ADMIN,
+            is_active=True,
+            is_default_org=True,
+        )
+        session = self.client.session
+        session['active_org_id'] = str(org.id)
+        session.save()
+
+        # Enrolamiento con expediente completo
+        response = self.client.post(reverse('tenancy:team_create'), {
+            'full_name': 'Ing. Roberto Silva Morales',
+            'email': 'rsilva@ingenieria.ni',
+            'personal_id_number': '001-100592-0003V',
+            'phone': '+505 8899-1122',
+            'job_title': 'Supervisor de Alta Tensión',
+            'role_level': 50,
+            'password': 'PasswordSegura2026!',
+            'department': 'OPERATIONS',
+            'contract_type': 'PROJECT',
+            'social_security_number': '9876543-2',
+            'hire_date': '2026-03-01',
+            'work_location': 'Frente Subestación Oriental',
+            'blood_type': 'O+',
+            'emergency_contact_name': 'Carmen Silva (Hermana)',
+            'emergency_contact_phone': '+505 8765-4321',
+        }, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+
+        created_user = User.objects.get(email='rsilva@ingenieria.ni')
+        self.assertEqual(created_user.full_name, 'Ing. Roberto Silva Morales')
+        self.assertEqual(created_user.personal_id_number, '001-100592-0003V')
+
+        membership = OrganizationMembership.objects.get(user=created_user, organization=org)
+        self.assertEqual(membership.role_level, 50)
+        self.assertEqual(membership.job_title, 'Supervisor de Alta Tensión')
+        self.assertEqual(membership.department, 'OPERATIONS')
+        self.assertEqual(membership.contract_type, 'PROJECT')
+        self.assertEqual(membership.social_security_number, '9876543-2')
+        self.assertEqual(str(membership.hire_date), '2026-03-01')
+        self.assertEqual(membership.work_location, 'Frente Subestación Oriental')
+        self.assertEqual(membership.blood_type, 'O+')
+        self.assertEqual(membership.emergency_contact_name, 'Carmen Silva (Hermana)')
+        self.assertEqual(membership.emergency_contact_phone, '+505 8765-4321')
+
+    def test_team_member_enrollment_backward_compatibility_minimal_fields(self):
+        """Verifica que el enrolamiento funcione con valores por defecto cuando solo se envían credenciales."""
+        org = Organization.objects.create(
+            country=self.country_ni,
+            name='Construcciones del Norte',
+            legal_name='Construcciones del Norte S.A.',
+            tax_id='J0310000022222',
+            currency=Organization.Currency.NIO,
+            slug='construcciones-norte',
+            enabled_modules=['operations'],
+            onboarding_completed=True,
+            is_active=True,
+        )
+        OrganizationMembership.objects.create(
+            user=self.user,
+            organization=org,
+            role_level=RoleLevel.OWNER_ADMIN,
+            is_active=True,
+            is_default_org=True,
+        )
+        session = self.client.session
+        session['active_org_id'] = str(org.id)
+        session.save()
+
+        # Solo credenciales mínimas
+        response = self.client.post(reverse('tenancy:team_create'), {
+            'full_name': 'Mario López Mendoza',
+            'email': 'mario@norte.ni',
+            'personal_id_number': '001-201088-0005A',
+            'role_level': 20,
+        }, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+
+        created_user = User.objects.get(email='mario@norte.ni')
+        membership = OrganizationMembership.objects.get(user=created_user, organization=org)
+        self.assertEqual(membership.role_level, 20)
+        self.assertEqual(membership.department, 'OPERATIONS')
+        self.assertEqual(membership.contract_type, 'PERMANENT')
+        self.assertEqual(membership.blood_type, 'UNKNOWN')
+        self.assertEqual(membership.social_security_number, '')
+        self.assertIsNone(membership.hire_date)
+
     def test_prepare_sandbox_command_execution(self):
         """Verifica la ejecución del comando prepare_sandbox."""
         from django.core.management import call_command
