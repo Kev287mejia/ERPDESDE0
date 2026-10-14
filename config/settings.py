@@ -11,12 +11,25 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-erp-sas-central-ameri
 # Modo de depuración configurable por entorno
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-# Hosts autorizados y orígenes confiables para CSRF
+# Hosts autorizados y orígenes confiables para CSRF y túneles seguros
 allowed_hosts_env = os.environ.get('ALLOWED_HOSTS')
 ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_env.split(',') if h.strip()] if allowed_hosts_env else ['*']
+if '*' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('*')
 
+DEFAULT_CSRF_TRUSTED_ORIGINS = [
+    'https://*.trycloudflare.com',
+    'https://*.devtunnels.ms',
+    'https://*.ngrok-free.app',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+]
 csrf_origins_env = os.environ.get('CSRF_TRUSTED_ORIGINS')
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in csrf_origins_env.split(',') if o.strip()] if csrf_origins_env else []
+env_csrf_origins = [o.strip() for o in csrf_origins_env.split(',') if o.strip()] if csrf_origins_env else []
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(DEFAULT_CSRF_TRUSTED_ORIGINS + env_csrf_origins))
+
+# Cabecera de proxy inverso para detección correcta de protocolo HTTPS en túneles
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Application definition
 INSTALLED_APPS = [

@@ -107,7 +107,12 @@ Desde la barra superior de navegación, el evaluador puede alternar en caliente 
 - **Oficial SST (70):** Bloqueos de seguridad, checklists normativos MITRAB y dotación EPP.
 - **Ingeniero Residente (50):** Ejecución técnica de partidas de obra y rendición de caja chica.
 - **Técnico de Campo (20):** Reportes diarios de bitácora y comprobantes de gasto menor.
-- **Auditor Externo (10):** Vistas exclusivas de lectura pasiva.
+### Evaluación Remota en Vivo con Cloudflare Quick Tunnels
+Para compartir una sesión de evaluación remota con el equipo de Marketing y Diseño sin requerir registro previo ni configuración de puertos:
+```bash
+./run_live_demo.sh
+```
+*El script levanta el servidor local Django en el puerto `8000` y genera de forma automática un túnel HTTPS seguro (`https://xxxx.trycloudflare.com`). Al compartir ese enlace, el evaluador puede acceder directamente al sistema y presionar el botón "1-Clic Demo".*
 
 ---
 
