@@ -4,19 +4,10 @@ from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 
 from apps.core.models import CountryConfig
+from apps.tenancy.constants import AVAILABLE_MODULES, DEFAULT_ENABLED_MODULES, MODULE_CHOICES
 from apps.tenancy.models import Organization, OrganizationMembership, RoleLevel
 
 User = get_user_model()
-
-MODULE_CHOICES = [
-    ('crm', 'MOD-CRM · Gestión Comercial & Cotizaciones'),
-    ('operations', 'MOD-OPS · Órdenes de Trabajo & Cuadrillas'),
-    ('sst', 'MOD-SST · Seguridad Laboral & Permisos MITRAB'),
-    ('inventory', 'MOD-INV · Control de Materiales & Almacén'),
-    ('finance', 'MOD-FIN · Tesorería, Cajas Chicas & Bancos'),
-    ('tech', 'MOD-TECH · Tecnología, Soporte IT & Activos Digitales'),
-    ('marketing', 'MOD-MKT · Marketing Digital, Campañas & Growth'),
-]
 
 
 class OrganizationOnboardingForm(forms.Form):
@@ -133,8 +124,8 @@ class OrganizationOnboardingForm(forms.Form):
     )
     enabled_modules = forms.MultipleChoiceField(
         label="Módulos Habilitados",
-        choices=MODULE_CHOICES,
-        initial=['crm', 'operations', 'sst'],
+        choices=AVAILABLE_MODULES,
+        initial=DEFAULT_ENABLED_MODULES,
         widget=forms.CheckboxSelectMultiple(),
     )
 

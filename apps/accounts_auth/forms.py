@@ -69,3 +69,115 @@ class EmailAuthenticationForm(forms.Form):
 
     def get_user(self):
         return self.user_cache
+
+
+class CorporateSignUpForm(forms.Form):
+    """
+    Formulario de registro autónomo corporativo para evaluadores y nuevas empresas.
+    """
+    full_name = forms.CharField(
+        label="Nombre Completo",
+        max_length=255,
+        widget=forms.TextInput(
+            attrs={
+                'class': (
+                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
+                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-sans'
+                ),
+                'placeholder': 'ej: Carlos Fonseca Terán',
+                'autocomplete': 'name',
+                'autofocus': True,
+            }
+        ),
+    )
+    email = forms.EmailField(
+        label="Correo Corporativo",
+        widget=forms.EmailInput(
+            attrs={
+                'class': (
+                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
+                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-mono'
+                ),
+                'placeholder': 'evaluador@empresa.com',
+                'autocomplete': 'email',
+            }
+        ),
+    )
+    phone = forms.CharField(
+        label="Teléfono de Contacto (Opcional)",
+        max_length=30,
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'class': (
+                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
+                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-mono tabular-nums'
+                ),
+                'placeholder': '+505 8888-0000',
+                'autocomplete': 'tel',
+            }
+        ),
+    )
+    password1 = forms.CharField(
+        label="Contraseña de Acceso",
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={
+                'class': (
+                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
+                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-mono'
+                ),
+                'placeholder': 'Mínimo 8 caracteres',
+                'autocomplete': 'new-password',
+            }
+        ),
+    )
+    password2 = forms.CharField(
+        label="Confirmar Contraseña",
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={
+                'class': (
+                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
+                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-mono'
+                ),
+                'placeholder': 'Repita la contraseña',
+                'autocomplete': 'new-password',
+            }
+        ),
+    )
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').lower().strip()
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        if User.objects.filter(email__iexact=email).exists():
+            raise ValidationError("Este correo electrónico ya se encuentra registrado.")
+        return email
+
+    def clean(self):
+        cleaned_data = super().clean()
+        p1 = cleaned_data.get('password1')
+        p2 = cleaned_data.get('password2')
+        if p1 and p2:
+            if p1 != p2:
+                self.add_error('password2', "Las contraseñas ingresadas no coinciden.")
+            elif len(p1) < 8:
+                self.add_error('password1', "La contraseña debe contener al menos 8 caracteres.")
+        return cleaned_data
+
+    def save(self):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        user = User.objects.create_user(
+            email=self.cleaned_data['email'],
+            full_name=self.cleaned_data['full_name'].strip(),
+            phone=self.cleaned_data.get('phone', '').strip(),
+            password=self.cleaned_data['password1'],
+        )
+        return user

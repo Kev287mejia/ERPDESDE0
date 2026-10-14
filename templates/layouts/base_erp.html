@@ -202,13 +202,9 @@
                             onchange="this.form.submit()" 
                             title="Simular permisos subordinados en tiempo real"
                             class="h-6 text-[11px] font-mono bg-transparent text-zinc-700 focus:outline-none cursor-pointer">
-                        <option value="100" {% if current_role_level == 100 and not is_simulating_role %}selected{% endif %}>LVL-100 · OWNER / ADMIN</option>
-                        <option value="85" {% if current_role_level == 85 %}selected{% endif %}>LVL-85 · GERENTE COMERCIAL</option>
-                        <option value="80" {% if current_role_level == 80 %}selected{% endif %}>LVL-80 · JEFE OPERACIONES</option>
-                        <option value="70" {% if current_role_level == 70 %}selected{% endif %}>LVL-70 · OFICIAL SST</option>
-                        <option value="50" {% if current_role_level == 50 %}selected{% endif %}>LVL-50 · ING. SUPERVISOR</option>
-                        <option value="20" {% if current_role_level == 20 %}selected{% endif %}>LVL-20 · TÉCNICO CAMPO</option>
-                        <option value="10" {% if current_role_level == 10 %}selected{% endif %}>LVL-10 · AUDITOR</option>
+                        {% for val, label in role_choices_desc %}
+                        <option value="{{ val }}" {% if current_role_level == val %}selected{% endif %}>LVL-{{ val }} · {{ label|upper }}</option>
+                        {% endfor %}
                     </select>
                 </div>
             </form>

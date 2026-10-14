@@ -5,6 +5,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 
+from apps.tenancy.constants import ERP_MODULES_BY_CODE, ERP_MODULES_CATALOG
 from apps.tenancy.forms import MemberRoleUpdateForm, TeamCreateMemberForm
 from apps.tenancy.models import OrganizationMembership, RoleLevel
 from apps.tenancy.permissions import RoleLevelRequiredMixin, TenantRequiredMixin
@@ -73,13 +74,8 @@ class TeamListView(RoleLevelRequiredMixin, View):
             'members': members,
             'create_form': create_form,
             'all_modules': [
-                {'code': 'crm', 'name': 'MOD-CRM · Gestión Comercial & Cotizaciones', 'min_role': 'Nivel 80+'},
-                {'code': 'operations', 'name': 'MOD-OPS · Órdenes de Trabajo & Cuadrillas', 'min_role': 'Nivel 20+'},
-                {'code': 'sst', 'name': 'MOD-SST · Seguridad Laboral & Permisos MITRAB', 'min_role': 'Nivel 20+ / 70+'},
-                {'code': 'inventory', 'name': 'MOD-INV · Control de Materiales & Almacén', 'min_role': 'Nivel 50+'},
-                {'code': 'finance', 'name': 'MOD-FIN · Tesorería, Cajas Chicas & Bancos', 'min_role': 'Nivel 50+ / 80+'},
-                {'code': 'tech', 'name': 'MOD-TECH · Tecnología, Soporte IT & Activos Digitales', 'min_role': 'Nivel 20+'},
-                {'code': 'marketing', 'name': 'MOD-MKT · Marketing Digital, Campañas & Growth', 'min_role': 'Nivel 80+'},
+                {'code': mod['code'], 'name': f"{mod['tag']} · {mod['name']}", 'min_role': f"Nivel {mod['min_role_level']}+"}
+                for mod in ERP_MODULES_CATALOG
             ],
         })
 
@@ -175,7 +171,7 @@ class OrganizationModulesUpdateView(RoleLevelRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         submitted_modules = request.POST.getlist('enabled_modules')
-        valid_modules = ['crm', 'operations', 'sst', 'inventory', 'finance', 'tech', 'marketing']
+        valid_modules = list(ERP_MODULES_BY_CODE.keys())
 
         cleaned_modules = [m for m in submitted_modules if m in valid_modules]
 

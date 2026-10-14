@@ -1,0 +1,85 @@
+# ==============================================================================
+# ETERNAL LABS - ENTERPRISE SOFTWARE DIVISION
+# CATÁLOGO CENTRALIZADO DE SUBSISTEMAS MODULARES (constants.py)
+# ==============================================================================
+
+ERP_MODULES_CATALOG = [
+    {
+        'code': 'crm',
+        'tag': 'MOD-CRM',
+        'name': 'Gestión Comercial & Cotizaciones',
+        'badge': 'RECOMENDADO',
+        'description': 'Pipeline de licitaciones corporativas, directorio de clientes y cotizador bimonetario con desglose de impuestos.',
+        'min_role_level': 80,
+        'default_enabled': True,
+    },
+    {
+        'code': 'operations',
+        'tag': 'MOD-OPS',
+        'name': 'Ingeniería, Frentes & Órdenes de Trabajo',
+        'badge': 'CRÍTICO',
+        'description': 'Gestión de cuadrillas de campo, asignación de ingenieros residentes y seguimiento de folios OT.',
+        'min_role_level': 20,
+        'default_enabled': True,
+    },
+    {
+        'code': 'sst',
+        'tag': 'MOD-SST',
+        'name': 'Seguridad Laboral & Normativa MITRAB',
+        'badge': 'LEY 618',
+        'description': 'Auditorías de campo, checklists obligatorios de seguridad industrial y avales formales de riesgo.',
+        'min_role_level': 20,
+        'default_enabled': True,
+    },
+    {
+        'code': 'inventory',
+        'tag': 'MOD-INV',
+        'name': 'Control de Materiales, Almacén & Kardex',
+        'badge': 'LOGÍSTICA',
+        'description': 'Gestión de bodegas centrales y satélites, control de existencias para proyectos y requisición de materiales.',
+        'min_role_level': 50,
+        'default_enabled': False,
+    },
+    {
+        'code': 'finance',
+        'tag': 'MOD-FIN',
+        'name': 'Tesorería, Cajas Chicas & Bancos',
+        'badge': 'FINANZAS',
+        'description': 'Arqueos de caja chica en campo, fondos de viáticos y comprobantes de gasto bimonetarios.',
+        'min_role_level': 50,
+        'default_enabled': False,
+    },
+    {
+        'code': 'tech',
+        'tag': 'MOD-TECH',
+        'name': 'Tecnología, Soporte IT & Activos Digitales',
+        'badge': 'TI / SISTEMAS',
+        'description': 'Mesa de ayuda técnica, inventario de hardware y equipos de cómputo, gestión de licencias software y soporte a usuarios.',
+        'min_role_level': 20,
+        'default_enabled': False,
+    },
+    {
+        'code': 'marketing',
+        'tag': 'MOD-MKT',
+        'name': 'Marketing Digital, Campañas & Growth',
+        'badge': 'CRECIMIENTO',
+        'description': 'Gestión de campañas publicitarias multicanal, captación de prospectos entrantes (inbound leads) y analítica de conversión.',
+        'min_role_level': 80,
+        'default_enabled': False,
+    },
+]
+
+# Diccionario indexado por código para consultas directas O(1)
+ERP_MODULES_BY_CODE = {mod['code']: mod for mod in ERP_MODULES_CATALOG}
+
+# Lista de tuplas para Choices de formularios Django
+AVAILABLE_MODULES = [(mod['code'], f"{mod['tag']} · {mod['name']}") for mod in ERP_MODULES_CATALOG]
+
+# Alias de compatibilidad
+MODULE_CHOICES = AVAILABLE_MODULES
+
+# Lista de códigos habilitados por defecto en el flujo de inicialización
+DEFAULT_ENABLED_MODULES = [mod['code'] for mod in ERP_MODULES_CATALOG if mod['default_enabled']]
+
+# Mapeo de umbrales jerárquicos de acceso RBAC
+MODULE_THRESHOLD_MAP = {mod['code']: mod['min_role_level'] for mod in ERP_MODULES_CATALOG}

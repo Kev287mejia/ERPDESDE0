@@ -1,8 +1,9 @@
+import json
 from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Count, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
@@ -12,6 +13,7 @@ from apps.core.models import CountryConfig
 from apps.crm.models import Quote
 from apps.operations.models import WorkOrder
 from apps.sst.models import SafetyChecklist, LeaveRequest
+from apps.tenancy.constants import ERP_MODULES_CATALOG
 from apps.tenancy.forms import OrganizationOnboardingForm
 from apps.tenancy.models import Organization, OrganizationMembership, RoleLevel
 
@@ -25,6 +27,37 @@ class OnboardingWizardView(LoginRequiredMixin, View):
     """
     template_name = 'tenancy/onboarding_wizard.html'
 
+    def _get_wizard_context(self, form):
+        countries = CountryConfig.objects.all().order_by('-is_active', 'name')
+        active_country = countries.filter(is_active=True).first()
+
+        countries_dict = {}
+        for c in countries:
+            countries_dict[c.code] = {
+                'code': c.code,
+                'name': c.name,
+                'primary_currency_code': c.primary_currency_code,
+                'primary_currency_symbol': c.primary_currency_symbol,
+                'secondary_currency_code': c.secondary_currency_code,
+                'secondary_currency_symbol': c.secondary_currency_symbol,
+                'tax_id_label': c.tax_id_label,
+                'tax_id_regex': c.tax_id_regex,
+                'personal_id_label': c.personal_id_label,
+                'default_tax_name': c.default_tax_name,
+                'default_tax_rate': f"{c.default_tax_rate:.2f}",
+                'timezone': c.timezone,
+                'is_active': c.is_active,
+            }
+
+        return {
+            'countries': countries,
+            'active_country': active_country,
+            'countries_json': json.dumps(countries_dict),
+            'countries_dict': countries_dict,
+            'modules_catalog': ERP_MODULES_CATALOG,
+            'form': form,
+        }
+
     def get(self, request, *args, **kwargs):
         countries = CountryConfig.objects.all().order_by('-is_active', 'name')
         active_country = countries.filter(is_active=True).first()
@@ -34,11 +67,7 @@ class OnboardingWizardView(LoginRequiredMixin, View):
             'enabled_modules': ['crm', 'operations', 'sst'],
         })
 
-        return render(request, self.template_name, {
-            'countries': countries,
-            'active_country': active_country,
-            'form': form,
-        })
+        return render(request, self.template_name, self._get_wizard_context(form))
 
     def post(self, request, *args, **kwargs):
         form = OrganizationOnboardingForm(request.POST)
@@ -100,11 +129,7 @@ class OnboardingWizardView(LoginRequiredMixin, View):
             )
             return redirect('tenancy:dashboard')
 
-        return render(request, self.template_name, {
-            'countries': countries,
-            'active_country': active_country,
-            'form': form,
-        }, status=422)
+        return render(request, self.template_name, self._get_wizard_context(form), status=422)
 
 
 class SwitchOrganizationView(LoginRequiredMixin, View):
@@ -329,10 +354,60 @@ class DashboardWorkspaceView(TenantRequiredMixin, View):
             },
         ]
 
+        # Consultas reales a la base de datos para la organización activa
+        total_members_count = OrganizationMembership.objects.filter(
+            organization=org, is_active=True
+        ).count()
+
+        enabled_codes = set(org.enabled_modules or [])
+        enabled_modules_list = [mod for mod in ERP_MODULES_CATALOG if mod['code'] in enabled_codes]
+
+        membership = getattr(request, 'membership', None)
+        if not membership and request.user.is_authenticated:
+            membership = OrganizationMembership.objects.filter(
+                user=request.user, organization=org, is_active=True
+            ).first()
+
+        accessible_modules_count = 0
+        for mod in enabled_modules_list:
+            if membership and membership.has_module_access(mod['code'], effective_role_level=role_level):
+                accessible_modules_count += 1
+
+        membership_counts = dict(
+            OrganizationMembership.objects.filter(organization=org, is_active=True)
+            .values('role_level')
+            .annotate(cnt=Count('id'))
+            .values_list('role_level', 'cnt')
+        )
+
+        rbac_distribution = []
+        for level_val, label in sorted(RoleLevel.choices, key=lambda x: x[0], reverse=True):
+            rbac_distribution.append({
+                'level': level_val,
+                'label': label,
+                'members_count': membership_counts.get(level_val, 0),
+                'is_current_session_level': (level_val == role_level),
+                'can_current_user_approve': (role_level >= level_val),
+            })
+
+        recent_members = list(
+            OrganizationMembership.objects.filter(organization=org, is_active=True)
+            .select_related('user')
+            .order_by('-created_at')[:5]
+        )
+
         return render(request, self.template_name, {
             'kpis': kpis,
             'kpi_cards': kpi_cards,
             'rbac_matrix': rbac_matrix,
+            'total_members_count': total_members_count,
+            'enabled_modules_list': enabled_modules_list,
+            'accessible_modules_count': accessible_modules_count,
+            'rbac_distribution': rbac_distribution,
+            'recent_members': recent_members,
+            'modules_catalog': ERP_MODULES_CATALOG,
+            'current_country': country,
+            'current_role_level': role_level,
         })
 
 

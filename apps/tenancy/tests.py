@@ -272,3 +272,117 @@ class TenancyOnboardingAndStrictModularTestCase(TestCase):
         self.assertIn("window.dispatchEvent(new CustomEvent('open-fund-modal'))", content)
         self.assertIn("window.dispatchEvent(new CustomEvent('open-bank-modal'))", content)
 
+    def test_dynamic_onboarding_wizard_context(self):
+        """Verifica que el OnboardingWizardView provea countries_json y modules_catalog dinámicos."""
+        response = self.client.get(reverse('tenancy:onboarding'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('countries_json', response.context)
+        self.assertIn('modules_catalog', response.context)
+        
+        # Validar atributos serializados
+        import json
+        data = json.loads(response.context['countries_json'])
+        self.assertIn('NI', data)
+        self.assertEqual(data['NI']['name'], 'Nicaragua')
+        self.assertEqual(data['NI']['primary_currency_code'], 'NIO')
+        self.assertEqual(data['NI']['tax_id_label'], 'RUC')
+
+    def test_dynamic_dashboard_metrics_and_rbac_distribution(self):
+        """Verifica que el dashboard consulte métricas reales en BD y construya rbac_distribution."""
+        org = Organization.objects.create(
+            country=self.country_ni,
+            name='Ingeniería Total',
+            legal_name='Ingeniería Total S.A.',
+            tax_id='J0310000055555',
+            currency=Organization.Currency.NIO,
+            tax_regime=Organization.TaxRegime.GENERAL,
+            industry=Organization.Industry.CONSTRUCTION,
+            accounting_template=Organization.AccountingTemplate.NIIF_PYMES,
+            slug='ingenieria-total',
+            enabled_modules=['crm', 'operations', 'sst'],
+            onboarding_completed=True,
+            is_active=True,
+        )
+
+        owner_mem = OrganizationMembership.objects.create(
+            user=self.user,
+            organization=org,
+            role_level=RoleLevel.OWNER_ADMIN,
+            job_title='Director General',
+            is_active=True,
+            is_default_org=True,
+        )
+
+        second_user = User.objects.create_user(
+            email='tech@corporacion.ni',
+            password='Password123!',
+            full_name='Técnico Electricista',
+        )
+        tech_mem = OrganizationMembership.objects.create(
+            user=second_user,
+            organization=org,
+            role_level=RoleLevel.TECHNICIAN,
+            job_title='Liniero de Distribución',
+            is_active=True,
+        )
+
+        session = self.client.session
+        session['active_org_id'] = str(org.id)
+        session.save()
+
+        response = self.client.get(reverse('tenancy:dashboard'))
+        self.assertEqual(response.status_code, 200)
+
+        # Contexto de métricas reales
+        self.assertEqual(response.context['total_members_count'], 2)
+        self.assertEqual(len(response.context['enabled_modules_list']), 3)
+        self.assertEqual(response.context['accessible_modules_count'], 3)
+        self.assertEqual(len(response.context['recent_members']), 2)
+
+        # Distribución RBAC
+        rbac_dist = response.context['rbac_distribution']
+        owner_entry = next(r for r in rbac_dist if r['level'] == 100)
+        tech_entry = next(r for r in rbac_dist if r['level'] == 20)
+        self.assertEqual(owner_entry['members_count'], 1)
+        self.assertEqual(tech_entry['members_count'], 1)
+        self.assertTrue(owner_entry['is_current_session_level'])
+        self.assertTrue(tech_entry['can_current_user_approve'])
+
+    def test_team_management_endpoint_responds_200(self):
+        """Verifica que /settings/team/ responda con 200."""
+        org = Organization.objects.create(
+            country=self.country_ni,
+            name='Equipo Central',
+            legal_name='Equipo Central S.A.',
+            tax_id='J0310000044444',
+            currency=Organization.Currency.NIO,
+            slug='equipo-central',
+            enabled_modules=['crm'],
+            onboarding_completed=True,
+            is_active=True,
+        )
+        OrganizationMembership.objects.create(
+            user=self.user,
+            organization=org,
+            role_level=RoleLevel.OWNER_ADMIN,
+            is_active=True,
+            is_default_org=True,
+        )
+        session = self.client.session
+        session['active_org_id'] = str(org.id)
+        session.save()
+
+        response = self.client.get(reverse('tenancy:team_management'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_prepare_sandbox_command_execution(self):
+        """Verifica la ejecución del comando prepare_sandbox."""
+        from django.core.management import call_command
+        from io import StringIO
+        out = StringIO()
+        call_command('prepare_sandbox', reset=True, stdout=out)
+        output = out.getvalue()
+        self.assertIn('ENTORNO SANDBOX PREPARADO CORRECTAMENTE', output)
+        self.assertIn('http://127.0.0.1:8000/auth/register/', output)
+
+

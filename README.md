@@ -140,6 +140,35 @@ python manage.py test
 
 ---
 
-## 5. Propiedad Intelectual y Créditos
+## 5. Guía Rápida para Evaluadores (UX / Marketing & Producto)
+
+Esta sección permite a los evaluadores de diseño, mercadeo y analistas funcionales desplegar y auditar el sistema en menos de dos minutos sin requerir configuración técnica manual previa:
+
+### Paso 1: Inicialización Autónoma del Entorno Sandbox
+Tras clonar el repositorio e instalar las dependencias, ejecute el comando integral de preparación:
+```bash
+python manage.py prepare_sandbox
+```
+*Este comando aplica las migraciones estructurales, precarga la matriz de jurisdicciones fiscales de Centroamérica y deja la plataforma lista para interacción inmediata. Si desea purgar organizaciones residuales de pruebas previas, puede añadir el argumento `--reset`.*
+
+### Paso 2: Registro Corporativo Autónomo
+Inicie el servidor local (`python manage.py runserver`) e ingrese a la interfaz de registro corporativo:
+```
+http://127.0.0.1:8000/auth/register/
+```
+Complete el registro con su nombre, correo y contraseña. El sistema iniciará su sesión de forma automática y lo transferirá al **Onboarding Wizard** en 3 fases:
+1. **Jurisdicción Fiscal:** Seleccione el país de operación correspondiente (Nicaragua activa por defecto).
+2. **Identidad Tributaria:** Ingrese la marca comercial, razón social, identificador fiscal (RUC) y rubro industrial.
+3. **Arquitectura Modular:** Habilite únicamente los subsistemas operativos que desea contratar (CRM, Operaciones, SST, Inventarios, Finanzas, Tecnología o Marketing).
+
+### Paso 3: Auditoría con el Simulador de Roles en Tiempo Real
+Al culminar el Onboarding, accederá a la Consola Operativa central como Administrador General (Nivel 100).
+- Localice el selector **Simulador de Rol** en la esquina superior derecha de la barra de navegación.
+- Alterne entre los diferentes rangos jerárquicos (Gerente Comercial Nivel 85, Jefe de Operaciones Nivel 80, Oficial SST Nivel 70, Ingeniero Nivel 50 o Técnico Nivel 20).
+- Verifique cómo la barra lateral de navegación, las métricas telemétricas del dashboard y los controles de aprobación se restringen o despliegan en tiempo real según el nivel de autoridad asignado.
+
+---
+
+## 6. Propiedad Intelectual y Créditos
 
 Copyright (c) 2026 Eternal Labs. Todos los derechos reservados. Arquitectura y dirección técnica desarrollada por Eternal Labs.

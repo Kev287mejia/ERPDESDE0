@@ -71,4 +71,5 @@ def tenancy_context(request):
         'nav_access': nav_access,
         'RoleLevel': RoleLevel,
         'role_choices': RoleLevel.choices,
+        'role_choices_desc': sorted(RoleLevel.choices, key=lambda x: x[0], reverse=True),
     }

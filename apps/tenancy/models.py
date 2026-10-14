@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from apps.core.models import TimeStampedModel
+from apps.tenancy.constants import MODULE_THRESHOLD_MAP
 
 
 class Organization(TimeStampedModel):
@@ -242,16 +243,6 @@ class OrganizationMembership(TimeStampedModel):
 
         if eval_role_level >= RoleLevel.OWNER_ADMIN:
             return True
-
-        MODULE_THRESHOLD_MAP = {
-            'crm': RoleLevel.OPERATIONS_COORD,       # 80
-            'operations': RoleLevel.TECHNICIAN,      # 20
-            'sst': RoleLevel.TECHNICIAN,             # 20
-            'inventory': RoleLevel.ENGINEER,         # 50
-            'finance': RoleLevel.ENGINEER,           # 50
-            'tech': RoleLevel.TECHNICIAN,            # 20
-            'marketing': RoleLevel.OPERATIONS_COORD, # 80
-        }
 
         min_required_role = MODULE_THRESHOLD_MAP.get(module_code.lower().strip())
         if min_required_role is None:

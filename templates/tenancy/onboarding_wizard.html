@@ -5,7 +5,17 @@
 {% block content %}
 <div class="max-w-4xl mx-auto w-full" x-data="{ 
     step: 1, 
-    country_code: 'NI',
+    country_code: '{{ form.country_code.value|default:active_country.code|default:'NI' }}',
+    countries: {{ countries_json|safe }},
+    get currentCountry() {
+        return (this.countries && this.countries[this.country_code]) ? this.countries[this.country_code] : {};
+    },
+    selectCountry(code) {
+        this.country_code = code;
+        if (this.currentCountry && this.currentCountry.primary_currency_code) {
+            this.currency = this.currentCountry.primary_currency_code;
+        }
+    },
     name: '{{ form.name.value|default:'' }}',
     legal_name: '{{ form.legal_name.value|default:'' }}',
     tax_id: '{{ form.tax_id.value|default:'' }}',
@@ -47,7 +57,7 @@
                         :class="step === 2 ? 'border-zinc-900 text-zinc-900 bg-zinc-50/50' : 'border-zinc-200 text-zinc-400 hover:text-zinc-600'"
                         class="border-l-2 pl-3 py-1.5 text-left transition-colors">
                     <span class="text-[10px] block font-semibold" :class="step === 2 ? 'text-zinc-900' : 'text-zinc-400'">02 IDENTIDAD</span>
-                    <span class="font-medium text-[11px]">Legal & RUC</span>
+                    <span class="font-medium text-[11px]" x-text="'Legal & ' + (currentCountry.tax_id_label || 'Tributario')">Legal & Tributario</span>
                 </button>
 
                 <!-- Paso 3 -->
@@ -91,14 +101,14 @@
                             Seleccione el marco normativo donde radicará la contabilidad oficial y la emisión de comprobantes.
                         </p>
                     </div>
-                    <span class="text-[10px] font-mono text-zinc-400">FASE 1: NICARAGUA ACTIVA</span>
+                    <span class="text-[10px] font-mono text-zinc-400" x-text="'SELECCIONADO: ' + (currentCountry.name || '') + ' (' + (currentCountry.code || '') + ')'"></span>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {% for country in countries %}
                     {% if country.is_active %}
-                    <!-- País Habilitado (Nicaragua) -->
-                    <div @click="country_code = '{{ country.code }}'"
+                    <!-- País Habilitado -->
+                    <div @click="selectCountry('{{ country.code }}')"
                          :class="country_code === '{{ country.code }}' ? 'border-zinc-900 ring-1 ring-zinc-900 bg-zinc-50/40' : 'border-zinc-200 bg-white hover:border-zinc-300'"
                          class="p-3.5 border rounded-[4px] cursor-pointer transition-all relative">
                         <div class="flex items-start justify-between">
@@ -115,15 +125,15 @@
                         <div class="mt-3 pt-2.5 border-t border-zinc-100 space-y-1 text-[11px] font-mono text-zinc-600">
                             <div class="flex items-center justify-between">
                                 <span class="text-zinc-400">MONEDA:</span>
-                                <span class="font-medium text-zinc-900">{{ country.primary_currency_code }} ({{ country.primary_currency_symbol }}) / USD</span>
+                                <span class="font-medium text-zinc-900">{{ country.primary_currency_code }} ({{ country.primary_currency_symbol }}){% if country.secondary_currency_code %} / {{ country.secondary_currency_code }}{% endif %}</span>
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="text-zinc-400">{{ country.tax_id_label }}:</span>
-                                <span class="font-medium text-zinc-900">Regex 14 Dígitos</span>
+                                <span class="font-medium text-zinc-900">{{ country.tax_id_label }} (Oficial)</span>
                             </div>
                             <div class="flex items-center justify-between">
-                                <span class="text-zinc-400">IMPUESTO:</span>
-                                <span class="font-medium text-zinc-900 tabular-nums">{{ country.default_tax_name }} {{ country.default_tax_rate }}%</span>
+                                <span class="text-zinc-400">{{ country.default_tax_name }}:</span>
+                                <span class="font-medium text-zinc-900 tabular-nums">{{ country.default_tax_rate }}%</span>
                             </div>
                         </div>
                     </div>
@@ -222,10 +232,10 @@
                             <p class="text-[10px] font-mono text-zinc-400 mt-1">Nombre formal registrado ante el Registro Público Mercantil.</p>
                         </div>
 
-                        <!-- RUC con Verificación HTMX -->
+                        <!-- Identificador Fiscal con Verificación HTMX -->
                         <div>
                             <label for="id_tax_id" class="block text-xs font-medium text-zinc-700 mb-1.5">
-                                RUC (Registro Único del Contribuyente) <span class="text-red-500">*</span>
+                                <span x-text="currentCountry.tax_id_label || 'Identificador Tributario'"></span> <span class="text-red-500">*</span>
                             </label>
                             <input type="text"
                                    name="tax_id"
@@ -234,14 +244,14 @@
                                    required
                                    maxlength="20"
                                    value="{{ form.tax_id.value|default:'' }}"
-                                   placeholder="ej: J0310000123456 o 001-290590-0001A"
+                                   :placeholder="'ej: ' + (currentCountry.tax_id_label || 'Número Fiscal')"
                                    hx-get="{% url 'tenancy:validate_ruc_htmx' %}"
                                    hx-trigger="input changed delay:400ms"
                                    hx-target="#ruc_validation_msg"
                                    hx-include="[name='country_code']"
                                    class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-mono tabular-nums uppercase">
                             <div id="ruc_validation_msg">
-                                <p class="text-[10px] font-mono text-zinc-400 mt-1">Estructura esperada: 14 dígitos continuos o formato de cédula con guiones.</p>
+                                <p class="text-[10px] font-mono text-zinc-400 mt-1" x-text="'Validación de sintaxis para ' + (currentCountry.name || '') + ' (' + (currentCountry.tax_id_label || 'Fiscal') + ')'"></p>
                             </div>
                         </div>
 
@@ -256,8 +266,8 @@
                                         id="id_currency" 
                                         x-model="currency"
                                         class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
-                                    <option value="NIO">Córdoba Nicaragüense (C$)</option>
-                                    <option value="USD">Dólar Estadounidense ($)</option>
+                                    <option :value="currentCountry.primary_currency_code || 'NIO'" x-text="(currentCountry.primary_currency_code || 'NIO') + ' (' + (currentCountry.primary_currency_symbol || 'C$') + ')'"></option>
+                                    <option value="USD">USD ($)</option>
                                 </select>
                                 <p class="text-[10px] font-mono text-zinc-400 mt-1">Moneda de corte para balances y reportes.</p>
                             </div>
@@ -282,12 +292,12 @@
                             </div>
                         </div>
 
-                        <!-- Fila Técnica: Régimen Fiscal DGI & Plantilla Contable Inicial -->
+                        <!-- Fila Técnica: Régimen Fiscal & Plantilla Contable Inicial -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <!-- Régimen Fiscal DGI -->
+                            <!-- Régimen Fiscal -->
                             <div>
                                 <label for="id_tax_regime" class="block text-xs font-medium text-zinc-700 mb-1.5">
-                                    Régimen Fiscal DGI <span class="text-red-500">*</span>
+                                    <span x-text="'Régimen Fiscal (' + (currentCountry.name || 'Jurisdicción') + ')'">Régimen Fiscal</span> <span class="text-red-500">*</span>
                                 </label>
                                 <select name="tax_regime" 
                                         id="id_tax_regime" 
@@ -309,7 +319,7 @@
                                         id="id_accounting_template" 
                                         x-model="accounting_template"
                                         class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
-                                    <option value="NIIF_PYMES">NIIF para PYMES (Nicaragua DGI)</option>
+                                    <option value="NIIF_PYMES">NIIF para PYMES (Norma Regional)</option>
                                     <option value="SIMPLIFIED">Simplificado (Caja & Bancos)</option>
                                     <option value="BLANK">En Blanco (Configuración Manual)</option>
                                 </select>
@@ -338,8 +348,8 @@
                     <!-- Ficha Técnica de Resumen Fiscal en Vivo (1/3) -->
                     <div class="border border-zinc-200 bg-zinc-50/80 rounded-[4px] p-4 space-y-3 font-mono text-xs">
                         <div class="text-[10px] uppercase tracking-wider font-semibold text-zinc-700 border-b border-zinc-200 pb-2 flex items-center gap-1.5">
-                            <span class="fi fi-ni border border-zinc-200 rounded-[2px]"></span>
-                            <span>RESUMEN EN VIVO DEL TENANT</span>
+                            <span :class="'fi fi-' + (country_code ? country_code.toLowerCase() : 'ni')" class="border border-zinc-200 rounded-[2px]"></span>
+                            <span x-text="'RESUMEN FISCAL · ' + (currentCountry.name || '')"></span>
                         </div>
 
                         <div class="space-y-2.5 text-[11px]">
@@ -352,7 +362,7 @@
                                 <span class="font-medium text-zinc-900 truncate block" x-text="legal_name || 'No definida'"></span>
                             </div>
                             <div>
-                                <span class="text-zinc-400 block text-[10px]">IDENTIFICADOR FISCAL:</span>
+                                <span class="text-zinc-400 block text-[10px]" x-text="(currentCountry.tax_id_label || 'IDENTIFICADOR') + ':"></span>
                                 <span class="font-medium text-zinc-900 tabular-nums uppercase" x-text="tax_id || 'Pendiente'"></span>
                             </div>
                             <div>
@@ -362,7 +372,7 @@
                             <div class="pt-2 border-t border-zinc-200/60 space-y-1 text-zinc-600">
                                 <div class="flex justify-between">
                                     <span class="text-zinc-400">MONEDA CONTABLE:</span>
-                                    <span class="text-zinc-900 font-medium" x-text="currency === 'NIO' ? 'NIO · C$' : 'USD · $'"></span>
+                                    <span class="text-zinc-900 font-medium" x-text="currency + ' (' + (currency === currentCountry.primary_currency_code ? (currentCountry.primary_currency_symbol || 'C$') : '$') + ')'"></span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-zinc-400">RÉGIMEN:</span>
@@ -373,8 +383,12 @@
                                     <span class="text-zinc-900 font-medium" x-text="accounting_template === 'NIIF_PYMES' ? 'NIIF PYMES' : accounting_template"></span>
                                 </div>
                                 <div class="flex justify-between">
-                                    <span class="text-zinc-400">TASA IVA DGI:</span>
-                                    <span class="text-zinc-900 font-medium tabular-nums">15.00%</span>
+                                    <span class="text-zinc-400" x-text="'TASA ' + (currentCountry.default_tax_name || 'IVA') + ':'"></span>
+                                    <span class="text-zinc-900 font-medium tabular-nums" x-text="(currentCountry.default_tax_rate || '0.00') + '%'"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-zinc-400">ZONA HORARIA:</span>
+                                    <span class="text-zinc-900 font-medium" x-text="currentCountry.timezone || 'UTC-6'"></span>
                                 </div>
                             </div>
                         </div>
@@ -399,105 +413,26 @@
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Lista de Módulos (2/3) -->
+                    <!-- Lista de Módulos (2/3) Dinámica desde Catálogo Centralizado -->
                     <div class="lg:col-span-2 space-y-2.5">
+                        {% for mod in modules_catalog %}
                         <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
-                            <input type="checkbox" name="enabled_modules" value="crm" checked
+                            <input type="checkbox" 
+                                   name="enabled_modules" 
+                                   value="{{ mod.code }}" 
+                                   {% if mod.default_enabled %}checked{% endif %}
                                    class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
                             <div class="flex-1 text-xs">
                                 <div class="flex items-center justify-between">
-                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-CRM · Gestión Comercial & Cotizaciones</span>
-                                    <span class="text-[10px] font-mono text-zinc-400">RECOMENDADO</span>
+                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">{{ mod.tag }} · {{ mod.name }}</span>
+                                    <span class="text-[10px] font-mono text-zinc-400">LVL-{{ mod.min_role_level }}+</span>
                                 </div>
                                 <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
-                                    Pipeline de licitaciones, directorio de clientes corporativos y cotizador bimonetario con desglose de IVA.
+                                    {{ mod.description }}
                                 </p>
                             </div>
                         </label>
-
-                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
-                            <input type="checkbox" name="enabled_modules" value="operations" checked
-                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
-                            <div class="flex-1 text-xs">
-                                <div class="flex items-center justify-between">
-                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-OPS · Ingeniería, Frentes & Órdenes de Trabajo</span>
-                                    <span class="text-[10px] font-mono text-zinc-400">CRÍTICO</span>
-                                </div>
-                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
-                                    Gestión de cuadrillas de campo, asignación de ingenieros residentes y seguimiento de folios OT.
-                                </p>
-                            </div>
-                        </label>
-
-                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
-                            <input type="checkbox" name="enabled_modules" value="sst" checked
-                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
-                            <div class="flex-1 text-xs">
-                                <div class="flex items-center justify-between">
-                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-SST · Seguridad Laboral & Normativa MITRAB</span>
-                                    <span class="text-[10px] font-mono text-zinc-400">LEY 618</span>
-                                </div>
-                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
-                                    Auditorías de campo, checklists obligatorios de seguridad industrial y avales formales de riesgo.
-                                </p>
-                            </div>
-                        </label>
-
-                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
-                            <input type="checkbox" name="enabled_modules" value="inventory"
-                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
-                            <div class="flex-1 text-xs">
-                                <div class="flex items-center justify-between">
-                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-INV · Control de Materiales, Almacén & Kardex</span>
-                                    <span class="text-[10px] font-mono text-zinc-400">LOGÍSTICA</span>
-                                </div>
-                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
-                                    Gestión de bodegas, control de existencias para proyectos y requisición de materiales.
-                                </p>
-                            </div>
-                        </label>
-
-                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
-                            <input type="checkbox" name="enabled_modules" value="finance"
-                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
-                            <div class="flex-1 text-xs">
-                                <div class="flex items-center justify-between">
-                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-FIN · Tesorería, Cajas Chicas & Bancos</span>
-                                    <span class="text-[10px] font-mono text-zinc-400">FINANZAS</span>
-                                </div>
-                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
-                                    Arqueos de caja chica en campo, fondos de viáticos y comprobantes de gasto bimonetarios.
-                                </p>
-                            </div>
-                        </label>
-
-                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
-                            <input type="checkbox" name="enabled_modules" value="tech"
-                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
-                            <div class="flex-1 text-xs">
-                                <div class="flex items-center justify-between">
-                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-TECH · Tecnología, Soporte IT & Activos Digitales</span>
-                                    <span class="text-[10px] font-mono text-zinc-400">TI / SISTEMAS</span>
-                                </div>
-                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
-                                    Mesa de ayuda técnica, inventario de hardware y equipos de cómputo, gestión de licencias software y soporte a usuarios.
-                                </p>
-                            </div>
-                        </label>
-
-                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
-                            <input type="checkbox" name="enabled_modules" value="marketing"
-                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
-                            <div class="flex-1 text-xs">
-                                <div class="flex items-center justify-between">
-                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-MKT · Marketing Digital, Campañas & Growth</span>
-                                    <span class="text-[10px] font-mono text-zinc-400">CRECIMIENTO</span>
-                                </div>
-                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
-                                    Gestión de campañas publicitarias multicanal, captación de prospectos entrantes (inbound leads) y analítica de conversión.
-                                </p>
-                            </div>
-                        </label>
+                        {% endfor %}
 
                         <!-- Botones de Acción -->
                         <div class="pt-4 flex items-center justify-between border-t border-zinc-100">
