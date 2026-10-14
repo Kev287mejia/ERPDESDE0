@@ -1,0 +1,503 @@
+import uuid
+from decimal import Decimal
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.utils import timezone
+
+from apps.tenancy.models import TenantScopedModel
+
+
+class BankAccount(TenantScopedModel):
+    """
+    Cuenta Bancaria Institucional del Tenant (BAC, Banpro, Lafise, BDF, Ficohsa).
+    Manejo bimonetario en Córdobas (NIO C$) y Dólares (USD $).
+    """
+    class AccountType(models.TextChoices):
+        CHECKING = 'CHECKING', 'Cuenta Corriente'
+        SAVINGS = 'SAVINGS', 'Cuenta de Ahorro'
+
+    class BankName(models.TextChoices):
+        BAC = 'BAC', 'BAC Credomatic Nicaragua'
+        BANPRO = 'BANPRO', 'Banco de la Producción (Banpro)'
+        LAFISE = 'LAFISE', 'Banco LAFISE Bancentro'
+        BDF = 'BDF', 'Banco de Finanzas (BDF)'
+        FICOHSA = 'FICOHSA', 'Banco Ficohsa Nicaragua'
+        OTHER = 'OTHER', 'Otra Institución Financiera'
+
+    bank_name = models.CharField(
+        max_length=40,
+        choices=BankName.choices,
+        default=BankName.BAC,
+        verbose_name="Institución Bancaria",
+    )
+    account_number = models.CharField(
+        max_length=40,
+        db_index=True,
+        verbose_name="Número de Cuenta Bancaria",
+        help_text="ej: 100-234567-89",
+    )
+    currency = models.CharField(
+        max_length=10,
+        default='NIO',
+        verbose_name="Moneda de la Cuenta",
+        help_text="NIO o USD",
+    )
+    account_type = models.CharField(
+        max_length=20,
+        choices=AccountType.choices,
+        default=AccountType.CHECKING,
+        verbose_name="Tipo de Cuenta",
+    )
+    current_balance = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Saldo en Libros",
+    )
+    description = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Descripción / Uso Operativo",
+        help_text="ej: Cuenta Principal de Operaciones y Planilla",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Cuenta Activa",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Cuenta Bancaria"
+        verbose_name_plural = "Cuentas Bancarias"
+        ordering = ['bank_name', 'account_number']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'account_number'],
+                name='unique_bank_account_per_tenant',
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_bank_name_display()} · {self.account_number} [{self.currency}]"
+
+
+class PettyCashFund(TenantScopedModel):
+    """
+    Caja Chica o Fondo Fijo Operativo asignado a un Custodio (Supervisor / Capataz de Cuadrilla).
+    Permite cubrir gastos menores en frentes de obra y liquidar viáticos, combustible y compras de emergencia.
+    """
+    code = models.CharField(
+        max_length=20,
+        db_index=True,
+        blank=True,
+        verbose_name="Código de Caja Chica",
+        help_text="ej: CAJ-01, FND-ALFA",
+    )
+    name = models.CharField(
+        max_length=120,
+        verbose_name="Nombre de la Caja / Fondo Fijo",
+        help_text="ej: Fondo Operativo Cuadrilla Alfa, Caja Chica Plantel Managua",
+    )
+    custodian = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='custodied_petty_cash_funds',
+        verbose_name="Custodio Responsable (Supervisor / Ingeniero)",
+    )
+    linked_crew = models.ForeignKey(
+        'operations.Crew',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='petty_cash_funds',
+        verbose_name="Cuadrilla Vinculada",
+    )
+    currency = models.CharField(
+        max_length=10,
+        default='NIO',
+        verbose_name="Moneda",
+    )
+    allocated_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('10000.00'),
+        verbose_name="Fondo Fijo Asignado (C$)",
+        help_text="Límite máximo formal autorizado para este fondo fijo",
+    )
+    current_balance = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Saldo Disponible en Mano (C$)",
+        help_text="Efectivo físico disponible antes de reposición",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Fondo Activo",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Caja Chica / Fondo Fijo"
+        verbose_name_plural = "Cajas Chicas y Fondos Operativos"
+        ordering = ['code']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'code'],
+                name='unique_petty_cash_code_per_tenant',
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.code} · {self.name} ({self.custodian.full_name or self.custodian.email})"
+
+    @property
+    def spent_amount(self) -> Decimal:
+        """Monto ejecutado pendiente de reposición."""
+        return max(Decimal('0.00'), self.allocated_amount - self.current_balance)
+
+    @property
+    def spent_percentage(self) -> int:
+        """Porcentaje del fondo consumido."""
+        if self.allocated_amount and self.allocated_amount > Decimal('0.00'):
+            pct = int((self.spent_amount / self.allocated_amount) * Decimal('100'))
+            return min(100, max(0, pct))
+        return 0
+
+    def save(self, *args, **kwargs):
+        if not self.code and self.organization_id:
+            count = PettyCashFund.objects.filter(organization_id=self.organization_id).count() + 1
+            candidate = f"CAJ-{count:02d}"
+            while PettyCashFund.objects.filter(organization_id=self.organization_id, code=candidate).exists():
+                count += 1
+                candidate = f"CAJ-{count:02d}"
+            self.code = candidate
+        super().save(*args, **kwargs)
+
+
+class PettyCashReplenishment(TenantScopedModel):
+    """
+    Arqueo y Solicitud de Reposición de Fondo Fijo.
+    Agrupa comprobantes de gastos de campo y solicita su desembolso desde cuenta bancaria.
+    """
+    class Status(models.TextChoices):
+        SUBMITTED = 'SUBMITTED', 'Enviado / En Revisión'
+        APPROVED = 'APPROVED', 'Aprobado para Pago'
+        DISBURSED = 'DISBURSED', 'Reembolsado / Liquidado'
+        REJECTED = 'REJECTED', 'Rechazado'
+
+    code = models.CharField(
+        max_length=25,
+        db_index=True,
+        blank=True,
+        verbose_name="Folio de Reposición",
+        help_text="ej: REP-2026-0001",
+    )
+    fund = models.ForeignKey(
+        PettyCashFund,
+        on_delete=models.PROTECT,
+        related_name='replenishments',
+        verbose_name="Caja Chica a Reembolsar",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.SUBMITTED,
+        db_index=True,
+        verbose_name="Estado de Reposición",
+    )
+    total_expenses_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Suma de Gastos Comprobados (C$)",
+    )
+    requested_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Monto Solicitado a Desembolsar (C$)",
+    )
+    notes = models.TextField(
+        blank=True,
+        verbose_name="Observaciones de Liquidación / Auditoría",
+    )
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='submitted_replenishments',
+        verbose_name="Custodio Solicitante",
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_replenishments',
+        verbose_name="Aprobado Por (Coordinación / Gerencia)",
+    )
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Aprobación",
+    )
+    disbursed_from_bank = models.ForeignKey(
+        BankAccount,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='petty_cash_disbursements',
+        verbose_name="Cuenta Bancaria Origen del Desembolso",
+    )
+    disbursed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Desembolso / Transferencia",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Reposición de Caja Chica"
+        verbose_name_plural = "Reposiciones de Fondo Fijo"
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f"{self.code} · {self.fund.name} ({self.get_status_display()})"
+
+    def save(self, *args, **kwargs):
+        if not self.code and self.organization_id:
+            year = timezone.now().year
+            count = PettyCashReplenishment.objects.filter(
+                organization_id=self.organization_id,
+                code__startswith=f"REP-{year}-"
+            ).count() + 1
+            candidate = f"REP-{year}-{count:04d}"
+            while PettyCashReplenishment.objects.filter(organization_id=self.organization_id, code=candidate).exists():
+                count += 1
+                candidate = f"REP-{year}-{count:04d}"
+            self.code = candidate
+        super().save(*args, **kwargs)
+
+
+class PettyCashExpense(TenantScopedModel):
+    """
+    Comprobante Individual de Gasto Operativo de Campo.
+    Se imputa directamente a la Caja Chica y opcionalmente a una Orden de Trabajo (OT) de Operaciones.
+    """
+    class Category(models.TextChoices):
+        FUEL = 'FUEL', 'Combustible y Lubricantes (Gasolina / Diesel)'
+        PER_DIEM = 'PER_DIEM', 'Viáticos y Alimentación de Cuadrilla'
+        TOLL_PARKING = 'TOLL_PARKING', 'Peajes y Estacionamientos'
+        EMERGENCY_HARDWARE = 'EMERGENCY_HARDWARE', 'Ferretería y Compras de Emergencia en Obra'
+        FREIGHT_LOCAL = 'FREIGHT_LOCAL', 'Fletes y Transporte Local'
+        OTHER_OPERATIONAL = 'OTHER_OPERATIONAL', 'Otros Gastos Menores de Campo'
+
+    voucher_number = models.CharField(
+        max_length=25,
+        db_index=True,
+        blank=True,
+        verbose_name="Folio de Comprobante",
+        help_text="ej: REC-2026-0001",
+    )
+    fund = models.ForeignKey(
+        PettyCashFund,
+        on_delete=models.CASCADE,
+        related_name='expenses',
+        verbose_name="Caja Chica Afectada",
+    )
+    work_order = models.ForeignKey(
+        'operations.WorkOrder',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='petty_cash_expenses',
+        verbose_name="Orden de Trabajo (Frente de Obra Imputable)",
+        help_text="Asigna este costo operativo directamente a la OT",
+    )
+    expense_category = models.CharField(
+        max_length=30,
+        choices=Category.choices,
+        default=Category.FUEL,
+        verbose_name="Rubro / Categoría de Gasto",
+    )
+    vendor_name = models.CharField(
+        max_length=150,
+        verbose_name="Comercio / Proveedor",
+        help_text="ej: Gasolinera Puma Tipitapa, Ferretería El Halcón",
+    )
+    vendor_tax_id = models.CharField(
+        max_length=30,
+        blank=True,
+        verbose_name="RUC / Cédula del Comercio",
+        help_text="Identificación tributaria del proveedor",
+    )
+    invoice_number = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Nº Factura / Conduce / Recibo",
+        help_text="Número fiscal impreso en el comprobante",
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        verbose_name="Monto del Gasto (C$)",
+    )
+    description = models.CharField(
+        max_length=255,
+        verbose_name="Concepto / Justificación Técnica",
+        help_text="ej: 35 Galones de Diesel para Hilux Cuadrilla Alfa - Frentes Chinandega",
+    )
+    spent_at = models.DateField(
+        default=timezone.now,
+        verbose_name="Fecha del Comprobante",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='registered_petty_expenses',
+        verbose_name="Registrado Por",
+    )
+    replenishment = models.ForeignKey(
+        PettyCashReplenishment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='expenses',
+        verbose_name="Lote de Reposición / Arqueo",
+    )
+    is_replenished = models.BooleanField(
+        default=False,
+        verbose_name="Gasto Ya Reembolsado",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Comprobante de Caja Chica"
+        verbose_name_plural = "Comprobantes de Caja Chica"
+        ordering = ['-spent_at', '-created_at']
+
+    def __str__(self) -> str:
+        return f"{self.voucher_number} · {self.vendor_name} ({self.amount} C$)"
+
+    def clean(self):
+        super().clean()
+        if self.is_replenished and not self._state.adding:
+            original = PettyCashExpense.objects.filter(pk=self.pk).first()
+            if original and original.is_replenished and (original.amount != self.amount or original.fund_id != self.fund_id):
+                raise ValidationError("No se puede modificar un comprobante de gasto que ya fue liquidado y reembolsado.")
+
+    def save(self, *args, **kwargs):
+        if not self.voucher_number and self.organization_id:
+            year = timezone.now().year
+            count = PettyCashExpense.objects.filter(
+                organization_id=self.organization_id,
+                voucher_number__startswith=f"REC-{year}-"
+            ).count() + 1
+            candidate = f"REC-{year}-{count:04d}"
+            while PettyCashExpense.objects.filter(organization_id=self.organization_id, voucher_number=candidate).exists():
+                count += 1
+                candidate = f"REC-{year}-{count:04d}"
+            self.voucher_number = candidate
+        super().save(*args, **kwargs)
+
+
+class FinancialTransaction(TenantScopedModel):
+    """
+    Libro Mayor de Tesorería, Caja y Bancos (Kardex Financiero Inmutable).
+    Garantiza trazabilidad legal: todo desembolso, reposición o transferencia
+    queda asentado de forma no editable ni eliminable.
+    """
+    class TransactionType(models.TextChoices):
+        PETTY_CASH_ALLOCATION = 'PETTY_CASH_ALLOCATION', 'Apertura / Dotación Inicial de Fondo Fijo'
+        PETTY_CASH_EXPENSE = 'PETTY_CASH_EXPENSE', 'Egreso de Caja Chica por Gasto de Campo'
+        PETTY_CASH_REPLENISH = 'PETTY_CASH_REPLENISH', 'Desembolso Bancario de Reposición'
+        BANK_TRANSFER = 'BANK_TRANSFER', 'Transferencia entre Cuentas Bancarias'
+        CLIENT_COLLECTION = 'CLIENT_COLLECTION', 'Cobro de Factura a Cliente'
+        VENDOR_DISBURSEMENT = 'VENDOR_DISBURSEMENT', 'Pago a Proveedor con Retenciones'
+
+    number = models.CharField(
+        max_length=25,
+        db_index=True,
+        blank=True,
+        verbose_name="Folio de Transacción",
+        help_text="ej: TRX-2026-0001",
+    )
+    transaction_type = models.CharField(
+        max_length=35,
+        choices=TransactionType.choices,
+        verbose_name="Tipo de Transacción",
+    )
+    bank_account = models.ForeignKey(
+        BankAccount,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='transactions',
+        verbose_name="Cuenta Bancaria Imputable",
+    )
+    petty_cash_fund = models.ForeignKey(
+        PettyCashFund,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='transactions',
+        verbose_name="Caja Chica Imputable",
+    )
+    amount = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        verbose_name="Monto Transado (C$)",
+    )
+    balance_after = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        verbose_name="Saldo Resultante en la Cuenta/Caja",
+    )
+    concept = models.CharField(
+        max_length=255,
+        verbose_name="Concepto / Detalle de la Operación",
+    )
+    reference_code = models.CharField(
+        max_length=80,
+        blank=True,
+        verbose_name="Nº Referencia / Minuta Bancaria / Folio Recibo",
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name="Operador Responsable",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Transacción Financiera"
+        verbose_name_plural = "Libro Mayor de Tesorería (Transacciones)"
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f"{self.number} · {self.get_transaction_type_display()} ({self.amount} C$)"
+
+    def clean(self):
+        super().clean()
+        if not self._state.adding:
+            raise ValidationError("El registro de auditoría financiera es inmutable. Prohibido modificar transacciones asentadas.")
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("El registro de auditoría financiera es inmutable. Prohibido modificar transacciones asentadas.")
+
+        if not self.number and self.organization_id:
+            year = timezone.now().year
+            count = FinancialTransaction.objects.filter(
+                organization_id=self.organization_id,
+                number__startswith=f"TRX-{year}-"
+            ).count() + 1
+            candidate = f"TRX-{year}-{count:04d}"
+            while FinancialTransaction.objects.filter(organization_id=self.organization_id, number=candidate).exists():
+                count += 1
+                candidate = f"TRX-{year}-{count:04d}"
+            self.number = candidate
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("El registro de auditoría financiera es inmutable. Prohibido eliminar transacciones históricas.")

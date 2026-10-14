@@ -1,0 +1,551 @@
+{% extends "layouts/base_auth.html" %}
+
+{% block title %}Onboarding Multi-País | Despliegue de Tenant{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto w-full" x-data="{ 
+    step: 1, 
+    country_code: 'NI',
+    name: '{{ form.name.value|default:'' }}',
+    legal_name: '{{ form.legal_name.value|default:'' }}',
+    tax_id: '{{ form.tax_id.value|default:'' }}',
+    currency: '{{ form.currency.value|default:'NIO' }}',
+    tax_regime: '{{ form.tax_regime.value|default:'GENERAL' }}',
+    industry: '{{ form.industry.value|default:'SERVICES' }}',
+    accounting_template: '{{ form.accounting_template.value|default:'NIIF_PYMES' }}'
+}">
+    <!-- Contenedor Estructural Suizo Grid-Locked (1px border, blanco puro, cero sombras) -->
+    <div class="border border-zinc-200 bg-white rounded-[4px]">
+
+        <!-- Encabezado del Wizard -->
+        <div class="p-6 border-b border-zinc-200 bg-white">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-medium">
+                    INICIALIZACIÓN MULTI-PAÍS &bull; CENTROAMÉRICA
+                </span>
+                <span class="text-[10px] font-mono text-zinc-400">ID: WIZARD-CORE-CA</span>
+            </div>
+            <h1 class="text-base font-semibold text-zinc-900 tracking-tight">Despliegue de Organización Operativa</h1>
+            <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                Configure la jurisdicción fiscal, la identidad tributaria y los subsistemas de operación para su nuevo espacio de trabajo.
+            </p>
+
+            <!-- Línea de Tiempo Técnica Numerada (3 Pasos de 1px) -->
+            <div class="grid grid-cols-3 gap-3 mt-6 pt-4 border-t border-zinc-100 text-xs font-mono">
+                <!-- Paso 1 -->
+                <button type="button" 
+                        @click="step = 1"
+                        :class="step === 1 ? 'border-zinc-900 text-zinc-900 bg-zinc-50/50' : 'border-zinc-200 text-zinc-400 hover:text-zinc-600'"
+                        class="border-l-2 pl-3 py-1.5 text-left transition-colors">
+                    <span class="text-[10px] block font-semibold" :class="step === 1 ? 'text-zinc-900' : 'text-zinc-400'">01 JURISDICCIÓN</span>
+                    <span class="font-medium text-[11px]">Fiscal Regional</span>
+                </button>
+
+                <!-- Paso 2 -->
+                <button type="button" 
+                        @click="if (country_code) step = 2"
+                        :class="step === 2 ? 'border-zinc-900 text-zinc-900 bg-zinc-50/50' : 'border-zinc-200 text-zinc-400 hover:text-zinc-600'"
+                        class="border-l-2 pl-3 py-1.5 text-left transition-colors">
+                    <span class="text-[10px] block font-semibold" :class="step === 2 ? 'text-zinc-900' : 'text-zinc-400'">02 IDENTIDAD</span>
+                    <span class="font-medium text-[11px]">Legal & RUC</span>
+                </button>
+
+                <!-- Paso 3 -->
+                <button type="button" 
+                        @click="if (country_code && name && tax_id) step = 3"
+                        :class="step === 3 ? 'border-zinc-900 text-zinc-900 bg-zinc-50/50' : 'border-zinc-200 text-zinc-400 hover:text-zinc-600'"
+                        class="border-l-2 pl-3 py-1.5 text-left transition-colors">
+                    <span class="text-[10px] block font-semibold" :class="step === 3 ? 'text-zinc-900' : 'text-zinc-400'">03 MÓDULOS</span>
+                    <span class="font-medium text-[11px]">Operativos</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Errores Globales del Formulario -->
+        {% if form.errors %}
+        <div class="p-3 mx-6 mt-4 border border-red-200 bg-red-50/50 rounded-[4px] text-xs font-mono text-red-700 space-y-1">
+            <div class="font-semibold text-red-800">Se encontraron observaciones en el formulario:</div>
+            {% for field, error_list in form.errors.items %}
+                {% for err in error_list %}
+                <div>&bull; <strong>{{ field }}:</strong> {{ err }}</div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Formulario Técnico Principal -->
+        <form method="POST" action="{% url 'tenancy:onboarding' %}" class="p-6">
+            {% csrf_token %}
+            <input type="hidden" name="country_code" :value="country_code">
+
+            <!-- ============================================================= -->
+            <!-- PASO 1: JURISDICCIÓN FISCAL (CENTROAMÉRICA - 3 COLUMNAS)      -->
+            <!-- ============================================================= -->
+            <div x-show="step === 1" x-cloak class="space-y-4">
+                <div class="flex items-center justify-between pb-2 border-b border-zinc-100">
+                    <div>
+                        <h2 class="text-xs font-mono uppercase tracking-wider font-semibold text-zinc-900">
+                            Paso 1: Jurisdicción Fiscal Regional (Centroamérica)
+                        </h2>
+                        <p class="text-xs text-zinc-500 mt-0.5">
+                            Seleccione el marco normativo donde radicará la contabilidad oficial y la emisión de comprobantes.
+                        </p>
+                    </div>
+                    <span class="text-[10px] font-mono text-zinc-400">FASE 1: NICARAGUA ACTIVA</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {% for country in countries %}
+                    {% if country.is_active %}
+                    <!-- País Habilitado (Nicaragua) -->
+                    <div @click="country_code = '{{ country.code }}'"
+                         :class="country_code === '{{ country.code }}' ? 'border-zinc-900 ring-1 ring-zinc-900 bg-zinc-50/40' : 'border-zinc-200 bg-white hover:border-zinc-300'"
+                         class="p-3.5 border rounded-[4px] cursor-pointer transition-all relative">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="fi fi-{{ country.code|lower }} border border-zinc-200 rounded-[2px] text-base"></span>
+                                <span class="text-xs font-semibold text-zinc-900">{{ country.name }}</span>
+                            </div>
+                            <span class="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-medium bg-zinc-50 text-zinc-700 border border-zinc-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                                HABILITADO
+                            </span>
+                        </div>
+
+                        <div class="mt-3 pt-2.5 border-t border-zinc-100 space-y-1 text-[11px] font-mono text-zinc-600">
+                            <div class="flex items-center justify-between">
+                                <span class="text-zinc-400">MONEDA:</span>
+                                <span class="font-medium text-zinc-900">{{ country.primary_currency_code }} ({{ country.primary_currency_symbol }}) / USD</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-zinc-400">{{ country.tax_id_label }}:</span>
+                                <span class="font-medium text-zinc-900">Regex 14 Dígitos</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-zinc-400">IMPUESTO:</span>
+                                <span class="font-medium text-zinc-900 tabular-nums">{{ country.default_tax_name }} {{ country.default_tax_rate }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Países en Fase Futura (Próximamente) -->
+                    <div class="p-3.5 border border-zinc-200 bg-zinc-50/50 rounded-[4px] select-none opacity-60">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="fi fi-{{ country.code|lower }} border border-zinc-200 rounded-[2px] text-base grayscale"></span>
+                                <span class="text-xs font-medium text-zinc-600">{{ country.name }}</span>
+                            </div>
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-medium bg-white text-zinc-500 border border-zinc-200">
+                                PRÓXIMAMENTE
+                            </span>
+                        </div>
+
+                        <div class="mt-3 pt-2.5 border-t border-zinc-200/60 space-y-1 text-[11px] font-mono text-zinc-500">
+                            <div class="flex items-center justify-between">
+                                <span class="text-zinc-400">MONEDA:</span>
+                                <span>{{ country.primary_currency_code }} ({{ country.primary_currency_symbol }})</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-zinc-400">{{ country.tax_id_label }}:</span>
+                                <span>Estándar Local</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-zinc-400">IMPUESTO:</span>
+                                <span class="tabular-nums">{{ country.default_tax_name }} {{ country.default_tax_rate }}%</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+
+                <div class="pt-4 flex justify-end">
+                    <button type="button" 
+                            @click="step = 2"
+                            class="h-8 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] flex items-center gap-1.5 transition-colors cursor-pointer">
+                        <span>Continuar a Identidad</span>
+                        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- PASO 2: IDENTIDAD LEGAL Y TRIBUTARIA (LAYOUT 2/3 + 1/3)       -->
+            <!-- ============================================================= -->
+            <div x-show="step === 2" x-cloak class="space-y-4">
+                <div class="flex items-center justify-between pb-2 border-b border-zinc-100">
+                    <div>
+                        <h2 class="text-xs font-mono uppercase tracking-wider font-semibold text-zinc-900">
+                            Paso 2: Identidad Legal y Registro Tributario
+                        </h2>
+                        <p class="text-xs text-zinc-500 mt-0.5">
+                            Parámetros fiscales inscritos ante la autoridad tributaria correspondiente.
+                        </p>
+                    </div>
+                    <span class="text-[10px] font-mono text-zinc-400">VALIDACIÓN REGEX ACTIVA</span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Formulario de Campos (2/3) -->
+                    <div class="lg:col-span-2 space-y-4">
+                        <!-- Nombre Comercial -->
+                        <div>
+                            <label for="id_name" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                                Nombre Comercial (Marca / Identificador Operativo) <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text"
+                                   name="name"
+                                   id="id_name"
+                                   x-model="name"
+                                   required
+                                   value="{{ form.name.value|default:'' }}"
+                                   placeholder="ej: SIE Nicaragua"
+                                   class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
+                            <p class="text-[10px] font-mono text-zinc-400 mt-1">Se utilizará en el App Shell y encabezados de reportes.</p>
+                        </div>
+
+                        <!-- Razón Social -->
+                        <div>
+                            <label for="id_legal_name" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                                Razón Social Legal <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text"
+                                   name="legal_name"
+                                   id="id_legal_name"
+                                   x-model="legal_name"
+                                   required
+                                   value="{{ form.legal_name.value|default:'' }}"
+                                   placeholder="ej: Soluciones de Ingeniería Eléctrica S.A."
+                                   class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
+                            <p class="text-[10px] font-mono text-zinc-400 mt-1">Nombre formal registrado ante el Registro Público Mercantil.</p>
+                        </div>
+
+                        <!-- RUC con Verificación HTMX -->
+                        <div>
+                            <label for="id_tax_id" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                                RUC (Registro Único del Contribuyente) <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text"
+                                   name="tax_id"
+                                   id="id_tax_id"
+                                   x-model="tax_id"
+                                   required
+                                   maxlength="20"
+                                   value="{{ form.tax_id.value|default:'' }}"
+                                   placeholder="ej: J0310000123456 o 001-290590-0001A"
+                                   hx-get="{% url 'tenancy:validate_ruc_htmx' %}"
+                                   hx-trigger="input changed delay:400ms"
+                                   hx-target="#ruc_validation_msg"
+                                   hx-include="[name='country_code']"
+                                   class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-mono tabular-nums uppercase">
+                            <div id="ruc_validation_msg">
+                                <p class="text-[10px] font-mono text-zinc-400 mt-1">Estructura esperada: 14 dígitos continuos o formato de cédula con guiones.</p>
+                            </div>
+                        </div>
+
+                        <!-- Fila Técnica: Moneda Base & Giro Comercial -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-zinc-100">
+                            <!-- Moneda Operativa -->
+                            <div>
+                                <label for="id_currency" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                                    Moneda Funcional Base <span class="text-red-500">*</span>
+                                </label>
+                                <select name="currency" 
+                                        id="id_currency" 
+                                        x-model="currency"
+                                        class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
+                                    <option value="NIO">Córdoba Nicaragüense (C$)</option>
+                                    <option value="USD">Dólar Estadounidense ($)</option>
+                                </select>
+                                <p class="text-[10px] font-mono text-zinc-400 mt-1">Moneda de corte para balances y reportes.</p>
+                            </div>
+
+                            <!-- Giro o Rubro Comercial -->
+                            <div>
+                                <label for="id_industry" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                                    Giro o Rubro Comercial <span class="text-red-500">*</span>
+                                </label>
+                                <select name="industry" 
+                                        id="id_industry" 
+                                        x-model="industry"
+                                        class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
+                                    <option value="SERVICES">Servicios Industriales & Mantenimiento</option>
+                                    <option value="CONSTRUCTION">Construcción, Ingeniería & Obras</option>
+                                    <option value="ENERGY_TELCO">Energía, Redes Eléctricas & Telco</option>
+                                    <option value="COMMERCE">Comercio & Distribución</option>
+                                    <option value="MANUFACTURING">Manufactura & Agroindustria</option>
+                                    <option value="OTHER">Otro Giro Comercial</option>
+                                </select>
+                                <p class="text-[10px] font-mono text-zinc-400 mt-1">Define las plantillas de operación y cuentas.</p>
+                            </div>
+                        </div>
+
+                        <!-- Fila Técnica: Régimen Fiscal DGI & Plantilla Contable Inicial -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Régimen Fiscal DGI -->
+                            <div>
+                                <label for="id_tax_regime" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                                    Régimen Fiscal DGI <span class="text-red-500">*</span>
+                                </label>
+                                <select name="tax_regime" 
+                                        id="id_tax_regime" 
+                                        x-model="tax_regime"
+                                        class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
+                                    <option value="GENERAL">Régimen General (IR Anual + Retenciones)</option>
+                                    <option value="SIMPLIFIED">Régimen Simplificado / Cuota Fija</option>
+                                    <option value="SPECIAL">Régimen Especial / Gran Contribuyente</option>
+                                </select>
+                                <p class="text-[10px] font-mono text-zinc-400 mt-1">Normativa de retención tributaria en la fuente.</p>
+                            </div>
+
+                            <!-- Plantilla Contable Inicial -->
+                            <div>
+                                <label for="id_accounting_template" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                                    Plantilla Contable Inicial <span class="text-red-500">*</span>
+                                </label>
+                                <select name="accounting_template" 
+                                        id="id_accounting_template" 
+                                        x-model="accounting_template"
+                                        class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
+                                    <option value="NIIF_PYMES">NIIF para PYMES (Nicaragua DGI)</option>
+                                    <option value="SIMPLIFIED">Simplificado (Caja & Bancos)</option>
+                                    <option value="BLANK">En Blanco (Configuración Manual)</option>
+                                </select>
+                                <p class="text-[10px] font-mono text-zinc-400 mt-1">Catálogo de cuentas activo al desplegar el Tenant.</p>
+                            </div>
+                        </div>
+
+                        <!-- Botones de Navegación -->
+                        <div class="pt-4 flex items-center justify-between border-t border-zinc-100">
+                            <button type="button" 
+                                    @click="step = 1"
+                                    class="h-8 px-3 text-xs font-medium bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-[4px] transition-colors">
+                                &larr; Regresar a Jurisdicción
+                            </button>
+                            <button type="button" 
+                                    @click="if (name && tax_id) step = 3"
+                                    class="h-8 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] flex items-center gap-1.5 transition-colors cursor-pointer">
+                                <span>Continuar a Módulos</span>
+                                <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Ficha Técnica de Resumen Fiscal en Vivo (1/3) -->
+                    <div class="border border-zinc-200 bg-zinc-50/80 rounded-[4px] p-4 space-y-3 font-mono text-xs">
+                        <div class="text-[10px] uppercase tracking-wider font-semibold text-zinc-700 border-b border-zinc-200 pb-2 flex items-center gap-1.5">
+                            <span class="fi fi-ni border border-zinc-200 rounded-[2px]"></span>
+                            <span>RESUMEN EN VIVO DEL TENANT</span>
+                        </div>
+
+                        <div class="space-y-2.5 text-[11px]">
+                            <div>
+                                <span class="text-zinc-400 block text-[10px]">NOMBRE COMERCIAL:</span>
+                                <span class="font-medium text-zinc-900 truncate block" x-text="name || 'No definido'"></span>
+                            </div>
+                            <div>
+                                <span class="text-zinc-400 block text-[10px]">RAZÓN SOCIAL:</span>
+                                <span class="font-medium text-zinc-900 truncate block" x-text="legal_name || 'No definida'"></span>
+                            </div>
+                            <div>
+                                <span class="text-zinc-400 block text-[10px]">IDENTIFICADOR FISCAL:</span>
+                                <span class="font-medium text-zinc-900 tabular-nums uppercase" x-text="tax_id || 'Pendiente'"></span>
+                            </div>
+                            <div>
+                                <span class="text-zinc-400 block text-[10px]">GIRO / RUBRO:</span>
+                                <span class="font-medium text-zinc-900 truncate block" x-text="industry"></span>
+                            </div>
+                            <div class="pt-2 border-t border-zinc-200/60 space-y-1 text-zinc-600">
+                                <div class="flex justify-between">
+                                    <span class="text-zinc-400">MONEDA CONTABLE:</span>
+                                    <span class="text-zinc-900 font-medium" x-text="currency === 'NIO' ? 'NIO · C$' : 'USD · $'"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-zinc-400">RÉGIMEN:</span>
+                                    <span class="text-zinc-900 font-medium" x-text="tax_regime"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-zinc-400">PLAN CONTABLE:</span>
+                                    <span class="text-zinc-900 font-medium" x-text="accounting_template === 'NIIF_PYMES' ? 'NIIF PYMES' : accounting_template"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-zinc-400">TASA IVA DGI:</span>
+                                    <span class="text-zinc-900 font-medium tabular-nums">15.00%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- PASO 3: SELECCIÓN DE ARQUITECTURA MODULAR (LAYOUT 2/3 + 1/3)  -->
+            <!-- ============================================================= -->
+            <div x-show="step === 3" x-cloak class="space-y-4">
+                <div class="flex items-center justify-between pb-2 border-b border-zinc-100">
+                    <div>
+                        <h2 class="text-xs font-mono uppercase tracking-wider font-semibold text-zinc-900">
+                            Paso 3: Arquitectura Modular del Tenant
+                        </h2>
+                        <p class="text-xs text-zinc-500 mt-0.5">
+                            Seleccione los subsistemas operativos que estarán suscritos y habilitados desde el primer arranque.
+                        </p>
+                    </div>
+                    <span class="text-[10px] font-mono text-zinc-400">MODULACIÓN DINÁMICA</span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Lista de Módulos (2/3) -->
+                    <div class="lg:col-span-2 space-y-2.5">
+                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
+                            <input type="checkbox" name="enabled_modules" value="crm" checked
+                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
+                            <div class="flex-1 text-xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-CRM · Gestión Comercial & Cotizaciones</span>
+                                    <span class="text-[10px] font-mono text-zinc-400">RECOMENDADO</span>
+                                </div>
+                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
+                                    Pipeline de licitaciones, directorio de clientes corporativos y cotizador bimonetario con desglose de IVA.
+                                </p>
+                            </div>
+                        </label>
+
+                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
+                            <input type="checkbox" name="enabled_modules" value="operations" checked
+                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
+                            <div class="flex-1 text-xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-OPS · Ingeniería, Frentes & Órdenes de Trabajo</span>
+                                    <span class="text-[10px] font-mono text-zinc-400">CRÍTICO</span>
+                                </div>
+                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
+                                    Gestión de cuadrillas de campo, asignación de ingenieros residentes y seguimiento de folios OT.
+                                </p>
+                            </div>
+                        </label>
+
+                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
+                            <input type="checkbox" name="enabled_modules" value="sst" checked
+                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
+                            <div class="flex-1 text-xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-SST · Seguridad Laboral & Normativa MITRAB</span>
+                                    <span class="text-[10px] font-mono text-zinc-400">LEY 618</span>
+                                </div>
+                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
+                                    Auditorías de campo, checklists obligatorios de seguridad industrial y avales formales de riesgo.
+                                </p>
+                            </div>
+                        </label>
+
+                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
+                            <input type="checkbox" name="enabled_modules" value="inventory"
+                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
+                            <div class="flex-1 text-xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-INV · Control de Materiales, Almacén & Kardex</span>
+                                    <span class="text-[10px] font-mono text-zinc-400">LOGÍSTICA</span>
+                                </div>
+                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
+                                    Gestión de bodegas, control de existencias para proyectos y requisición de materiales.
+                                </p>
+                            </div>
+                        </label>
+
+                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
+                            <input type="checkbox" name="enabled_modules" value="finance"
+                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
+                            <div class="flex-1 text-xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-FIN · Tesorería, Cajas Chicas & Bancos</span>
+                                    <span class="text-[10px] font-mono text-zinc-400">FINANZAS</span>
+                                </div>
+                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
+                                    Arqueos de caja chica en campo, fondos de viáticos y comprobantes de gasto bimonetarios.
+                                </p>
+                            </div>
+                        </label>
+
+                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
+                            <input type="checkbox" name="enabled_modules" value="tech"
+                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
+                            <div class="flex-1 text-xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-TECH · Tecnología, Soporte IT & Activos Digitales</span>
+                                    <span class="text-[10px] font-mono text-zinc-400">TI / SISTEMAS</span>
+                                </div>
+                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
+                                    Mesa de ayuda técnica, inventario de hardware y equipos de cómputo, gestión de licencias software y soporte a usuarios.
+                                </p>
+                            </div>
+                        </label>
+
+                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
+                            <input type="checkbox" name="enabled_modules" value="marketing"
+                                   class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
+                            <div class="flex-1 text-xs">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-semibold text-zinc-900 font-mono text-[12px]">MOD-MKT · Marketing Digital, Campañas & Growth</span>
+                                    <span class="text-[10px] font-mono text-zinc-400">CRECIMIENTO</span>
+                                </div>
+                                <p class="text-zinc-500 mt-0.5 text-[11px] leading-relaxed">
+                                    Gestión de campañas publicitarias multicanal, captación de prospectos entrantes (inbound leads) y analítica de conversión.
+                                </p>
+                            </div>
+                        </label>
+
+                        <!-- Botones de Acción -->
+                        <div class="pt-4 flex items-center justify-between border-t border-zinc-100">
+                            <button type="button" 
+                                    @click="step = 2"
+                                    class="h-8 px-3 text-xs font-medium bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-[4px] transition-colors">
+                                &larr; Regresar a Identidad
+                            </button>
+                            <button type="submit" 
+                                    class="h-9 px-5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] flex items-center gap-1.5 transition-colors cursor-pointer">
+                                <span>Inicializar Organización Operativa</span>
+                                <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Ficha Resumen de Despliegue (1/3) -->
+                    <div class="border border-zinc-200 bg-zinc-50/80 rounded-[4px] p-4 space-y-3 font-mono text-xs">
+                        <div class="text-[10px] uppercase tracking-wider font-semibold text-zinc-700 border-b border-zinc-200 pb-2">
+                            CONFIRMACIÓN DE ARQUITECTURA
+                        </div>
+
+                        <div class="space-y-2 text-[11px] text-zinc-600">
+                            <div class="p-2.5 bg-white border border-zinc-200 rounded-[3px] space-y-1">
+                                <span class="text-zinc-400 block text-[10px]">AUTORIDAD DE USUARIO:</span>
+                                <span class="font-bold text-zinc-900 block">NIVEL 100 · OWNER / ADMIN</span>
+                                <span class="text-[10px] text-zinc-500 block">Tendrá control absoluto sobre los parámetros, nómina y roles.</span>
+                            </div>
+
+                            <div class="p-2.5 bg-white border border-zinc-200 rounded-[3px] space-y-1">
+                                <span class="text-zinc-400 block text-[10px]">ESTRUCTURA DE DATOS:</span>
+                                <span class="font-bold text-zinc-900 block">AISLAMIENTO COMPLETO</span>
+                                <span class="text-[10px] text-zinc-500 block">Las transacciones quedarán restringidas estrictamente a este Tenant.</span>
+                            </div>
+
+                            <div class="p-2.5 bg-white border border-zinc-200 rounded-[3px] space-y-1">
+                                <span class="text-zinc-400 block text-[10px]">REGLA DE ACCESO ESTRICTA:</span>
+                                <span class="font-bold text-zinc-900 block">VISIBILIDAD 100% MODULAR</span>
+                                <span class="text-[10px] text-zinc-500 block">Únicamente los módulos seleccionados se desplegarán en el menú, dashboard y permisos. Lo no seleccionado quedará completamente oculto.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </form>
+    </div>
+</div>
+{% endblock %}

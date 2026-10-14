@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotización {{ quote.number }} · {{ quote.account.commercial_name }}</title>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { font-size: 11px; color: #0f172a; }
+            @page {
+                size: letter;
+                margin: 15mm 15mm 15mm 15mm;
+            }
+        }
+        .tabular-nums { font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen p-4 sm:p-8">
+
+    <!-- Print Control Bar (Hidden on Print) -->
+    <div class="no-print max-w-4xl mx-auto mb-6 flex items-center justify-between bg-white border border-slate-200 rounded p-3 shadow-none">
+        <div class="flex items-center gap-2 text-xs font-mono text-slate-600">
+            <span class="font-bold text-blue-700">{{ quote.number }}</span>
+            <span>&bull;</span>
+            <span>Vista de Impresión Oficial DGI {{ current_country.name|upper }}</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="{% url 'crm:quote_detail' pk=quote.pk %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+                &larr; Volver a la Consola
+            </a>
+            <button onclick="window.print()" class="px-4 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded transition-colors flex items-center gap-1.5 shadow-none">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24-3.411 1.76-6.195 4.53-6.195 2.77 0 4.77 2.784 4.53 6.195H6.72zM3 13.5v6.75A2.25 2.25 0 005.25 22.5h13.5A2.25 2.25 0 0021 20.25V13.5m-18 0h18M6.75 3.75h10.5M9 7.5h6"/>
+                </svg>
+                <span>Imprimir / Guardar PDF</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Official Printable Document Container (Letter / A4) -->
+    <div class="max-w-4xl mx-auto bg-white border border-slate-300 p-8 sm:p-10 space-y-6">
+
+        <!-- Document Header: Emisor & Folio Oficial -->
+        <div class="flex flex-col sm:flex-row justify-between items-start gap-4 pb-6 border-b-2 border-slate-800">
+            <div class="space-y-1">
+                <div class="text-xl font-bold tracking-tight text-slate-900 font-sans">
+                    {{ current_org.legal_name|default:current_org.name }}
+                </div>
+                <div class="text-xs text-slate-600 font-mono">
+                    <strong>{{ current_country.tax_id_label }}:</strong> {{ current_org.tax_id }}
+                </div>
+                <div class="text-xs text-slate-500">
+                    {{ current_org.address|default:"Managua, Nicaragua" }}
+                </div>
+                <div class="text-xs text-slate-500 font-mono">
+                    Tel: {{ current_org.phone|default:"+505 2222-0000" }} &bull; Correo: {{ current_org.email|default:"contacto@empresa.com.ni" }}
+                </div>
+            </div>
+
+            <div class="text-left sm:text-right border border-slate-300 rounded p-3 bg-slate-50 min-w-[220px]">
+                <div class="text-[10px] font-mono uppercase tracking-wider text-slate-500 font-bold">
+                    COTIZACIÓN TÉCNICA FORMAL
+                </div>
+                <div class="text-lg font-mono font-bold text-blue-800 tabular-nums">
+                    {{ quote.number }}
+                </div>
+                <div class="text-xs font-mono text-slate-600 mt-1">
+                    Fecha: <strong>{{ quote.created_at|date:"d/m/Y" }}</strong>
+                </div>
+                {% if quote.valid_until %}
+                <div class="text-xs font-mono text-slate-600">
+                    Validez: <strong>{{ quote.valid_until|date:"d/m/Y" }}</strong>
+                </div>
+                {% endif %}
+                <div class="text-[10px] font-mono text-slate-500 mt-1 border-t border-slate-200 pt-1">
+                    T/C BCN Ref: C$ {{ quote.exchange_rate }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Receptor Fiscal / Cliente B2B -->
+        <div class="border border-slate-200 rounded p-4 bg-slate-50 text-xs">
+            <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-2">
+                DATOS FISCALES DEL CLIENTE RECEPTOR
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <div class="font-bold text-slate-900 text-sm">{{ quote.account.commercial_name }}</div>
+                    {% if quote.account.legal_name %}
+                    <div class="text-slate-600">{{ quote.account.legal_name }}</div>
+                    {% endif %}
+                    <div class="font-mono text-slate-700 mt-1">
+                        <strong>{{ current_country.tax_id_label }}:</strong> {{ quote.account.tax_id|default:"Sin Registrar" }}
+                        {% if quote.account.is_tax_exempt %}
+                        <span class="ml-1 text-blue-700 font-bold">(EXENTO DE IVA)</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <div class="text-slate-600"><strong>Ubicación:</strong> {{ quote.account.address|default:quote.account.city }}</div>
+                    <div class="text-slate-600"><strong>Términos:</strong> {% if quote.account.payment_terms_days == 0 %}Contado{% else %}{{ quote.account.payment_terms_days }} Días Crédito{% endif %}</div>
+                    <div class="text-slate-600"><strong>Moneda Cotizada:</strong> {{ quote.currency_code }} ({{ quote.currency_symbol }})</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Referencia / Alcance del Proyecto -->
+        <div class="space-y-1">
+            <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                ALCANCE Y OBJETO DE LA OFERTA
+            </div>
+            <div class="text-sm font-semibold text-slate-900">
+                {{ quote.title }}
+            </div>
+        </div>
+
+        <!-- Tabla Formal de Partidas -->
+        <div>
+            <table class="w-full text-left border-collapse text-xs border border-slate-300">
+                <thead>
+                    <tr class="bg-slate-100 border-b border-slate-300 font-mono text-[10px] uppercase text-slate-700">
+                        <th class="py-2 px-2.5 w-10 text-center border-r border-slate-300">ÍTEM</th>
+                        <th class="py-2 px-2.5 w-24 border-r border-slate-300">CÓDIGO</th>
+                        <th class="py-2 px-2.5 border-r border-slate-300">DESCRIPCIÓN DE LA PARTIDA</th>
+                        <th class="py-2 px-2.5 w-14 text-center border-r border-slate-300">UND</th>
+                        <th class="py-2 px-2.5 w-16 text-right border-r border-slate-300">CANT</th>
+                        <th class="py-2 px-2.5 w-24 text-right border-r border-slate-300">P. UNIT ({{ quote.currency_symbol }})</th>
+                        <th class="py-2 px-2.5 w-24 text-right">TOTAL ({{ quote.currency_symbol }})</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 font-sans">
+                    {% for item in items %}
+                    <tr>
+                        <td class="py-2 px-2.5 text-center font-mono text-slate-500 border-r border-slate-200">
+                            {{ forloop.counter }}
+                        </td>
+                        <td class="py-2 px-2.5 font-mono text-slate-700 border-r border-slate-200">
+                            {{ item.code|default:"—" }}
+                        </td>
+                        <td class="py-2 px-2.5 border-r border-slate-200">
+                            <div class="font-medium text-slate-900">{{ item.description }}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">{{ item.get_item_type_display }}</div>
+                        </td>
+                        <td class="py-2 px-2.5 text-center font-mono text-slate-600 border-r border-slate-200">
+                            {{ item.unit }}
+                        </td>
+                        <td class="py-2 px-2.5 text-right font-mono tabular-nums text-slate-800 border-r border-slate-200">
+                            {{ item.quantity|floatformat:2 }}
+                        </td>
+                        <td class="py-2 px-2.5 text-right font-mono tabular-nums text-slate-800 border-r border-slate-200">
+                            {{ item.unit_price|floatformat:2 }}
+                        </td>
+                        <td class="py-2 px-2.5 text-right font-mono font-bold tabular-nums text-slate-900">
+                            {{ item.line_total|floatformat:2 }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="py-4 text-center text-slate-400">
+                            Sin partidas registradas.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Liquidación Financiera e Impuestos Oficiales DGI -->
+        <div class="flex flex-col sm:flex-row justify-between items-start gap-6 pt-2">
+            <div class="flex-1 text-xs text-slate-600 space-y-2">
+                <div class="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                    CONDICIONES COMERCIALES Y GARANTÍA
+                </div>
+                <div class="p-3 bg-slate-50 border border-slate-200 rounded whitespace-pre-line text-[11px] leading-relaxed">
+                    {{ quote.notes|default:"• Plazo de entrega según cronograma coordinado.• Vigencia de oferta: 30 días calendario.• Garantía de calidad técnica contratada." }}
+                </div>
+                <div class="text-[10px] text-slate-400 font-mono">
+                    * Precios expresados en {{ quote.currency_code }} ({{ quote.currency_symbol }}). Sujeto a legislación tributaria de {{ current_country.name }}.
+                </div>
+            </div>
+
+            <!-- Tabla de Totales -->
+            <div class="w-full sm:w-72 border border-slate-300 rounded overflow-hidden text-xs font-mono">
+                <div class="p-2.5 bg-slate-100 border-b border-slate-300 font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+                    LIQUIDACIÓN TRIBUTARIA ({{ quote.currency_code }})
+                </div>
+                <div class="p-3 space-y-1.5 tabular-nums">
+                    <div class="flex justify-between text-slate-600">
+                        <span>Subtotal Bruto:</span>
+                        <span>{{ quote.currency_symbol }} {{ quote.subtotal|floatformat:2 }}</span>
+                    </div>
+                    {% if quote.discount_total > 0 %}
+                    <div class="flex justify-between text-red-600">
+                        <span>Descuento:</span>
+                        <span>- {{ quote.currency_symbol }} {{ quote.discount_total|floatformat:2 }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between text-slate-700 pt-1 border-t border-slate-200">
+                        <span>Base Imponible:</span>
+                        <span>{{ quote.currency_symbol }} {{ quote.subtotal|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between text-slate-700">
+                        <span>
+                            {{ quote.tax_name }} ({{ quote.tax_rate }}%)
+                            {% if quote.account.is_tax_exempt or not quote.apply_tax %}
+                            <strong class="text-blue-700 text-[10px]">(EXENTO)</strong>
+                            {% endif %}:
+                        </span>
+                        <span>{{ quote.currency_symbol }} {{ quote.tax_total|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm font-bold text-slate-900 pt-2 border-t-2 border-slate-300">
+                        <span>TOTAL GENERAL:</span>
+                        <span class="text-blue-800">{{ quote.currency_symbol }} {{ quote.grand_total|floatformat:2 }}</span>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-2 border-t border-slate-200 text-[10px] text-slate-500 text-center">
+                    {% if quote.currency_code == 'NIO' %}
+                    Equivalente: $ {{ quote.grand_total|floatformat:2 }} USD (T/C: C$ {{ quote.exchange_rate }})
+                    {% else %}
+                    Equivalente: C$ {{ quote.grand_total|floatformat:2 }} NIO (T/C: C$ {{ quote.exchange_rate }})
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Bloque de Firmas y Aceptación de la Oferta -->
+        <div class="pt-12 grid grid-cols-2 gap-8 text-center text-xs font-mono">
+            <div class="border-t border-slate-400 pt-2">
+                <div class="font-bold text-slate-900">
+                    {% if quote.approved_by %}{{ quote.approved_by.full_name }}{% elif quote.created_by %}{{ quote.created_by.full_name }}{% else %}{{ current_org.name }}{% endif %}
+                </div>
+                <div class="text-[11px] text-slate-500">Por: {{ current_org.legal_name|default:current_org.name }}</div>
+                <div class="text-[10px] text-slate-400">Emisor / Contratista Autorizado</div>
+            </div>
+
+            <div class="border-t border-slate-400 pt-2">
+                <div class="font-bold text-slate-900">
+                    {{ quote.account.commercial_name }}
+                </div>
+                <div class="text-[11px] text-slate-500">Firma y Sello de Aceptación del Cliente</div>
+                <div class="text-[10px] text-slate-400">Fecha de Aceptación: ____ / ____ / ________</div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,964 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Tesorería, Cajas Chicas & Bancos · Finanzas{% endblock %}
+{% block breadcrumb_section %}FINANZAS & TESORERÍA{% endblock %}
+{% block breadcrumb_page %}FONDOS DE CAJA & BANCOS{% endblock %}
+{% block page_title %}Tesorería, Fondos de Caja Chica & Cuentas Bancarias{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2" x-data>
+    <!-- 1. Registrar Comprobante de Gasto (Disponible para Custodios e Ingenieros) -->
+    <button type="button" 
+            id="btn-register-expense"
+            onclick="window.dispatchEvent(new CustomEvent('open-expense-modal'))"
+            @click="$dispatch('open-expense-modal')"
+            class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        <span>Registrar Gasto de Campo</span>
+    </button>
+
+    <!-- 2. Rendir y Solicitar Reposición -->
+    <button type="button" 
+            id="btn-request-replenish"
+            onclick="window.dispatchEvent(new CustomEvent('open-replenish-modal'))"
+            @click="$dispatch('open-replenish-modal')"
+            class="h-8 px-3 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700 text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
+        </svg>
+        <span>Solicitar Reposición (Arqueo)</span>
+    </button>
+
+    {% if can_manage_funds %}
+    <!-- 3. Aperturar Nueva Caja Chica (Nivel 80+) -->
+    <button type="button" 
+            id="btn-open-fund"
+            onclick="window.dispatchEvent(new CustomEvent('open-fund-modal'))"
+            @click="$dispatch('open-fund-modal')"
+            class="h-8 px-3 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700 text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"/>
+        </svg>
+        <span>Aperturar Fondo Fijo</span>
+    </button>
+    {% endif %}
+
+    {% if can_create_bank_account %}
+    <!-- 4. Registrar Cuenta Bancaria (Nivel 100) -->
+    <button type="button" 
+            id="btn-create-bank-account"
+            onclick="window.dispatchEvent(new CustomEvent('open-bank-modal'))"
+            @click="$dispatch('open-bank-modal')"
+            class="h-8 px-3 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700 text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.5M4.5 21V10.5M3 21h18"/>
+        </svg>
+        <span>Nueva Cuenta Bancaria</span>
+    </button>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto" 
+     x-data="{ 
+         activeTab: 'funds', 
+         showExpenseModal: false, 
+         showReplenishModal: false, 
+         showFundModal: false, 
+         showBankModal: false,
+         showDisburseModal: false,
+         selectedReplenishmentId: '',
+         selectedReplenishmentCode: '',
+         selectedReplenishmentAmount: ''
+     }"
+     @open-expense-modal.window="showExpenseModal = true"
+     @open-replenish-modal.window="showReplenishModal = true"
+     @open-fund-modal.window="showFundModal = true"
+     @open-bank-modal.window="showBankModal = true"
+     @open-disburse-modal.window="
+         selectedReplenishmentId = $event.detail.id; 
+         selectedReplenishmentCode = $event.detail.code; 
+         selectedReplenishmentAmount = $event.detail.amount;
+         showDisburseModal = true;
+     ">
+
+    <!-- ===================================================================== -->
+    <!-- BANDA TELEMÉTRICA DE KPIS FINANCIEROS (SWISS GRID 4 CELDAS DIVIDE-1PX) -->
+    <!-- ===================================================================== -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 border border-zinc-200 rounded-[4px] bg-white">
+        <!-- KPI 1: Saldo Disponible en Cajas Chicas -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">EFECTIVO EN MANO</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    CAJAS CHICAS
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    {{ current_org.currency_symbol }} {{ total_petty_cash_balance|floatformat:2 }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    DISPONIBLE
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Fondos en custodia activa</span>
+                <span class="font-mono text-[10px] text-zinc-500 tabular-nums">{{ funds|length }} FONDOS</span>
+            </div>
+        </div>
+
+        <!-- KPI 2: Gastos Pendientes de Reposición -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">GASTOS POR REEMBOLSAR</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    ARQUEO PENDIENTE
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-amber-600 tabular-nums tracking-tight">
+                    {{ current_org.currency_symbol }} {{ total_pending_reimbursement|floatformat:2 }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    EJECUTADO
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Comprobantes de frentes</span>
+                <span class="font-mono text-[10px] text-zinc-500">Imputación OT</span>
+            </div>
+        </div>
+
+        {% if can_view_bank_accounts %}
+        <!-- KPI 3: Saldo Bancario en Córdobas (Visible Nivel 80+) -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">DISPONIBILIDAD BANCARIA</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    NIO (C$)
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    C$ {{ total_bank_nio|floatformat:2 }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    EN LIBROS
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Cuentas Institucionales</span>
+                <span class="font-mono text-[10px] text-zinc-500">BAC / Banpro / BDF</span>
+            </div>
+        </div>
+
+        <!-- KPI 4: Saldo Bancario en Dólares (Visible Nivel 80+) -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">DISPONIBILIDAD BANCARIA</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    USD ($)
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    $ {{ total_bank_usd|floatformat:2 }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    DIVISAS
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Moneda Extranjera</span>
+                <span class="font-mono text-[10px] text-zinc-500">Respaldo USD</span>
+            </div>
+        </div>
+        {% else %}
+        <!-- KPI Alternativo para Custodios de Campo -->
+        <div class="p-4 space-y-2 sm:col-span-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">SUPERVISIÓN DE FRENTE DE OBRA</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    MODO CUSTODIO
+                </span>
+            </div>
+            <p class="text-xs text-zinc-600 font-sans leading-relaxed pt-1">
+                Usted está operando con custodia de fondos de campo. Registre sus comprobantes de viáticos, combustible y compras menores imputándolos a la Orden de Trabajo correspondiente para rendir cuentas en su próximo arqueo.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- BARRA DE PESTAÑAS TÉCNICAS (SWISS GRID SUB-NAV)                       -->
+    <!-- ===================================================================== -->
+    <div class="border-b border-zinc-200">
+        <nav class="flex space-x-6 text-xs font-mono">
+            <button type="button" @click="activeTab = 'funds'"
+                    :class="activeTab === 'funds' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
+                    class="py-2.5 transition-colors cursor-pointer">
+                1. Cajas Chicas & Fondos Fijos ({{ funds|length }})
+            </button>
+            <button type="button" @click="activeTab = 'expenses'"
+                    :class="activeTab === 'expenses' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
+                    class="py-2.5 transition-colors cursor-pointer">
+                2. Comprobantes de Campo ({{ recent_expenses|length }})
+            </button>
+            <button type="button" @click="activeTab = 'replenishments'"
+                    :class="activeTab === 'replenishments' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
+                    class="py-2.5 transition-colors cursor-pointer">
+                3. Arqueos & Reposiciones ({{ replenishments|length }})
+            </button>
+            {% if can_view_bank_accounts %}
+            <button type="button" @click="activeTab = 'banks'"
+                    :class="activeTab === 'banks' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
+                    class="py-2.5 transition-colors cursor-pointer">
+                4. Cuentas Bancarias ({{ bank_accounts|length }})
+            </button>
+            <button type="button" @click="activeTab = 'ledger'"
+                    :class="activeTab === 'ledger' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
+                    class="py-2.5 transition-colors cursor-pointer">
+                5. Libro Mayor de Tesorería
+            </button>
+            {% endif %}
+        </nav>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- PANEL 1: CAJAS CHICAS Y FONDOS FIJOS                                 -->
+    <!-- ===================================================================== -->
+    <div x-show="activeTab === 'funds'" class="space-y-4">
+        <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+            <div class="p-3 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider block">
+                        Fondos Fijos Asignados a Supervisores y Cuadrillas
+                    </span>
+                    <span class="text-[11px] font-mono text-zinc-500 block">
+                        Límite asignado vs. Saldo disponible en mano
+                    </span>
+                </div>
+                {% if can_manage_funds %}
+                <button type="button" 
+                        @click="showFundModal = true"
+                        class="h-7 px-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-mono font-medium rounded-[3px] transition-colors flex items-center gap-1 cursor-pointer">
+                    <svg class="w-3 h-3 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                    </svg>
+                    <span>+ Aperturar Fondo</span>
+                </button>
+                {% endif %}
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                            <th class="py-2 px-3 font-semibold">CÓDIGO</th>
+                            <th class="py-2 px-3 font-semibold">NOMBRE DEL FONDO FIJO</th>
+                            <th class="py-2 px-3 font-semibold">CUSTODIO RESPONSABLE</th>
+                            <th class="py-2 px-3 font-semibold">CUADRILLA / VEHÍCULO</th>
+                            <th class="py-2 px-3 text-right font-semibold">FONDO ASIGNADO</th>
+                            <th class="py-2 px-3 text-right font-semibold">DISPONIBLE EN MANO</th>
+                            <th class="py-2 px-3 text-right font-semibold">POR REEMBOLSAR</th>
+                            <th class="py-2 px-3 text-center font-semibold">ACCIONES</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100 font-mono">
+                        {% for fund in funds %}
+                        <tr class="hover:bg-zinc-50/60 transition-colors">
+                            <td class="py-2.5 px-3 font-semibold text-zinc-900">
+                                {{ fund.code }}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans font-medium text-zinc-900">
+                                <a href="{% url 'finance:fund_detail' fund.pk %}" class="hover:underline text-zinc-900">
+                                    {{ fund.name }}
+                                </a>
+                            </td>
+                            <td class="py-2.5 px-3 font-sans text-zinc-700">
+                                {{ fund.custodian.full_name|default:fund.custodian.email }}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans text-zinc-600 text-[11px]">
+                                {% if fund.linked_crew %}
+                                {{ fund.linked_crew.name }} ({{ fund.linked_crew.vehicle_plate|default:"Sin Placa" }})
+                                {% else %}
+                                <span class="text-zinc-400">Plantel / Uso General</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-semibold text-zinc-900 tabular-nums">
+                                C$ {{ fund.allocated_amount|floatformat:2 }}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-semibold tabular-nums {% if fund.current_balance < 2000 %}text-rose-700{% else %}text-emerald-700{% endif %}">
+                                C$ {{ fund.current_balance|floatformat:2 }}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-semibold text-amber-700 tabular-nums">
+                                C$ {{ fund.spent_amount|floatformat:2 }}
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                                <a href="{% url 'finance:fund_detail' fund.pk %}"
+                                   class="px-2 py-1 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-800 rounded-[3px] text-[11px] font-sans font-medium transition-colors">
+                                    Ver Arqueo &rarr;
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="py-8 text-center text-zinc-400 font-sans">
+                                No se encontraron cajas chicas registradas en este espacio.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- PANEL 2: COMPROBANTES DE GASTOS DE CAMPO                             -->
+    <!-- ===================================================================== -->
+    <div x-show="activeTab === 'expenses'" class="space-y-4">
+        <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+            <div class="p-3 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider block">
+                        Comprobantes de Gastos de Frente de Obra (Recibos / Facturas)
+                    </span>
+                    <span class="text-[11px] font-mono text-zinc-500 block">
+                        Imputación directa a órdenes de trabajo de ingeniería
+                    </span>
+                </div>
+                <button type="button" 
+                        @click="showExpenseModal = true"
+                        class="h-7 px-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-mono font-medium rounded-[3px] transition-colors flex items-center gap-1 cursor-pointer">
+                    <svg class="w-3 h-3 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                    </svg>
+                    <span>+ Registrar Gasto</span>
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                            <th class="py-2 px-3 font-semibold">FOLIO</th>
+                            <th class="py-2 px-3 font-semibold">FECHA</th>
+                            <th class="py-2 px-3 font-semibold">CAJA CHICA</th>
+                            <th class="py-2 px-3 font-semibold">OT IMPUTABLE</th>
+                            <th class="py-2 px-3 font-semibold">RUBRO</th>
+                            <th class="py-2 px-3 font-semibold">PROVEEDOR / COMERCIO</th>
+                            <th class="py-2 px-3 text-right font-semibold">MONTO (C$)</th>
+                            <th class="py-2 px-3 font-semibold">JUSTIFICACIÓN TÉCNICA</th>
+                            <th class="py-2 px-3 text-center font-semibold">ESTADO</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100 font-mono">
+                        {% for exp in recent_expenses %}
+                        <tr class="hover:bg-zinc-50/60 transition-colors">
+                            <td class="py-2 px-3 font-semibold text-zinc-900">
+                                {{ exp.voucher_number }}
+                            </td>
+                            <td class="py-2 px-3 text-zinc-600 text-[11px]">
+                                {{ exp.spent_at|date:"d/m/Y" }}
+                            </td>
+                            <td class="py-2 px-3 font-sans text-zinc-800">
+                                {{ exp.fund.code }}
+                            </td>
+                            <td class="py-2 px-3 font-sans">
+                                {% if exp.work_order %}
+                                <a href="{% url 'operations:workorder_detail' exp.work_order.pk %}" class="text-zinc-900 hover:underline font-semibold text-[11px]">
+                                    {{ exp.work_order.number }}
+                                </a>
+                                {% else %}
+                                <span class="text-zinc-400 font-sans text-[11px]">Gasto General</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 font-sans text-zinc-700 text-[11px]">
+                                {{ exp.get_expense_category_display }}
+                            </td>
+                            <td class="py-2 px-3 font-sans text-zinc-900 font-medium">
+                                {{ exp.vendor_name }}
+                                {% if exp.invoice_number %}
+                                <span class="block text-[10px] font-mono text-zinc-400">Fact #{{ exp.invoice_number }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 text-right font-semibold text-rose-700 tabular-nums">
+                                - C$ {{ exp.amount|floatformat:2 }}
+                            </td>
+                            <td class="py-2 px-3 font-sans text-zinc-600 max-w-xs truncate" title="{{ exp.description }}">
+                                {{ exp.description }}
+                            </td>
+                            <td class="py-2 px-3 text-center font-sans">
+                                {% if exp.is_replenished %}
+                                <span class="px-1.5 py-0.5 rounded-[3px] text-[10px] font-mono font-medium bg-zinc-50 text-emerald-800 border border-emerald-200">
+                                    LIQUIDADO
+                                </span>
+                                {% else %}
+                                <span class="px-1.5 py-0.5 rounded-[3px] text-[10px] font-mono font-medium bg-zinc-50 text-amber-800 border border-amber-200">
+                                    PENDIENTE
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="py-8 text-center text-zinc-400 font-sans">
+                                No hay comprobantes de gastos registrados en este período.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- PANEL 3: ARQUEOS Y REPOSICIONES                                      -->
+    <!-- ===================================================================== -->
+    <div x-show="activeTab === 'replenishments'" class="space-y-4">
+        <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+            <div class="p-3 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider block">
+                        Historial de Arqueos y Liquidaciones de Fondo Fijo
+                    </span>
+                    <span class="text-[11px] font-mono text-zinc-500 block">
+                        Aprobación y desembolso bancario
+                    </span>
+                </div>
+                <button type="button" 
+                        @click="showReplenishModal = true"
+                        class="h-7 px-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-mono font-medium rounded-[3px] transition-colors flex items-center gap-1 cursor-pointer">
+                    <svg class="w-3 h-3 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                    </svg>
+                    <span>+ Solicitar Arqueo</span>
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                            <th class="py-2 px-3 font-semibold">FOLIO</th>
+                            <th class="py-2 px-3 font-semibold">FECHA</th>
+                            <th class="py-2 px-3 font-semibold">CAJA CHICA</th>
+                            <th class="py-2 px-3 font-semibold">SOLICITANTE</th>
+                            <th class="py-2 px-3 text-right font-semibold">GASTOS COMPROBADOS</th>
+                            <th class="py-2 px-3 text-center font-semibold">ESTADO</th>
+                            <th class="py-2 px-3 font-semibold">DESEMBOLSADO DESDE</th>
+                            <th class="py-2 px-3 text-center font-semibold">ACCIONES</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100 font-mono">
+                        {% for rep in replenishments %}
+                        <tr class="hover:bg-zinc-50/60 transition-colors">
+                            <td class="py-2.5 px-3 font-semibold text-zinc-900">
+                                {{ rep.code }}
+                            </td>
+                            <td class="py-2.5 px-3 text-zinc-600 text-[11px]">
+                                {{ rep.created_at|date:"d/m/Y H:i" }}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans font-medium text-zinc-900">
+                                {{ rep.fund.name }}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans text-zinc-700">
+                                {{ rep.submitted_by.full_name|default:rep.submitted_by.email }}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-semibold text-zinc-900 tabular-nums">
+                                C$ {{ rep.requested_amount|floatformat:2 }}
+                            </td>
+                            <td class="py-2.5 px-3 text-center font-sans">
+                                {% if rep.status == 'DISBURSED' %}
+                                <span class="px-2 py-0.5 rounded-[3px] text-[10px] font-mono font-medium bg-zinc-50 text-emerald-800 border border-emerald-200">
+                                    REEMBOLSADO
+                                </span>
+                                {% elif rep.status == 'SUBMITTED' %}
+                                <span class="px-2 py-0.5 rounded-[3px] text-[10px] font-mono font-medium bg-zinc-50 text-amber-800 border border-amber-200">
+                                    EN REVISIÓN
+                                </span>
+                                {% else %}
+                                <span class="px-2 py-0.5 rounded-[3px] text-[10px] font-mono font-medium bg-zinc-50 text-zinc-700 border border-zinc-200">
+                                    {{ rep.get_status_display }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans text-[11px] text-zinc-600">
+                                {% if rep.disbursed_from_bank %}
+                                {{ rep.disbursed_from_bank.bank_name }} ({{ rep.disbursed_from_bank.account_number }})
+                                {% else %}
+                                <span class="text-zinc-400">Pendiente de desembolso</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2.5 px-3 text-center font-sans">
+                                {% if rep.status == 'SUBMITTED' and can_manage_funds %}
+                                <button type="button"
+                                        @click="
+                                            selectedReplenishmentId = '{{ rep.id }}';
+                                            selectedReplenishmentCode = '{{ rep.code }}';
+                                            selectedReplenishmentAmount = '{{ rep.requested_amount|floatformat:2 }}';
+                                            showDisburseModal = true;
+                                        "
+                                        class="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 text-white rounded-[3px] text-[11px] font-medium transition-colors cursor-pointer">
+                                    Desembolsar &rarr;
+                                </button>
+                                {% else %}
+                                <a href="{% url 'finance:fund_detail' rep.fund.pk %}" class="text-zinc-900 hover:underline text-[11px] font-medium">
+                                    Ver Detalle
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="py-8 text-center text-zinc-400 font-sans">
+                                No hay solicitudes de reposición en el histórico.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if can_view_bank_accounts %}
+    <!-- ===================================================================== -->
+    <!-- PANEL 4: CUENTAS BANCARIAS                                           -->
+    <!-- ===================================================================== -->
+    <div x-show="activeTab === 'banks'" class="space-y-4">
+        <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+            <div class="p-3 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider block">
+                        Cuentas Bancarias Operativas (BAC, Banpro, Lafise)
+                    </span>
+                    <span class="text-[11px] font-mono text-zinc-500 block">
+                        Disponibilidad bimonetaria en Córdobas y Dólares
+                    </span>
+                </div>
+                {% if can_create_bank_account %}
+                <button type="button" 
+                        @click="showBankModal = true"
+                        class="h-7 px-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-mono font-medium rounded-[3px] transition-colors flex items-center gap-1 cursor-pointer">
+                    <svg class="w-3 h-3 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                    </svg>
+                    <span>+ Nueva Cuenta</span>
+                </button>
+                {% endif %}
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                {% for bank in bank_accounts %}
+                <div class="border border-zinc-200 bg-white rounded-[4px] p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-[3px] bg-zinc-50 text-zinc-800 border border-zinc-200">
+                            {{ bank.currency }}
+                        </span>
+                        <span class="text-[10px] font-mono text-zinc-500">{{ bank.get_account_type_display }}</span>
+                    </div>
+
+                    <div>
+                        <div class="text-sm font-semibold text-zinc-900">{{ bank.get_bank_name_display }}</div>
+                        <div class="text-xs font-mono text-zinc-500 mt-0.5 tabular-nums">{{ bank.account_number }}</div>
+                    </div>
+
+                    <div class="pt-2 border-t border-zinc-100 flex items-baseline justify-between">
+                        <span class="text-[10px] font-mono text-zinc-400 uppercase">SALDO EN LIBROS:</span>
+                        <span class="text-lg font-semibold font-mono text-zinc-900 tabular-nums">
+                            {% if bank.currency == 'USD' %}${% else %}C${% endif %} {{ bank.current_balance|floatformat:2 }}
+                        </span>
+                    </div>
+
+                    {% if bank.description %}
+                    <div class="text-[11px] text-zinc-500 font-sans border-t border-zinc-100 pt-1.5 truncate">
+                        {{ bank.description }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="col-span-3 py-8 text-center text-zinc-400 font-sans">
+                    No hay cuentas bancarias configuradas para esta empresa.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- PANEL 5: LIBRO MAYOR DE TESORERÍA (KARDEX FINANCIERO)                -->
+    <!-- ===================================================================== -->
+    <div x-show="activeTab === 'ledger'" class="space-y-4">
+        <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+            <div class="p-3 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider block">
+                        Libro Mayor de Tesorería (Registro Transaccional Inmutable)
+                    </span>
+                    <span class="text-[11px] font-mono text-zinc-500 block">
+                        Trazabilidad no editable de egresos, reembolsos y transferencias
+                    </span>
+                </div>
+                <span class="text-[10px] font-mono text-zinc-500 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[3px]">
+                    KARDEX AUDITADO
+                </span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                            <th class="py-2 px-3 font-semibold">FOLIO</th>
+                            <th class="py-2 px-3 font-semibold">FECHA</th>
+                            <th class="py-2 px-3 font-semibold">TIPO DE OPERACIÓN</th>
+                            <th class="py-2 px-3 font-semibold">CUENTA / CAJA</th>
+                            <th class="py-2 px-3 font-semibold">CONCEPTO / DETALLE</th>
+                            <th class="py-2 px-3 text-right font-semibold">MONTO (C$)</th>
+                            <th class="py-2 px-3 text-right font-semibold">SALDO TRAS OPERACIÓN</th>
+                            <th class="py-2 px-3 font-semibold">RESPONSABLE</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100 font-mono">
+                        {% for trx in transactions %}
+                        <tr class="hover:bg-zinc-50/60 transition-colors">
+                            <td class="py-2 px-3 font-semibold text-zinc-900">
+                                {{ trx.number }}
+                            </td>
+                            <td class="py-2 px-3 text-zinc-600 text-[11px]">
+                                {{ trx.created_at|date:"d/m/Y H:i" }}
+                            </td>
+                            <td class="py-2 px-3 font-sans text-zinc-800 text-[11px]">
+                                {{ trx.get_transaction_type_display }}
+                            </td>
+                            <td class="py-2 px-3 font-sans text-zinc-700">
+                                {% if trx.petty_cash_fund %}
+                                {{ trx.petty_cash_fund.code }} · {{ trx.petty_cash_fund.name }}
+                                {% elif trx.bank_account %}
+                                {{ trx.bank_account.bank_name }} ({{ trx.bank_account.account_number }})
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 font-sans text-zinc-900 max-w-sm truncate" title="{{ trx.concept }}">
+                                {{ trx.concept }}
+                            </td>
+                            <td class="py-2 px-3 text-right font-semibold tabular-nums text-zinc-900">
+                                C$ {{ trx.amount|floatformat:2 }}
+                            </td>
+                            <td class="py-2 px-3 text-right font-semibold tabular-nums text-zinc-600">
+                                C$ {{ trx.balance_after|floatformat:2 }}
+                            </td>
+                            <td class="py-2 px-3 font-sans text-zinc-500 text-[11px]">
+                                {{ trx.performed_by.full_name|default:trx.performed_by.email }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="py-8 text-center text-zinc-400 font-sans">
+                                No se registran transacciones asentadas en el libro mayor.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 1: REGISTRAR GASTO DE CAMPO                                    -->
+    <!-- ===================================================================== -->
+    <div x-show="showExpenseModal" 
+         x-cloak 
+         @keydown.escape.window="showExpenseModal = false"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+        <div class="bg-white rounded-[4px] border border-zinc-200 max-w-lg w-full p-5 space-y-4 shadow-sm"
+             @click.away="showExpenseModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+                <div>
+                    <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-900">Registrar Comprobante de Gasto</h3>
+                    <p class="text-[11px] text-zinc-500 font-sans">Imputación directa a caja chica y orden de trabajo</p>
+                </div>
+                <button type="button" @click="showExpenseModal = false" class="text-zinc-400 hover:text-zinc-600 p-1">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'finance:expense_create' %}" class="space-y-3 font-sans text-xs">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Caja Chica / Fondo Asignado <span class="text-red-500">*</span></label>
+                    {{ expense_form.fund }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Orden de Trabajo Imputable (Frente de Obra)</label>
+                    {{ expense_form.work_order }}
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-700 mb-1">Rubro de Gasto <span class="text-red-500">*</span></label>
+                        {{ expense_form.expense_category }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-700 mb-1">Monto en Córdobas (C$) <span class="text-red-500">*</span></label>
+                        {{ expense_form.amount }}
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-700 mb-1">Comercio / Proveedor <span class="text-red-500">*</span></label>
+                        {{ expense_form.vendor_name }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-700 mb-1">Nº Factura / Recibo</label>
+                        {{ expense_form.invoice_number }}
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Justificación Técnica <span class="text-red-500">*</span></label>
+                    {{ expense_form.description }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Fecha del Comprobante</label>
+                    {{ expense_form.spent_at }}
+                </div>
+                <div class="pt-3 border-t border-zinc-100 flex items-center justify-end gap-2">
+                    <button type="button" @click="showExpenseModal = false" class="h-9 px-3 text-xs font-medium text-zinc-700 border border-zinc-200 bg-white hover:bg-zinc-50 rounded-[4px] transition-colors cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="h-9 px-4 text-xs font-medium text-white bg-zinc-900 rounded-[4px] hover:bg-zinc-800 transition-colors cursor-pointer">
+                        Registrar y Descontar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 2: SOLICITAR REPOSICIÓN / ARQUEO                               -->
+    <!-- ===================================================================== -->
+    <div x-show="showReplenishModal" 
+         x-cloak 
+         @keydown.escape.window="showReplenishModal = false"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+        <div class="bg-white rounded-[4px] border border-zinc-200 max-w-md w-full p-5 space-y-4 shadow-sm"
+             @click.away="showReplenishModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+                <div>
+                    <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-900">Arqueo & Solicitud de Reposición</h3>
+                    <p class="text-[11px] text-zinc-500 font-sans">Agrupa los gastos ejecutados para desembolso bancario</p>
+                </div>
+                <button type="button" @click="showReplenishModal = false" class="text-zinc-400 hover:text-zinc-600 p-1">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'finance:replenish_submit' %}" class="space-y-3 font-sans text-xs">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Caja Chica a Rendir <span class="text-red-500">*</span></label>
+                    {{ replenish_form.fund }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Observaciones / Justificación del Arqueo</label>
+                    {{ replenish_form.notes }}
+                </div>
+                <div class="pt-3 border-t border-zinc-100 flex items-center justify-end gap-2">
+                    <button type="button" @click="showReplenishModal = false" class="h-9 px-3 text-xs font-medium text-zinc-700 border border-zinc-200 bg-white hover:bg-zinc-50 rounded-[4px] transition-colors cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="h-9 px-4 text-xs font-medium text-white bg-zinc-900 rounded-[4px] hover:bg-zinc-800 transition-colors cursor-pointer">
+                        Enviar a Aprobación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 3: DESEMBOLSAR REPOSICIÓN (Nivel 80+)                           -->
+    <!-- ===================================================================== -->
+    <div x-show="showDisburseModal" 
+         x-cloak 
+         @keydown.escape.window="showDisburseModal = false"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+        <div class="bg-white rounded-[4px] border border-zinc-200 max-w-md w-full p-5 space-y-4 shadow-sm"
+             @click.away="showDisburseModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+                <div>
+                    <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-900">Autorizar Desembolso Bancario</h3>
+                    <p class="text-[11px] text-zinc-500 font-sans">Liquidación y reposición de saldo a la caja chica</p>
+                </div>
+                <button type="button" @click="showDisburseModal = false" class="text-zinc-400 hover:text-zinc-600 p-1">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="bg-zinc-50 p-3 rounded-[4px] border border-zinc-200 text-xs space-y-1 font-mono">
+                <div class="flex justify-between">
+                    <span class="text-zinc-400">FOLIO ARQUEO:</span>
+                    <strong class="text-zinc-900" x-text="selectedReplenishmentCode"></strong>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-zinc-400">MONTO A DESEMBOLSAR:</span>
+                    <strong class="text-zinc-900 tabular-nums">C$ <span x-text="selectedReplenishmentAmount"></span></strong>
+                </div>
+            </div>
+
+            <form method="POST" action="{% url 'finance:replenish_disburse' %}" class="space-y-3 font-sans text-xs">
+                {% csrf_token %}
+                <input type="hidden" name="replenishment_id" :value="selectedReplenishmentId">
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Cuenta Bancaria Origen del Débito <span class="text-red-500">*</span></label>
+                    {{ disburse_form.bank_account }}
+                </div>
+                <div class="pt-3 border-t border-zinc-100 flex items-center justify-end gap-2">
+                    <button type="button" @click="showDisburseModal = false" class="h-9 px-3 text-xs font-medium text-zinc-700 border border-zinc-200 bg-white hover:bg-zinc-50 rounded-[4px] transition-colors cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="h-9 px-4 text-xs font-medium text-white bg-zinc-900 rounded-[4px] hover:bg-zinc-800 transition-colors cursor-pointer">
+                        Confirmar Transferencia
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if can_manage_funds %}
+    <!-- ===================================================================== -->
+    <!-- MODAL 4: APERTURAR FONDO FIJO (Nivel 80+)                             -->
+    <!-- ===================================================================== -->
+    <div x-show="showFundModal" 
+         x-cloak 
+         @keydown.escape.window="showFundModal = false"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+        <div class="bg-white rounded-[4px] border border-zinc-200 max-w-md w-full p-5 space-y-4 shadow-sm"
+             @click.away="showFundModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+                <div>
+                    <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-900">Aperturar Caja Chica / Fondo Fijo</h3>
+                    <p class="text-[11px] text-zinc-500 font-sans">Dotación inicial y asignación de custodio responsable</p>
+                </div>
+                <button type="button" @click="showFundModal = false" class="text-zinc-400 hover:text-zinc-600 p-1">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'finance:fund_create' %}" class="space-y-3 font-sans text-xs">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Código de Caja (Opcional, autogenerado)</label>
+                    {{ fund_form.code }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Nombre Descriptivo del Fondo <span class="text-red-500">*</span></label>
+                    {{ fund_form.name }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Custodio Responsable (Supervisor / Ingeniero) <span class="text-red-500">*</span></label>
+                    {{ fund_form.custodian }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Cuadrilla Vinculada (Opcional)</label>
+                    {{ fund_form.linked_crew }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Monto Asignado / Límite de Fondo (C$) <span class="text-red-500">*</span></label>
+                    {{ fund_form.allocated_amount }}
+                </div>
+                <div class="pt-3 border-t border-zinc-100 flex items-center justify-end gap-2">
+                    <button type="button" @click="showFundModal = false" class="h-9 px-3 text-xs font-medium text-zinc-700 border border-zinc-200 bg-white hover:bg-zinc-50 rounded-[4px] transition-colors cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="h-9 px-4 text-xs font-medium text-white bg-zinc-900 rounded-[4px] hover:bg-zinc-800 transition-colors cursor-pointer">
+                        Aperturar Fondo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if can_create_bank_account %}
+    <!-- ===================================================================== -->
+    <!-- MODAL 5: REGISTRAR CUENTA BANCARIA (Nivel 100)                        -->
+    <!-- ===================================================================== -->
+    <div x-show="showBankModal" 
+         x-cloak 
+         @keydown.escape.window="showBankModal = false"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+        <div class="bg-white rounded-[4px] border border-zinc-200 max-w-md w-full p-5 space-y-4 shadow-sm"
+             @click.away="showBankModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+                <div>
+                    <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-900">Nueva Cuenta Bancaria</h3>
+                    <p class="text-[11px] text-zinc-500 font-sans">Institución bancaria corporativa para desembolsos y cobros</p>
+                </div>
+                <button type="button" @click="showBankModal = false" class="text-zinc-400 hover:text-zinc-600 p-1">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'finance:bank_account_create' %}" class="space-y-3 font-sans text-xs">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Institución Bancaria <span class="text-red-500">*</span></label>
+                    {{ bank_form.bank_name }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Número de Cuenta Bancaria <span class="text-red-500">*</span></label>
+                    {{ bank_form.account_number }}
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-700 mb-1">Moneda <span class="text-red-500">*</span></label>
+                        {{ bank_form.currency }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-zinc-700 mb-1">Tipo de Cuenta <span class="text-red-500">*</span></label>
+                        {{ bank_form.account_type }}
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Saldo Inicial en Libros</label>
+                    {{ bank_form.current_balance }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Descripción / Uso Operativo</label>
+                    {{ bank_form.description }}
+                </div>
+                <div class="pt-3 border-t border-zinc-100 flex items-center justify-end gap-2">
+                    <button type="button" @click="showBankModal = false" class="h-9 px-3 text-xs font-medium text-zinc-700 border border-zinc-200 bg-white hover:bg-zinc-50 rounded-[4px] transition-colors cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="h-9 px-4 text-xs font-medium text-white bg-zinc-900 rounded-[4px] hover:bg-zinc-800 transition-colors cursor-pointer">
+                        Registrar Cuenta
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

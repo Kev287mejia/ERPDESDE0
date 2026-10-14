@@ -1,0 +1,590 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Almacén, Bodegas y Kardex | {{ current_org.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ 
+    activeTab: 'items',
+    showWarehouseModal: false,
+    showItemModal: false,
+    showEntryModal: false,
+    showTransferModal: false,
+    showDispatchModal: false
+}">
+    <!-- Header Técnico -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4 gap-3">
+        <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-500 font-mono mb-1">
+                <span>LOGÍSTICA & ALMACÉN</span>
+                <span>/</span>
+                <span class="text-slate-700 font-semibold">EXISTENCIAS & KARDEX</span>
+            </div>
+            <h1 class="text-xl font-bold tracking-tight text-slate-900">
+                Control de Almacén, Unidades Móviles y Kardex
+            </h1>
+            <p class="text-xs text-slate-500 mt-0.5">
+                Libro mayor de movimientos inmutables, existencias por bodega/furgoneta y despacho de materiales a campo.
+            </p>
+        </div>
+
+        <!-- Botonera de Acciones -->
+        <div class="flex flex-wrap items-center gap-2">
+            {% if can_manage_inventory %}
+            <button type="button" @click="showEntryModal = true" class="inline-flex items-center px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition shadow-xs">
+                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Entrada / Compra
+            </button>
+            <button type="button" @click="showTransferModal = true" class="inline-flex items-center px-3.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-xs">
+                <svg class="w-3.5 h-3.5 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                </svg>
+                Traslado entre Bodegas
+            </button>
+            {% endif %}
+            <button type="button" @click="showDispatchModal = true" class="inline-flex items-center px-3.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-xs">
+                <svg class="w-3.5 h-3.5 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path>
+                </svg>
+                Despachar a OT
+            </button>
+        </div>
+    </div>
+
+    <!-- KPIs Superiores de Almacén -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-subtle border-t-2 border-t-blue-600">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 block font-semibold">SKUs EN CATÁLOGO</span>
+            <span class="text-2xl font-bold text-slate-900 font-mono tabular-nums block mt-1 tracking-tight">{{ items|length }}</span>
+            <span class="text-[11px] text-slate-500 mt-1 block font-mono">Ítems codificados</span>
+        </div>
+        <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-subtle border-t-2 border-t-indigo-600">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 block font-semibold">BODEGAS Y MÓVILES</span>
+            <span class="text-2xl font-bold text-slate-900 font-mono tabular-nums block mt-1 tracking-tight">{{ warehouses|length }}</span>
+            <span class="text-[11px] text-slate-500 mt-1 block">Puntos de almacenamiento</span>
+        </div>
+        <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-subtle border-t-2 border-t-amber-500">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 block font-semibold">ALERTAS DE STOCK BAJO</span>
+            <span class="text-2xl font-bold {% if low_stock_count > 0 %}text-amber-700{% else %}text-slate-900{% endif %} font-mono tabular-nums block mt-1 tracking-tight">
+                {{ low_stock_count }}
+            </span>
+            <span class="text-[11px] text-slate-500 mt-1 block">Requieren reorden</span>
+        </div>
+        <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-subtle border-t-2 border-t-emerald-600">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 block font-semibold">
+                {% if can_view_financials %}
+                Valorización de Inventario
+                {% else %}
+                Gobernanza de Almacén
+                {% endif %}
+            </span>
+            {% if can_view_financials %}
+            <span class="text-2xl font-bold text-slate-900 font-mono tabular-nums block mt-1 tracking-tight">
+                {{ current_country.primary_currency_symbol }} {{ total_valuation|floatformat:2 }}
+            </span>
+            <span class="text-[11px] text-slate-500 mt-1 block font-mono">Costo promedio ponderado</span>
+            {% else %}
+            <span class="text-xs font-semibold text-slate-800 block mt-2">Supervisión Técnica</span>
+            <span class="text-[11px] text-slate-500 block font-mono mt-0.5">Cantidades físicas autorizadas</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Pestañas de Navegación -->
+    <div class="border-b border-slate-200/90">
+        <nav class="flex space-x-6 text-xs font-semibold">
+            <button type="button" @click="activeTab = 'items'"
+                    :class="activeTab === 'items' ? 'border-blue-600 text-blue-700 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                    class="py-2.5 border-b-2 transition">
+                1. Catálogo Maestro & Existencias ({{ items|length }})
+            </button>
+            <button type="button" @click="activeTab = 'kardex'"
+                    :class="activeTab === 'kardex' ? 'border-blue-600 text-blue-700 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                    class="py-2.5 border-b-2 transition">
+                2. Libro Mayor Kardex (Inmutable)
+            </button>
+            <button type="button" @click="activeTab = 'warehouses'"
+                    :class="activeTab === 'warehouses' ? 'border-blue-600 text-blue-700 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                    class="py-2.5 border-b-2 transition">
+                3. Bodegas & Unidades Móviles ({{ warehouses|length }})
+            </button>
+        </nav>
+    </div>
+
+    <!-- PANEL 1: CATÁLOGO MAESTRO & EXISTENCIAS -->
+    <div x-show="activeTab === 'items'" class="space-y-4">
+        <div class="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-subtle">
+            <div class="p-3.5 bg-slate-50/75 border-b border-slate-200/80 flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-blue-600"></div>
+                    <span class="font-mono font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                        Existencias Físicas por Ítem y Almacén
+                    </span>
+                </div>
+                {% if can_manage_inventory %}
+                <button type="button" @click="showItemModal = true" class="text-xs font-mono font-bold text-blue-700 hover:text-blue-800 transition">
+                    + Nuevo Ítem SKU
+                </button>
+                {% endif %}
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
+                            <th class="py-2.5 px-3">Código SKU</th>
+                            <th class="py-2.5 px-3">Descripción Técnica</th>
+                            <th class="py-2.5 px-3">Categoría</th>
+                            <th class="py-2.5 px-3 text-center">Unidad</th>
+                            <th class="py-2.5 px-3 text-right font-mono">Stock Total</th>
+                            <th class="py-2.5 px-3 text-right font-mono">Mínimo</th>
+                            <th class="py-2.5 px-3">Estado</th>
+                            {% if can_view_financials %}
+                            <th class="py-2.5 px-3 text-right font-mono">Costo Prom. ({{ current_country.primary_currency_symbol }})</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-mono">
+                        {% for row in item_rows %}
+                        {% with item=row.item total_qty=row.total_qty is_low_stock=row.is_low_stock %}
+                        <tr class="hover:bg-slate-50/70 transition">
+                            <td class="py-2.5 px-3 font-bold text-slate-900">
+                                {{ item.sku }}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans text-slate-900 font-medium">
+                                {{ item.name }}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans text-slate-600 text-[11px]">
+                                {{ item.get_category_display }}
+                            </td>
+                            <td class="py-2.5 px-3 text-center text-slate-600">
+                                {{ item.unit }}
+                            </td>
+                            <td class="py-2.5 px-3 text-right font-bold tabular-nums text-slate-900">
+                                {{ total_qty|floatformat:2 }}
+                            </td>
+                            <td class="py-2.5 px-3 text-right tabular-nums text-slate-500">
+                                {{ item.min_stock_level|floatformat:2 }}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans">
+                                {% if is_low_stock %}
+                                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                    STOCK BAJO
+                                </span>
+                                {% else %}
+                                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    ÓPTIMO
+                                </span>
+                                {% endif %}
+                            </td>
+                            {% if can_view_financials %}
+                            <td class="py-2.5 px-3 text-right tabular-nums text-slate-700">
+                                {{ item.unit_cost|floatformat:2 }}
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endwith %}
+                        {% empty %}
+                        <tr>
+                            <td colspan="{% if can_view_financials %}8{% else %}7{% endif %}" class="py-8 text-center text-xs text-slate-400 font-sans">
+                                No hay materiales o insumos registrados en el catálogo maestro.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANEL 2: LIBRO MAYOR KARDEX INMUTABLE -->
+    <div x-show="activeTab === 'kardex'" class="space-y-4" x-cloak>
+        <div class="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-subtle">
+            <div class="p-3.5 bg-slate-50/75 border-b border-slate-200/80 flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-indigo-600"></div>
+                    <span class="font-mono font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                        Libro Mayor de Kardex (Trazabilidad Inmutable)
+                    </span>
+                </div>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-bold">
+                    KARDEX: INMUTABLE
+                </span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
+                            <th class="py-2.5 px-3">Folio Kardex</th>
+                            <th class="py-2.5 px-3">Fecha / Hora</th>
+                            <th class="py-2.5 px-3">Tipo de Operación</th>
+                            <th class="py-2.5 px-3">Bodega</th>
+                            <th class="py-2.5 px-3">SKU & Material</th>
+                            <th class="py-2.5 px-3 text-right font-mono">Cantidad</th>
+                            <th class="py-2.5 px-3 text-right font-mono">Saldo Resultante</th>
+                            <th class="py-2.5 px-3">Referencia / OT</th>
+                            <th class="py-2.5 px-3">Responsable</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-mono">
+                        {% for mov in movements %}
+                        <tr class="hover:bg-slate-50/70 transition">
+                            <td class="py-2.5 px-3 font-bold text-slate-900">
+                                {{ mov.number }}
+                            </td>
+                            <td class="py-2.5 px-3 text-slate-500 text-[11px]">
+                                {{ mov.created_at|date:"d/m/Y H:i" }}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans text-[11px]">
+                                {% if mov.movement_type == 'IN_PURCHASE' or mov.movement_type == 'IN_ADJUSTMENT' or mov.movement_type == 'TRANSFER_IN' %}
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    {{ mov.get_movement_type_display }}
+                                </span>
+                                {% else %}
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                                    {{ mov.get_movement_type_display }}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2.5 px-3 text-slate-700">
+                                {{ mov.warehouse.code }}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans text-slate-900">
+                                <span class="font-mono font-bold">{{ mov.item.sku }}</span>
+                                <span class="text-slate-500 text-[11px] block truncate max-w-[180px]">{{ mov.item.name }}</span>
+                            </td>
+                            <td class="py-2.5 px-3 text-right tabular-nums font-bold {% if mov.movement_type == 'TRANSFER_OUT' or mov.movement_type == 'OUT_WORKORDER' %}text-rose-700{% else %}text-emerald-700{% endif %}">
+                                {% if mov.movement_type == 'TRANSFER_OUT' or mov.movement_type == 'OUT_WORKORDER' %}-{% else %}+{% endif %}{{ mov.quantity|floatformat:2 }} {{ mov.item.unit }}
+                            </td>
+                            <td class="py-2.5 px-3 text-right tabular-nums text-slate-900 font-bold">
+                                {{ mov.balance_after|floatformat:2 }}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans text-[11px] text-slate-600 max-w-[200px] truncate" title="{{ mov.reference_note }}">
+                                {% if mov.work_order %}
+                                <a href="{% url 'operations:workorder_detail' mov.work_order.pk %}" class="font-mono font-bold text-slate-900 hover:underline">
+                                    {{ mov.work_order.number }}
+                                </a>
+                                {% else %}
+                                {{ mov.reference_note|default:"—" }}
+                                {% endif %}
+                            </td>
+                            <td class="py-2.5 px-3 font-sans text-[11px] text-slate-600">
+                                {{ mov.performed_by.full_name|default:mov.performed_by.email|truncatechars:15 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="py-8 text-center text-xs text-slate-400 font-sans">
+                                No se han registrado movimientos de inventario en el Kardex.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANEL 3: BODEGAS FÍSICAS & UNIDADES MÓVILES -->
+    <div x-show="activeTab === 'warehouses'" class="space-y-4" x-cloak>
+        <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold text-slate-900 uppercase tracking-wider font-mono">Puntos de Almacenamiento & Cuadrillas</h2>
+            {% if can_manage_inventory %}
+            <button type="button" @click="showWarehouseModal = true" class="text-xs font-mono font-bold text-slate-900 hover:text-slate-700 underline">
+                + Nueva Bodega / Unidad Móvil
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for wh in warehouses %}
+            <div class="bg-white border border-slate-200/90 rounded-xl p-4 space-y-3 shadow-subtle hover:border-slate-300 transition-all">
+                <div class="flex items-start justify-between border-b border-slate-100 pb-2.5">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-mono font-bold text-xs bg-slate-900 text-white px-2 py-0.5 rounded-md">{{ wh.code }}</span>
+                            <h3 class="text-xs font-bold text-slate-900">{{ wh.name }}</h3>
+                        </div>
+                        <span class="text-[11px] text-slate-500 font-mono block mt-1">{{ wh.get_warehouse_type_display }}</span>
+                    </div>
+                    {% if wh.is_active %}
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">ACTIVA</span>
+                    {% else %}
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200">INACTIVA</span>
+                    {% endif %}
+                </div>
+
+                <div class="space-y-1 text-xs">
+                    {% if wh.linked_crew %}
+                    <div>
+                        <span class="text-[10px] font-mono text-slate-400 uppercase block">Cuadrilla Asignada:</span>
+                        <span class="font-semibold text-slate-800">{{ wh.linked_crew.code }} · {{ wh.linked_crew.name }}</span>
+                    </div>
+                    {% endif %}
+                    {% if wh.address %}
+                    <div>
+                        <span class="text-[10px] font-mono text-slate-400 uppercase block">Ubicación:</span>
+                        <span class="text-slate-600 text-[11px]">{{ wh.address }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-span-3 py-8 text-center text-xs text-slate-400 bg-white border border-slate-200 rounded">
+                Sin bodegas físicas o unidades móviles registradas.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- MODAL 1: NUEVA BODEGA / UNIDAD MÓVIL (Oficial 80+) -->
+    {% if can_manage_inventory %}
+    <div x-show="showWarehouseModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-md w-full p-6 space-y-4 shadow-none" @click.outside="showWarehouseModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-bold text-slate-900">
+                    Nueva Bodega o Furgoneta de Cuadrilla
+                </h3>
+                <button type="button" @click="showWarehouseModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'inventory:warehouse_create' %}" class="space-y-3">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Nombre de la Bodega <span class="text-rose-500">*</span></label>
+                    {{ warehouse_form.name }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Tipo de Bodega <span class="text-rose-500">*</span></label>
+                    {{ warehouse_form.warehouse_type }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Cuadrilla Vinculada (Opcional)</label>
+                    {{ warehouse_form.linked_crew }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Dirección / Ubicación Física</label>
+                    {{ warehouse_form.address }}
+                </div>
+                <div class="pt-2">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        {{ warehouse_form.is_active }}
+                        <span class="text-xs text-slate-700">Bodega activa para recepción y despacho</span>
+                    </label>
+                </div>
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+                    <button type="button" @click="showWarehouseModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
+                        Guardar Bodega
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- MODAL 2: NUEVO ÍTEM SKU (Oficial 80+) -->
+    {% if can_manage_inventory %}
+    <div x-show="showItemModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-lg w-full p-6 space-y-4 shadow-none" @click.outside="showItemModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-bold text-slate-900">
+                    Alta en Catálogo Maestro de Materiales
+                </h3>
+                <button type="button" @click="showItemModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'inventory:item_create' %}" class="space-y-3">
+                {% csrf_token %}
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Código SKU</label>
+                        {{ item_form.sku }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Categoría <span class="text-rose-500">*</span></label>
+                        {{ item_form.category }}
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Descripción / Nombre del Ítem <span class="text-rose-500">*</span></label>
+                    {{ item_form.name }}
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Unidad</label>
+                        {{ item_form.unit }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Stock Mínimo</label>
+                        {{ item_form.min_stock_level }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Costo Base</label>
+                        {{ item_form.unit_cost }}
+                    </div>
+                </div>
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+                    <button type="button" @click="showItemModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
+                        Registrar Ítem
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- MODAL 3: ENTRADA / COMPRA (Oficial 80+) -->
+    {% if can_manage_inventory %}
+    <div x-show="showEntryModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-lg w-full p-6 space-y-4 shadow-none" @click.outside="showEntryModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-bold text-slate-900">
+                    Recepción / Entrada de Materiales a Bodega
+                </h3>
+                <button type="button" @click="showEntryModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'inventory:movement_entry' %}" class="space-y-3">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Bodega Receptora <span class="text-rose-500">*</span></label>
+                    {{ entry_form.warehouse }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Material / Insumo <span class="text-rose-500">*</span></label>
+                    {{ entry_form.item }}
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Cantidad a Ingresar <span class="text-rose-500">*</span></label>
+                        {{ entry_form.quantity }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Costo Unitario de Compra</label>
+                        {{ entry_form.unit_cost }}
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Nota de Referencia / Factura</label>
+                    {{ entry_form.reference_note }}
+                </div>
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+                    <button type="button" @click="showEntryModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
+                        Registrar Entrada en Kardex
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- MODAL 4: TRASLADO ENTRE BODEGAS (Oficial 80+) -->
+    {% if can_manage_inventory %}
+    <div x-show="showTransferModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-lg w-full p-6 space-y-4 shadow-none" @click.outside="showTransferModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-bold text-slate-900">
+                    Traslado entre Bodegas / Carga a Cuadrilla
+                </h3>
+                <button type="button" @click="showTransferModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'inventory:movement_transfer' %}" class="space-y-3">
+                {% csrf_token %}
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Bodega Origen <span class="text-rose-500">*</span></label>
+                        {{ transfer_form.source_warehouse }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Bodega Destino / Móvil <span class="text-rose-500">*</span></label>
+                        {{ transfer_form.target_warehouse }}
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Material a Trasladar <span class="text-rose-500">*</span></label>
+                    {{ transfer_form.item }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Cantidad <span class="text-rose-500">*</span></label>
+                    {{ transfer_form.quantity }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Motivo / Conduce de Traslado</label>
+                    {{ transfer_form.reference_note }}
+                </div>
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+                    <button type="button" @click="showTransferModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
+                        Ejecutar Traslado Atómico
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- MODAL 5: DESPACHO A ORDEN DE TRABAJO (Ingeniero 50+ / Coord 80+) -->
+    <div x-show="showDispatchModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-lg w-full p-6 space-y-4 shadow-none" @click.outside="showDispatchModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-bold text-slate-900">
+                    Despacho de Material a Orden de Trabajo (OT)
+                </h3>
+                <button type="button" @click="showDispatchModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'inventory:movement_dispatch_ot' %}" class="space-y-3">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Bodega / Furgoneta de Salida <span class="text-rose-500">*</span></label>
+                    {{ dispatch_form.warehouse }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Orden de Trabajo Destino <span class="text-rose-500">*</span></label>
+                    {{ dispatch_form.work_order }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Material / Ítem <span class="text-rose-500">*</span></label>
+                    {{ dispatch_form.item }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Cantidad a Despachar <span class="text-rose-500">*</span></label>
+                    {{ dispatch_form.quantity }}
+                </div>
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+                    <button type="button" @click="showDispatchModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
+                        Confirmar Despacho a OT
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

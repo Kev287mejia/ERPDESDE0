@@ -1,0 +1,465 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Checklists Pre-Operacionales & Control EPP | {{ current_org.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ activeTab: 'checklists', showChecklistModal: false, showEPPModal: false }">
+    <!-- Header Técnico -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4 gap-3">
+        <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-500 font-mono mb-1">
+                <span>SEGURIDAD LABORAL (SST)</span>
+                <span>/</span>
+                <span class="text-slate-700 font-semibold">PREVENCIÓN & DOTACIÓN</span>
+            </div>
+            <h1 class="text-xl font-bold tracking-tight text-slate-900">
+                {% if is_field_tech %}
+                Mis Checklists de Seguridad y Dotación EPP
+                {% else %}
+                Consola SST: Checklists Pre-Operacionales & Control EPP
+                {% endif %}
+            </h1>
+            <p class="text-xs text-slate-500 mt-0.5">
+                Cumplimiento normativo MITRAB, verificación previa de maniobras en sitio y trazabilidad de dotación técnica.
+            </p>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <button type="button" @click="showChecklistModal = true" class="inline-flex items-center px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition shadow-xs">
+                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Nuevo Checklist
+            </button>
+            {% if can_manage_sst %}
+            <button type="button" @click="showEPPModal = true" class="inline-flex items-center px-3.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-xs">
+                <svg class="w-3.5 h-3.5 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                </svg>
+                Asignar Dotación EPP
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Fila de KPIs SST (Plus Jakarta Sans + JetBrains Mono) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-subtle border-t-2 border-t-amber-500">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 block font-semibold">CHECKLISTS PENDIENTES</span>
+            <span class="text-2xl font-bold {% if pending_checklists_count > 0 %}text-amber-700{% else %}text-slate-900{% endif %} font-mono tabular-nums block mt-1 tracking-tight">
+                {{ pending_checklists_count }}
+            </span>
+            <span class="text-[11px] text-slate-500 mt-1 block">Requieren dictamen de Oficial SST</span>
+        </div>
+        <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-subtle border-t-2 border-t-emerald-600">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 block font-semibold">OTs ALTO RIESGO LIBERADAS</span>
+            <span class="text-2xl font-bold text-emerald-700 font-mono tabular-nums block mt-1 tracking-tight">
+                {{ cleared_high_risk_ots_count }}
+            </span>
+            <span class="text-[11px] text-slate-500 mt-1 block">Habilitadas para maniobras</span>
+        </div>
+        <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-subtle border-t-2 border-t-blue-600">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 block font-semibold">DOTACIONES EPP ACTIVAS</span>
+            <span class="text-2xl font-bold text-slate-900 font-mono tabular-nums block mt-1 tracking-tight">
+                {{ active_epp_count }}
+            </span>
+            <span class="text-[11px] text-slate-500 mt-1 block">Equipos en uso por personal</span>
+        </div>
+        <div class="bg-white border border-slate-200/90 rounded-xl p-4 shadow-subtle border-t-2 border-t-rose-500">
+            <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 block font-semibold">ALERTAS DE VENCIMIENTO</span>
+            <span class="text-2xl font-bold {% if expiring_epp_count > 0 %}text-rose-700{% else %}text-slate-900{% endif %} font-mono tabular-nums block mt-1 tracking-tight">
+                {{ expiring_epp_count }}
+            </span>
+            <span class="text-[11px] text-slate-500 mt-1 block font-mono">Próximos 30 días o vencidos</span>
+        </div>
+    </div>
+
+    <!-- Navegación por Pestañas -->
+    <div class="border-b border-slate-200/90">
+        <nav class="flex space-x-6 text-xs font-semibold">
+            <button type="button" @click="activeTab = 'checklists'"
+                    :class="activeTab === 'checklists' ? 'border-blue-600 text-blue-700 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                    class="py-2.5 border-b-2 transition">
+                1. Checklists Pre-Operacionales ({{ checklists|length }})
+            </button>
+            <button type="button" @click="activeTab = 'epp'"
+                    :class="activeTab === 'epp' ? 'border-blue-600 text-blue-700 font-bold' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                    class="py-2.5 border-b-2 transition">
+                2. Control de Dotación & EPP ({{ epps|length }})
+            </button>
+        </nav>
+    </div>
+
+    <!-- PANEL 1: CHECKLISTS PRE-OPERACIONALES -->
+    <div x-show="activeTab === 'checklists'" class="space-y-4">
+        <div class="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-subtle">
+            <div class="p-3.5 bg-slate-50/75 border-b border-slate-200/80 flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+                    <span class="font-mono font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                        Registro de Inspecciones Pre-Operacionales en Sitio
+                    </span>
+                </div>
+                <span class="text-[11px] text-slate-500 font-mono">Norma de Seguridad Eléctrica & Maniobras</span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
+                            <th class="py-2.5 px-3">Folio</th>
+                            <th class="py-2.5 px-3">Orden de Trabajo</th>
+                            <th class="py-2.5 px-3">Cuadrilla</th>
+                            <th class="py-2.5 px-3">Riesgo / Labor</th>
+                            <th class="py-2.5 px-3 text-center">Verificaciones Críticas (5)</th>
+                            <th class="py-2.5 px-3">Estado</th>
+                            <th class="py-2.5 px-3">Reportado Por</th>
+                            <th class="py-2.5 px-3 text-right">Dictamen SST</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for chk in checklists %}
+                        <tr class="hover:bg-slate-50/70 transition">
+                            <td class="py-2.5 px-3 font-mono font-bold text-slate-900">
+                                {{ chk.number }}
+                            </td>
+                            <td class="py-2.5 px-3 font-mono">
+                                <a href="{% url 'operations:workorder_detail' chk.work_order.pk %}" class="text-slate-800 hover:text-blue-700 font-bold transition">
+                                    {{ chk.work_order.number }}
+                                </a>
+                                <span class="block text-[10px] text-slate-500 truncate max-w-[180px]">{{ chk.work_order.title }}</span>
+                            </td>
+                            <td class="py-2.5 px-3 text-slate-700">
+                                {% if chk.crew %}
+                                <span class="font-mono font-semibold">{{ chk.crew.code }}</span>
+                                <span class="block text-[10px] text-slate-500">{{ chk.crew.name|truncatechars:18 }}</span>
+                                {% else %}
+                                <span class="text-slate-400 italic">Sin cuadrilla</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2.5 px-3 text-[11px] text-slate-700">
+                                {{ chk.get_work_type_display }}
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                                <div class="inline-flex items-center space-x-1 font-mono text-[9px]">
+                                    <span class="px-1 py-0.2 rounded border {% if chk.epp_verified %}bg-emerald-50 text-emerald-800 border-emerald-300{% else %}bg-rose-50 text-rose-800 border-rose-300{% endif %}" title="EPP Verificado">EPP</span>
+                                    <span class="px-1 py-0.2 rounded border {% if chk.loto_verified %}bg-emerald-50 text-emerald-800 border-emerald-300{% else %}bg-rose-50 text-rose-800 border-rose-300{% endif %}" title="Aislamiento LOTO">LOTO</span>
+                                    <span class="px-1 py-0.2 rounded border {% if chk.tools_inspected %}bg-emerald-50 text-emerald-800 border-emerald-300{% else %}bg-rose-50 text-rose-800 border-rose-300{% endif %}" title="Herramientas Inspeccionadas">HERR</span>
+                                    <span class="px-1 py-0.2 rounded border {% if chk.area_signaled %}bg-emerald-50 text-emerald-800 border-emerald-300{% else %}bg-rose-50 text-rose-800 border-rose-300{% endif %}" title="Área Señalizada">SEÑAL</span>
+                                    <span class="px-1 py-0.2 rounded border {% if chk.risk_briefing_done %}bg-emerald-50 text-emerald-800 border-emerald-300{% else %}bg-rose-50 text-rose-800 border-rose-300{% endif %}" title="Charla de 5 Minutos">CHARLA</span>
+                                </div>
+                            </td>
+                            <td class="py-2.5 px-3">
+                                {% if chk.status == 'APPROVED' %}
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    APROBADO
+                                </span>
+                                {% elif chk.status == 'REJECTED' %}
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                                    RECHAZADO
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                    PENDIENTE
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2.5 px-3 text-slate-700 text-[11px]">
+                                <span class="font-medium block">{{ chk.submitted_by.full_name|default:chk.submitted_by.email }}</span>
+                                <span class="text-[10px] text-slate-400 font-mono">{{ chk.created_at|date:"d/m/Y H:i" }}</span>
+                            </td>
+                            <td class="py-2.5 px-3 text-right">
+                                {% if can_manage_sst and chk.status == 'PENDING' %}
+                                <div class="inline-flex items-center space-x-1">
+                                    <form method="POST" action="{% url 'sst:checklist_review' chk.pk %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="approve">
+                                        <button type="submit" class="px-2 py-1 text-[10px] font-mono font-bold bg-emerald-700 hover:bg-emerald-800 text-white rounded transition shadow-none" title="Aprobar y Liberar OT">
+                                            Aprobar
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="{% url 'sst:checklist_review' chk.pk %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="reject">
+                                        <button type="submit" class="px-2 py-1 text-[10px] font-mono font-bold bg-rose-700 hover:bg-rose-800 text-white rounded transition shadow-none" title="Rechazar y Detener Labor">
+                                            Rechazar
+                                        </button>
+                                    </form>
+                                </div>
+                                {% else %}
+                                <span class="text-[10px] text-slate-400 font-mono">
+                                    {% if chk.reviewed_by %}
+                                    Validado por {{ chk.reviewed_by.full_name|default:chk.reviewed_by.email|truncatechars:15 }}
+                                    {% else %}
+                                    —
+                                    {% endif %}
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="py-8 text-center text-xs text-slate-400">
+                                No hay checklists pre-operacionales registrados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANEL 2: CONTROL DE DOTACIÓN EPP (MITRAB) -->
+    <div x-show="activeTab === 'epp'" class="space-y-4" x-cloak>
+        <div class="bg-white border border-slate-200 rounded overflow-hidden">
+            <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+                <span class="font-mono font-semibold text-slate-700 uppercase tracking-wider">
+                    Dotación de Equipos de Protección Personal (EPP)
+                </span>
+                <span class="text-[11px] text-slate-500 font-mono">Control de Vida Útil & Acuse de Recibo</span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
+                            <th class="py-2.5 px-3">Código</th>
+                            <th class="py-2.5 px-3">Colaborador</th>
+                            <th class="py-2.5 px-3">Categoría</th>
+                            <th class="py-2.5 px-3">Equipo / Especificación</th>
+                            <th class="py-2.5 px-3">Lote / Serie</th>
+                            <th class="py-2.5 px-3 font-mono">Entrega</th>
+                            <th class="py-2.5 px-3 font-mono">Vencimiento</th>
+                            <th class="py-2.5 px-3">Estado</th>
+                            <th class="py-2.5 px-3 text-right">Recepción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for epp in epps %}
+                        <tr class="hover:bg-slate-50/70 transition">
+                            <td class="py-2.5 px-3 font-mono font-bold text-slate-900">
+                                {{ epp.code }}
+                            </td>
+                            <td class="py-2.5 px-3 font-medium text-slate-900">
+                                {{ epp.collaborator.full_name|default:epp.collaborator.email }}
+                            </td>
+                            <td class="py-2.5 px-3 text-slate-600 text-[11px]">
+                                {{ epp.get_category_display }}
+                            </td>
+                            <td class="py-2.5 px-3 text-slate-800">
+                                {{ epp.item_name }}
+                            </td>
+                            <td class="py-2.5 px-3 font-mono text-slate-600 text-[11px]">
+                                {{ epp.serial_or_batch|default:"—" }}
+                            </td>
+                            <td class="py-2.5 px-3 font-mono text-slate-700">
+                                {{ epp.delivery_date|date:"d/m/Y" }}
+                            </td>
+                            <td class="py-2.5 px-3 font-mono">
+                                {% if epp.expiration_date %}
+                                <span class="{% if epp.is_expired %}text-rose-700 font-bold{% else %}text-slate-700{% endif %}">
+                                    {{ epp.expiration_date|date:"d/m/Y" }}
+                                </span>
+                                {% else %}
+                                <span class="text-slate-400 italic text-[11px]">No aplica</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2.5 px-3">
+                                {% if epp.status == 'ACTIVE' %}
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    VIGENTE
+                                </span>
+                                {% elif epp.status == 'EXPIRED' %}
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+                                    VENCIDO
+                                </span>
+                                {% else %}
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                    REEMPLAZADO
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2.5 px-3 text-right">
+                                {% if epp.acknowledged_by_worker %}
+                                <span class="inline-flex items-center text-emerald-700 font-mono text-[10px] font-bold">
+                                    <svg class="w-3.5 h-3.5 mr-1 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    CONFIRMADO
+                                </span>
+                                {% else %}
+                                {% if request.user.id == epp.collaborator_id or can_manage_sst %}
+                                <form method="POST" action="{% url 'sst:epp_acknowledge' epp.pk %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="px-2 py-1 text-[10px] font-mono font-bold bg-slate-900 hover:bg-slate-800 text-white rounded transition shadow-none">
+                                        Firmar Recepción
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="text-[10px] text-amber-700 font-mono">Pendiente de firma</span>
+                                {% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="py-8 text-center text-xs text-slate-400">
+                                Sin registros de dotación de EPP para los filtros aplicados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 1: REGISTRAR CHECKLIST PRE-OPERACIONAL -->
+    <div x-show="showChecklistModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-2xl w-full p-6 space-y-4 shadow-none" @click.outside="showChecklistModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                    <h3 class="text-xs font-mono uppercase tracking-wider font-bold text-slate-900">
+                        Nuevo Checklist Pre-Operacional en Sitio
+                    </h3>
+                    <p class="text-[11px] text-slate-500">Verificación técnica de campo obligatoria antes de iniciar maniobras.</p>
+                </div>
+                <button type="button" @click="showChecklistModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'sst:checklist_create' %}" class="space-y-4">
+                {% csrf_token %}
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Orden de Trabajo <span class="text-rose-500">*</span></label>
+                        {{ checklist_form.work_order }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Cuadrilla Responsable</label>
+                        {{ checklist_form.crew }}
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Tipo de Riesgo Operativo <span class="text-rose-500">*</span></label>
+                    {{ checklist_form.work_type }}
+                </div>
+
+                <div class="p-3 bg-slate-50 border border-slate-200 rounded space-y-2">
+                    <span class="text-[10px] font-mono uppercase text-slate-600 font-bold block">
+                        5 Verificaciones Críticas de Seguridad
+                    </span>
+
+                    <label class="flex items-center space-x-2 text-xs text-slate-800 cursor-pointer">
+                        {{ checklist_form.epp_verified }}
+                        <span>1. Verificación de EPP completo en buen estado por cada integrante de brigada</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-xs text-slate-800 cursor-pointer">
+                        {{ checklist_form.loto_verified }}
+                        <span>2. Bloqueo y Etiquetado (LOTO) / Aislamiento de fuentes de energía verificado</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-xs text-slate-800 cursor-pointer">
+                        {{ checklist_form.tools_inspected }}
+                        <span>3. Herramientas, equipos de medición y líneas dieléctricas revisadas e inspeccionadas</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-xs text-slate-800 cursor-pointer">
+                        {{ checklist_form.area_signaled }}
+                        <span>4. Área de trabajo delimitada con conos/cintas, despejada y señalizada</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-xs text-slate-800 cursor-pointer">
+                        {{ checklist_form.risk_briefing_done }}
+                        <span>5. Charla pre-operacional de 5 minutos impartida y riesgos analizados en sitio</span>
+                    </label>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Condiciones Inseguras / Hallazgos</label>
+                    {{ checklist_form.hazard_notes }}
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+                    <button type="button" @click="showChecklistModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
+                        Presentar Checklist
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ASIGNAR DOTACIÓN EPP (Oficial SST 70+) -->
+    {% if can_manage_sst and epp_form %}
+    <div x-show="showEPPModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-xl w-full p-6 space-y-4 shadow-none" @click.outside="showEPPModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                    <h3 class="text-xs font-mono uppercase tracking-wider font-bold text-slate-900">
+                        Entrega de Equipo de Protección Personal (EPP)
+                    </h3>
+                    <p class="text-[11px] text-slate-500">Registro de entrega bajo normas MITRAB de seguridad ocupacional.</p>
+                </div>
+                <button type="button" @click="showEPPModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'sst:epp_create' %}" class="space-y-4">
+                {% csrf_token %}
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Colaborador Receptor <span class="text-rose-500">*</span></label>
+                    {{ epp_form.collaborator }}
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Categoría EPP <span class="text-rose-500">*</span></label>
+                        {{ epp_form.category }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Cantidad Entregada <span class="text-rose-500">*</span></label>
+                        {{ epp_form.quantity }}
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Equipo / Especificación Técnica <span class="text-rose-500">*</span></label>
+                    {{ epp_form.item_name }}
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Lote / Número de Serie</label>
+                    {{ epp_form.serial_or_batch }}
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Fecha de Entrega <span class="text-rose-500">*</span></label>
+                        {{ epp_form.delivery_date }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Fecha de Vencimiento / Renovación</label>
+                        {{ epp_form.expiration_date }}
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+                    <button type="button" @click="showEPPModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
+                        Registrar Dotación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,141 @@
+{% extends "layouts/base_auth.html" %}
+
+{% block title %}Iniciar Sesión{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-sm mx-auto" x-data="{
+    fillDemo(email, pass) {
+        const emailInput = document.getElementById('id_email');
+        const passInput = document.getElementById('id_password');
+        if (emailInput) {
+            emailInput.value = email;
+            emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (passInput) {
+            passInput.value = pass;
+            passInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+}">
+    <!-- Contenedor Principal Suizo: Borde Fino 1px, Cero Sombras, Blanco Puro -->
+    <div class="bg-white border border-zinc-200 rounded-[4px]">
+        
+        <!-- Cabecera del Panel -->
+        <div class="p-6 border-b border-zinc-200 bg-white">
+            <div class="flex items-center justify-between mb-2">
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-mono uppercase tracking-wider font-semibold bg-zinc-50 text-zinc-700 border border-zinc-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    AUTENTICACIÓN B2B
+                </span>
+                <span class="text-[10px] font-mono text-zinc-400">SEC-01</span>
+            </div>
+            <h1 class="text-base font-semibold text-zinc-900 tracking-tight">Acceso a la Plataforma</h1>
+            <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
+                Ingrese sus credenciales operativas autorizadas para acceder a su espacio de trabajo.
+            </p>
+        </div>
+
+        <!-- Errores Globales -->
+        {% if form.non_field_errors %}
+        <div class="p-3 mx-6 mt-4 border border-red-200 bg-red-50/50 rounded-[4px] text-xs font-mono text-red-700 space-y-1">
+            {% for error in form.non_field_errors %}
+            <div class="flex items-start gap-1.5">
+                <span class="font-bold text-red-600">&bull;</span>
+                <span class="font-sans text-[12px] leading-tight">{{ error }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Formulario de Acceso -->
+        <form method="POST" action="{% url 'accounts_auth:login' %}" class="p-6 space-y-4">
+            {% csrf_token %}
+            {% if next %}
+            <input type="hidden" name="next" value="{{ next }}">
+            {% endif %}
+
+            <!-- Correo Electrónico -->
+            <div>
+                <label for="id_email" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                    Correo Corporativo <span class="text-red-500">*</span>
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                <p class="text-[11px] font-mono text-red-600 mt-1">
+                    {{ form.email.errors.0 }}
+                </p>
+                {% endif %}
+            </div>
+
+            <!-- Contraseña -->
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label for="id_password" class="block text-xs font-medium text-zinc-700">
+                        Contraseña de Acceso <span class="text-red-500">*</span>
+                    </label>
+                </div>
+                {{ form.password }}
+                {% if form.password.errors %}
+                <p class="text-[11px] font-mono text-red-600 mt-1">
+                    {{ form.password.errors.0 }}
+                </p>
+                {% endif %}
+            </div>
+
+            <!-- Botón de Envío -->
+            <div class="pt-2">
+                <button type="submit"
+                        class="w-full h-9 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
+                    <span>Iniciar Sesión</span>
+                    <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+                    </svg>
+                </button>
+            </div>
+        </form>
+
+        <!-- Selector Rápido de Roles para Simulación / Pruebas -->
+        <div class="bg-zinc-50 border-t border-zinc-200 p-4 rounded-b-[4px]">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-mono font-medium uppercase tracking-wider text-zinc-500">
+                    Cuentas de Demostración RBAC
+                </span>
+                <span class="text-[10px] font-mono text-zinc-400 font-semibold">1-CLICK</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <button type="button"
+                        @click="fillDemo('owner@vector.com', 'Vector2026!')"
+                        class="text-left px-2.5 py-1.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-[4px] transition-colors group">
+                    <div class="text-[11px] font-medium text-zinc-900">Owner (100)</div>
+                    <div class="text-[10px] font-mono text-zinc-500 truncate">owner@vector.com</div>
+                </button>
+
+                <button type="button"
+                        @click="fillDemo('coord@vector.com', 'Vector2026!')"
+                        class="text-left px-2.5 py-1.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-[4px] transition-colors group">
+                    <div class="text-[11px] font-medium text-zinc-900">Operaciones (80)</div>
+                    <div class="text-[10px] font-mono text-zinc-500 truncate">coord@vector.com</div>
+                </button>
+
+                <button type="button"
+                        @click="fillDemo('sst@vector.com', 'Vector2026!')"
+                        class="text-left px-2.5 py-1.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-[4px] transition-colors group">
+                    <div class="text-[11px] font-medium text-zinc-900">Oficial SST (70)</div>
+                    <div class="text-[10px] font-mono text-zinc-500 truncate">sst@vector.com</div>
+                </button>
+
+                <button type="button"
+                        @click="fillDemo('engineer@vector.com', 'Vector2026!')"
+                        class="text-left px-2.5 py-1.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-[4px] transition-colors group">
+                    <div class="text-[11px] font-medium text-zinc-900">Ing. Residente (50)</div>
+                    <div class="text-[10px] font-mono text-zinc-500 truncate">engineer@vector.com</div>
+                </button>
+            </div>
+            <div class="mt-2.5 text-center">
+                <span class="text-[10px] font-mono text-zinc-400">Contraseña Demo: <strong class="text-zinc-700 font-medium">Vector2026!</strong></span>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

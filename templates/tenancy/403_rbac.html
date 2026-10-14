@@ -1,0 +1,114 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}403 Acceso Restringido (RBAC){% endblock %}
+{% block breadcrumb_section %}SEGURIDAD & AUDITORÍA{% endblock %}
+{% block breadcrumb_page %}CONTROL DE ACCESO{% endblock %}
+{% block page_title %}403 &bull; Restricción de Autoridad Jerárquica{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-8">
+    <div class="border border-zinc-200 bg-white rounded-[4px] overflow-hidden">
+        
+        <!-- Encabezado de Advertencia Técnica Suiza -->
+        <div class="p-4 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-6 h-6 rounded-[3px] bg-red-50 border border-red-200 text-red-600 flex items-center justify-center font-mono font-bold text-xs">
+                    !
+                </div>
+                <div>
+                    <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block font-medium">PROTOCOLO DE SEGURIDAD RBAC</span>
+                    <span class="text-xs font-semibold tracking-tight text-zinc-900">Acceso No Autorizado por Umbral Operativo</span>
+                </div>
+            </div>
+            <span class="px-2 py-0.5 rounded-[4px] text-[10px] font-mono font-medium bg-white text-zinc-700 border border-zinc-200">
+                HTTP 403 FORBIDDEN
+            </span>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <!-- Mensaje Explicativo -->
+            <div>
+                <h2 class="text-sm font-semibold text-zinc-900 tracking-tight">
+                    Su nivel de autoridad operativo actual no posee las atribuciones requeridas para acceder a este recurso.
+                </h2>
+                <p class="text-xs text-zinc-500 mt-1.5 leading-relaxed">
+                    {{ reason|default:"El subsistema al que intenta ingresar está reservado para colaboradores con mayor jerarquía técnica o el módulo correspondiente no ha sido suscrito en la organización activa." }}
+                </p>
+            </div>
+
+            <!-- Tabla Comparativa de Auditoría: NIVEL REQUERIDO vs NIVEL EN SESIÓN -->
+            <div class="border border-zinc-200 rounded-[4px] overflow-hidden">
+                <div class="p-2.5 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between font-mono text-[10px] uppercase text-zinc-500 font-medium">
+                    <span>AUDITORÍA COMPARATIVA DE AUTORIDAD</span>
+                    <span>TENANT: {{ current_org.name }}</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 bg-white">
+                    <!-- Nivel Actual -->
+                    <div class="p-4 space-y-1">
+                        <span class="text-[10px] font-mono text-zinc-400 block uppercase">NIVEL ACTIVO EN SESIÓN:</span>
+                        <div class="flex items-center gap-2 pt-0.5">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-[4px] text-xs font-mono font-semibold bg-zinc-100 text-zinc-900 border border-zinc-200 tabular-nums">
+                                LVL-{{ current_role_level }}
+                            </span>
+                            <span class="text-xs font-medium text-zinc-800">{{ current_role_label|upper }}</span>
+                        </div>
+                        {% if is_simulating_role %}
+                        <span class="text-[10px] font-mono text-amber-700 block pt-1">
+                            (MODO SIMULADOR ACTIVO &bull; ROL REAL: NIVEL {{ real_role_level }})
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Nivel Requerido -->
+                    <div class="p-4 space-y-1">
+                        <span class="text-[10px] font-mono text-zinc-400 block uppercase">NIVEL MÍNIMO REQUERIDO:</span>
+                        <div class="flex items-center gap-2 pt-0.5">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-[4px] text-xs font-mono font-semibold bg-red-50 text-red-700 border border-red-200 tabular-nums">
+                                LVL-{{ required_role_level|default:"100" }}
+                            </span>
+                            <span class="text-xs font-medium text-zinc-800">{{ required_role_label|upper }}</span>
+                        </div>
+                        {% if required_module %}
+                        <span class="text-[10px] font-mono text-zinc-500 block pt-1">
+                            MÓDULO: MOD-{{ required_module|upper }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="pt-2 flex flex-col sm:flex-row items-center gap-2.5 justify-between">
+                <a href="{% url 'tenancy:dashboard' %}"
+                   class="w-full sm:w-auto h-8 px-4 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium rounded-[4px] transition-colors flex items-center justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
+                    </svg>
+                    <span>Regresar a Consola Operativa</span>
+                </a>
+
+                {% if is_simulating_role %}
+                <form method="POST" action="{% url 'tenancy:simulate_role' %}" class="w-full sm:w-auto">
+                    {% csrf_token %}
+                    <input type="hidden" name="role_level" value="100">
+                    <button type="submit"
+                            class="w-full sm:w-auto h-8 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
+                        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>Desactivar Simulación (Restaurar Nivel 100)</span>
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Pie Informativo -->
+        <div class="p-3 bg-zinc-50 border-t border-zinc-200 text-[10px] font-mono text-zinc-400 flex items-center justify-between">
+            <span>GUARDIÁN: RoleLevelRequiredMixin / ModuleAccessRequiredMixin</span>
+            <span>AISLAMIENTO MULTI-TENANT</span>
+        </div>
+    </div>
+</div>
+{% endblock %}

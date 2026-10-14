@@ -1,0 +1,154 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Registrar Cuadrilla Operativa | {{ current_org.name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Breadcrumb & Header -->
+    <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+        <div>
+            <div class="flex items-center space-x-2 text-xs text-slate-500 font-mono mb-1">
+                <a href="{% url 'operations:workorder_list' %}" class="hover:text-slate-800 transition">OPERACIONES</a>
+                <span>/</span>
+                <a href="{% url 'operations:crew_planning' %}" class="hover:text-slate-800 transition">PLANEACIÓN</a>
+                <span>/</span>
+                <span class="text-slate-700 font-semibold">NUEVA CUADRILLA</span>
+            </div>
+            <h1 class="text-xl font-bold tracking-tight text-slate-900">Registrar Cuadrilla Operativa</h1>
+            <p class="text-xs text-slate-500 mt-0.5">Definición de brigada técnica de campo, técnicos miembros y unidad vehicular asignada.</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <a href="{% url 'operations:crew_planning' %}" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition">
+                <svg class="w-4 h-4 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Cancelar
+            </a>
+        </div>
+    </div>
+
+    <!-- Form Container -->
+    <div class="max-w-3xl mx-auto">
+        <form method="post" class="bg-white border border-slate-200 rounded p-6 space-y-6">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded p-3">
+                {% for err in form.non_field_errors %}
+                <p>{{ err }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Sección 1: Datos de la Brigada -->
+            <div class="space-y-4">
+                <div class="border-b border-slate-100 pb-2">
+                    <h2 class="text-xs font-bold text-slate-900 uppercase tracking-wider">1. Identificación y Especialidad</h2>
+                    <p class="text-[11px] text-slate-500">Nombre operativo y área de especialización técnica.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">
+                            Nombre de la Cuadrilla <span class="text-rose-500">*</span>
+                        </label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                        <p class="text-[11px] text-rose-600 mt-1">{{ form.name.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">
+                            Especialidad Técnica <span class="text-rose-500">*</span>
+                        </label>
+                        {{ form.specialty }}
+                        {% if form.specialty.errors %}
+                        <p class="text-[11px] text-rose-600 mt-1">{{ form.specialty.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        {{ form.is_active }}
+                        <span class="text-xs font-medium text-slate-800">Cuadrilla activa disponible para programación inmediata</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Sección 2: Personal Técnico Asignado -->
+            <div class="space-y-4 pt-4 border-t border-slate-100">
+                <div class="border-b border-slate-100 pb-2">
+                    <h2 class="text-xs font-bold text-slate-900 uppercase tracking-wider">2. Personal y Técnicos de Campo</h2>
+                    <p class="text-[11px] text-slate-500">Líder responsable y técnicos que integran la brigada.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Líder de Cuadrilla / Capataz
+                    </label>
+                    {{ form.leader }}
+                    <span class="text-[11px] text-slate-400 mt-1 block">Responsable de coordinar el trabajo en sitio y reportar avances.</span>
+                    {% if form.leader.errors %}
+                    <p class="text-[11px] text-rose-600 mt-1">{{ form.leader.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Técnicos Miembros (Presione Cmd/Ctrl para selección múltiple)
+                    </label>
+                    {{ form.members }}
+                    <span class="text-[11px] text-slate-400 mt-1 block">Los técnicos seleccionados verán las OTs de esta cuadrilla en "Mis Tareas de Hoy".</span>
+                    {% if form.members.errors %}
+                    <p class="text-[11px] text-rose-600 mt-1">{{ form.members.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Sección 3: Unidad Vehicular -->
+            <div class="space-y-4 pt-4 border-t border-slate-100">
+                <div class="border-b border-slate-100 pb-2">
+                    <h2 class="text-xs font-bold text-slate-900 uppercase tracking-wider">3. Asignación Vehicular</h2>
+                    <p class="text-[11px] text-slate-500">Vehículo asignado para transporte de materiales, herramientas y brigada.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">
+                            Placa del Vehículo
+                        </label>
+                        {{ form.vehicle_plate }}
+                        <span class="text-[11px] text-slate-400 mt-1 block font-mono">ej: M 345-890</span>
+                        {% if form.vehicle_plate.errors %}
+                        <p class="text-[11px] text-rose-600 mt-1">{{ form.vehicle_plate.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">
+                            Descripción / Modelo del Vehículo
+                        </label>
+                        {{ form.vehicle_description }}
+                        <span class="text-[11px] text-slate-400 mt-1 block">ej: Camioneta Hilux 4x4 #04</span>
+                        {% if form.vehicle_description.errors %}
+                        <p class="text-[11px] text-rose-600 mt-1">{{ form.vehicle_description.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="flex items-center justify-end space-x-3 pt-6 border-t border-slate-200">
+                <a href="{% url 'operations:crew_planning' %}" class="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition">
+                    Cancelar
+                </a>
+                <button type="submit" class="px-4 py-2 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
+                    Guardar Cuadrilla
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

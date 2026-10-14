@@ -1,0 +1,168 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Nuevo Cliente · CRM{% endblock %}
+{% block breadcrumb_section %}COMERCIAL & CRM{% endblock %}
+{% block breadcrumb_page %}NUEVO CLIENTE{% endblock %}
+{% block page_title %}Registro de Cuenta Comercial / Cliente Único B2B{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+
+    <div class="bg-white border border-slate-200 rounded p-5">
+        <div class="pb-3 mb-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+                <h2 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Datos Generales de la Cuenta
+                </h2>
+                <p class="text-[11px] text-slate-500">
+                    Parámetros comerciales, tributarios y de crédito fiscal
+                </p>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600">
+                JURISDICCIÓN: {{ current_country.name|upper }} ({{ current_country.code }})
+            </span>
+        </div>
+
+        <form method="POST" class="space-y-4">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Nombre Comercial -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Nombre Comercial <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.commercial_name }}
+                    {% if form.commercial_name.errors %}
+                    <p class="text-[11px] text-red-600 mt-1">{{ form.commercial_name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Razón Social -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Razón Social (Legal)
+                    </label>
+                    {{ form.legal_name }}
+                    {% if form.legal_name.errors %}
+                    <p class="text-[11px] text-red-600 mt-1">{{ form.legal_name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Tipo de Cuenta -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Tipo de Cuenta
+                    </label>
+                    {{ form.account_type }}
+                </div>
+
+                <!-- Etapa Comercial -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Etapa Comercial Inicial
+                    </label>
+                    {{ form.lifecycle_stage }}
+                </div>
+
+                <!-- RUC / Tax ID -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        {{ form.tax_id.label|default:current_country.tax_id_label }}
+                    </label>
+                    {{ form.tax_id }}
+                    {% if form.tax_id.errors %}
+                    <p class="text-[11px] text-red-600 mt-1">{{ form.tax_id.errors.0 }}</p>
+                    {% endif %}
+                    <p class="text-[10px] text-slate-400 mt-0.5">Validación sintáctica oficial DGI Nicaragua.</p>
+                </div>
+
+                <!-- Correo -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Correo de Facturación / Contacto
+                    </label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                    <p class="text-[11px] text-red-600 mt-1">{{ form.email.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Teléfono -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Teléfono Corporativo
+                    </label>
+                    {{ form.phone }}
+                </div>
+
+                <!-- Ciudad -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Ciudad / Departamento
+                    </label>
+                    {{ form.city }}
+                </div>
+
+                <!-- Dirección Física -->
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Dirección Física
+                    </label>
+                    {{ form.address }}
+                </div>
+
+                <!-- Moneda Habitual -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Moneda Habitual de Cotización
+                    </label>
+                    {{ form.default_currency }}
+                </div>
+
+                <!-- Términos de Pago -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Términos de Crédito (Días)
+                    </label>
+                    {{ form.payment_terms_days }}
+                    <p class="text-[10px] text-slate-400 mt-0.5">0 = Contado, 15 = 15 días, 30 = 30 días.</p>
+                </div>
+
+                <!-- Ejecutivo Responsable -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Ejecutivo Comercial Responsable
+                    </label>
+                    {{ form.assigned_to }}
+                </div>
+
+                <!-- Exento de IVA -->
+                <div class="flex items-center gap-2 pt-6">
+                    {{ form.is_tax_exempt }}
+                    <label for="{{ form.is_tax_exempt.id_for_label }}" class="text-xs font-medium text-slate-700 cursor-pointer">
+                        Exento de IVA (Con constancia oficial DGI)
+                    </label>
+                </div>
+            </div>
+
+            <!-- Botones -->
+            <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                <a href="{% url 'crm:account_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit" class="px-4 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded transition-colors shadow-none">
+                    Guardar Cliente
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

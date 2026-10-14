@@ -1,0 +1,567 @@
+import re
+import uuid
+from decimal import Decimal
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.test import TestCase, Client
+from django.urls import reverse
+from django.utils import timezone
+
+from apps.core.models import CountryConfig
+from apps.tenancy.models import Organization, OrganizationMembership, RoleLevel
+from apps.crm.models import Account, Quote, QuoteItem
+from apps.operations.models import (
+    Crew,
+    WorkOrder,
+    WorkOrderItem,
+    WorkOrderEvidence,
+    WorkOrderTimelineLog,
+)
+
+User = get_user_model()
+
+
+class OperationsModuleEndToEndTestCase(TestCase):
+    """
+    Suite de Pruebas End-to-End para el Módulo de Operaciones e Ingeniería (apps/operations).
+    Verifica:
+    1. Conversión en 1 Clic (Quote -> WorkOrder) con estricta Confidencialidad Financiera.
+    2. Regla de Bloqueo SST en labores de Alto Riesgo.
+    3. Aislamiento estricto del Técnico de Campo (Nivel 20) y Matriz de Permisos RBAC.
+    4. Inmutabilidad de la Bitácora Cronológica de Auditoría (WorkOrderTimelineLog).
+    5. Aislamiento Multi-Tenant Estricto por Organización.
+    """
+
+    def setUp(self):
+        # 1. Configuración de País y Moneda Fiscal
+        self.country_ni, _ = CountryConfig.objects.get_or_create(
+            code='NI',
+            defaults={
+                'name': 'Nicaragua',
+                'flag_emoji': '🇳🇮',
+                'primary_currency_code': 'NIO',
+                'primary_currency_symbol': 'C$',
+                'secondary_currency_code': 'USD',
+                'secondary_currency_symbol': '$',
+                'tax_id_label': 'RUC',
+                'tax_id_regex': r'^[A-Z]\d{13}$',
+                'personal_id_label': 'Cédula de Identidad',
+                'personal_id_regex': r'^\d{3}-\d{6}-\d{4}[A-Z]$',
+                'default_tax_name': 'IVA',
+                'default_tax_rate': Decimal('15.00'),
+                'is_active': True,
+            }
+        )
+
+        # 2. Organizaciones Multi-Tenant
+        self.org = Organization.objects.create(
+            name="Vector Ingeniería Nicaragua, S.A.",
+            legal_name="Vector Ingeniería de Centroamérica, S.A.",
+            slug="vector-ni-ops",
+            tax_id="J0310000199999",
+            country=self.country_ni,
+            enabled_modules=['crm', 'operations', 'sst'],
+            is_active=True,
+        )
+
+        self.org_intruder = Organization.objects.create(
+            name="Constructora Invasora, S.A.",
+            legal_name="Invasora S.A.",
+            slug="invasora-ni-ops",
+            tax_id="J0310000188888",
+            country=self.country_ni,
+            enabled_modules=['operations'],
+            is_active=True,
+        )
+
+        # 3. Usuarios de Distintos Niveles Jerárquicos RBAC
+        # Nivel 100: Owner / Administrador General
+        self.user_owner = User.objects.create_user(
+            email='owner@vector.com.ni',
+            full_name='Lic. Fernando Morales (Owner)',
+            password='password123'
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_owner,
+            organization=self.org,
+            role_level=RoleLevel.OWNER_ADMIN,
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # Nivel 80: Coordinador de Operaciones
+        self.user_ops_coord = User.objects.create_user(
+            email='operaciones@vector.com.ni',
+            full_name='Ing. Marcos Ruiz (Coordinador)',
+            password='password123'
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_ops_coord,
+            organization=self.org,
+            role_level=RoleLevel.OPERATIONS_COORD,
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # Nivel 70: Oficial SST (Seguridad y Salud en el Trabajo)
+        self.user_sst = User.objects.create_user(
+            email='sst@vector.com.ni',
+            full_name='Lic. Carmen Silva (Oficial SST)',
+            password='password123'
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_sst,
+            organization=self.org,
+            role_level=RoleLevel.SST_OFFICER,
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # Nivel 50: Ingeniero Residente / Supervisor
+        self.user_engineer = User.objects.create_user(
+            email='ingeniero@vector.com.ni',
+            full_name='Ing. Roberto Solís (Ingeniero)',
+            password='password123'
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_engineer,
+            organization=self.org,
+            role_level=RoleLevel.ENGINEER,
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # Nivel 20: Técnico de Campo #1
+        self.user_tech1 = User.objects.create_user(
+            email='tecnico1@vector.com.ni',
+            full_name='Juan Pérez (Técnico 1)',
+            password='password123'
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_tech1,
+            organization=self.org,
+            role_level=RoleLevel.TECHNICIAN,
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # Nivel 20: Técnico de Campo #2 (Cuadrilla distinta)
+        self.user_tech2 = User.objects.create_user(
+            email='tecnico2@vector.com.ni',
+            full_name='Pedro Gómez (Técnico 2)',
+            password='password123'
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_tech2,
+            organization=self.org,
+            role_level=RoleLevel.TECHNICIAN,
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # 4. Cliente para Pruebas Operativas
+        self.account = Account.objects.create(
+            organization=self.org,
+            commercial_name="Ingenio Monte Rosa",
+            legal_name="Pantaleon Nicaragua S.A.",
+            tax_id="J0310000112233",
+            city="Chinandega",
+            address="Km 135 Carretera Chinandega - Corinto",
+            default_currency="NIO",
+        )
+
+    def _get_client_for_user(self, user, org=None):
+        """Helper para autenticar cliente HTTP con sesión de organización activa."""
+        client = Client()
+        client.force_login(user)
+        session = client.session
+        target_org = org or self.org
+        session['active_org_id'] = str(target_org.id)
+        session.save()
+        return client
+
+    # --------------------------------------------------------------------------
+    # TEST 1: Conversión en 1 Clic (Quote -> WorkOrder) y Confidencialidad
+    # --------------------------------------------------------------------------
+    def test_quote_to_workorder_conversion_and_financial_confidentiality(self):
+        """
+        Verifica:
+        1. Cotización aprobada COT-2026-0001 se convierte en OT-2026-0001 mediante POST
+           a /operations/from-quote/<pk>/ ejecutado por el Coordinador (80).
+        2. Se copian exactamente las partidas técnicas (BOM) sin precios ni montos monetarios.
+        3. Se genera la bitácora inicial FROM_QUOTE en WorkOrderTimelineLog.
+        4. Al visualizar la OT con roles de campo (Ingeniero 50, Técnico 20, SST 70),
+           el HTML NUNCA expone precios (50000, 25000, 109250) ni el símbolo de moneda 'C$'.
+        """
+        # Crear Cotización con montos comerciales y 2 ítems
+        quote = Quote.objects.create(
+            organization=self.org,
+            account=self.account,
+            title="Mantenimiento Mayor de Subestación Eléctrica 138kV",
+            notes="Instrucciones de ingeniería: revisar protecciones y aislamiento.",
+            currency_code="NIO",
+            tax_rate=Decimal('15.00'),
+            apply_tax=True,
+            status=Quote.Status.APPROVED,
+            approved_by=self.user_ops_coord,
+            approved_at=timezone.now(),
+        )
+
+        item1 = QuoteItem.objects.create(
+            organization=self.org,
+            quote=quote,
+            item_type=QuoteItem.ItemType.SERVICE,
+            code="SRV-ING-01",
+            description="Servicio de Ingeniería y Montaje Electromecánico",
+            unit="UND",
+            quantity=Decimal('1.00'),
+            unit_price=Decimal('50000.00'),
+            discount_percent=Decimal('0.00'),
+        )
+
+        item2 = QuoteItem.objects.create(
+            organization=self.org,
+            quote=quote,
+            item_type=QuoteItem.ItemType.MATERIAL,
+            code="MAT-CAB-01",
+            description="Cable de Cobre Aislado THHN #4/0",
+            unit="MTS",
+            quantity=Decimal('2.00'),
+            unit_price=Decimal('25000.00'),
+            discount_percent=Decimal('10.00'),
+        )
+
+        # Actualizar totales de la cotización
+        quote.subtotal = Decimal('100000.00')
+        quote.discount_total = Decimal('5000.00')
+        quote.tax_total = Decimal('14250.00')
+        quote.grand_total = Decimal('109250.00')
+        quote.save()
+
+        # Ejecutar Conversión en 1 Clic con Coordinador de Operaciones (Nivel 80)
+        client_coord = self._get_client_for_user(self.user_ops_coord)
+        url_convert = reverse('operations:convert_from_quote', kwargs={'quote_pk': quote.pk})
+        response = client_coord.post(url_convert)
+        self.assertEqual(response.status_code, 302)
+
+        # Verificar que la WorkOrder fue creada
+        wo = WorkOrder.objects.filter(source_quote=quote).first()
+        self.assertIsNotNone(wo)
+        self.assertTrue(wo.number.startswith('OT-'))
+        self.assertEqual(wo.account, self.account)
+        self.assertEqual(wo.title, quote.title)
+        self.assertEqual(wo.phase, WorkOrder.Phase.DRAFT)
+
+        # Verificar copiado de partidas técnicas (BOM)
+        bom_items = wo.items.all().order_by('created_at')
+        self.assertEqual(bom_items.count(), 2)
+
+        bom_srv = bom_items.filter(code="SRV-ING-01").first()
+        self.assertIsNotNone(bom_srv)
+        self.assertEqual(bom_srv.description, "Servicio de Ingeniería y Montaje Electromecánico")
+        self.assertEqual(bom_srv.unit, "UND")
+        self.assertEqual(bom_srv.planned_quantity, Decimal('1.00'))
+        self.assertEqual(bom_srv.executed_quantity, Decimal('0.00'))
+        self.assertFalse(bom_srv.is_completed)
+
+        bom_mat = bom_items.filter(code="MAT-CAB-01").first()
+        self.assertIsNotNone(bom_mat)
+        self.assertEqual(bom_mat.description, "Cable de Cobre Aislado THHN #4/0")
+        self.assertEqual(bom_mat.unit, "MTS")
+        self.assertEqual(bom_mat.planned_quantity, Decimal('2.00'))
+        self.assertEqual(bom_mat.executed_quantity, Decimal('0.00'))
+
+        # Verificar primer registro en la Bitácora Inmutable
+        log_initial = wo.timeline_logs.filter(event_type='FROM_QUOTE').first()
+        self.assertIsNotNone(log_initial)
+        self.assertIn(quote.number, log_initial.summary)
+        self.assertEqual(log_initial.actor, self.user_ops_coord)
+
+        # Verificar Confidencialidad Financiera Estricta en HTML para roles de campo
+        client_eng = self._get_client_for_user(self.user_engineer)
+        url_detail = reverse('operations:workorder_detail', kwargs={'pk': wo.pk})
+        resp_detail = client_eng.get(url_detail)
+        self.assertEqual(resp_detail.status_code, 200)
+
+        html_content = resp_detail.content.decode('utf-8')
+        # Cero exposición de precios unitarios o totales de cotización
+        self.assertNotIn("50000", html_content)
+        self.assertNotIn("25000", html_content)
+        self.assertNotIn("109250", html_content)
+        self.assertNotIn("C$", html_content)
+
+        # Verificar que sí se muestran las partidas técnicas y cantidades
+        self.assertIn("SRV-ING-01", html_content)
+        self.assertIn("MAT-CAB-01", html_content)
+        self.assertIn("1.00", html_content)
+        self.assertIn("2.00", html_content)
+        self.assertIn("MTS", html_content)
+
+    # --------------------------------------------------------------------------
+    # TEST 2: Regla de Seguridad SST y Bloqueo en Alto Riesgo
+    # --------------------------------------------------------------------------
+    def test_sst_high_risk_lock_and_clearance(self):
+        """
+        Verifica:
+        1. Si is_high_risk=True y sst_cleared=False, pasar a IN_PROGRESS es bloqueado.
+        2. Solo el Oficial SST (70+) puede otorgar o revocar la liberación SST.
+        3. Una vez liberada por SST, la OT puede iniciar en campo (IN_PROGRESS).
+        """
+        wo = WorkOrder.objects.create(
+            organization=self.org,
+            account=self.account,
+            title="Reparación en Transformador de Potencia de Alta Tensión",
+            is_high_risk=True,
+            sst_cleared=False,
+            phase=WorkOrder.Phase.SCHEDULED,
+            created_by=self.user_ops_coord,
+        )
+
+        can_start, reason = wo.can_start_field_execution()
+        self.assertFalse(can_start)
+        self.assertIn("Alto Riesgo", reason)
+
+        # Intento de pasar a IN_PROGRESS por el Ingeniero (Nivel 50)
+        client_eng = self._get_client_for_user(self.user_engineer)
+        url_trans = reverse('operations:workorder_phase_transition', kwargs={'pk': wo.pk})
+        response = client_eng.post(url_trans, data={'phase': WorkOrder.Phase.IN_PROGRESS})
+        self.assertEqual(response.status_code, 302)
+
+        # Comprobar que NO cambió de fase debido al bloqueo SST
+        wo.refresh_from_db()
+        self.assertEqual(wo.phase, WorkOrder.Phase.SCHEDULED)
+
+        # Intento de liberación SST por Técnico (Nivel 20) -> Recibe 403 Forbidden
+        client_tech = self._get_client_for_user(self.user_tech1)
+        url_sst = reverse('operations:workorder_sst_clearance', kwargs={'pk': wo.pk})
+        resp_forbidden = client_tech.post(url_sst, data={'action': 'grant'})
+        self.assertEqual(resp_forbidden.status_code, 403)
+
+        # Liberación legítima otorgada por el Oficial SST (Nivel 70)
+        client_sst = self._get_client_for_user(self.user_sst)
+        resp_sst = client_sst.post(url_sst, data={
+            'action': 'grant',
+            'notes': 'Permiso de trabajo en altura y análisis de riesgo AST revisado y aprobado.'
+        })
+        self.assertEqual(resp_sst.status_code, 302)
+
+        wo.refresh_from_db()
+        self.assertTrue(wo.sst_cleared)
+
+        # Verificar registro en bitácora de auditoría SST
+        log_sst = wo.timeline_logs.filter(event_type='SST_CLEARANCE').first()
+        self.assertIsNotNone(log_sst)
+        self.assertIn("Liberación SST Otorgada", log_sst.summary)
+        self.assertEqual(log_sst.actor, self.user_sst)
+
+        # Ahora el Ingeniero intenta nuevamente pasar a IN_PROGRESS -> Exitoso
+        resp_success = client_eng.post(url_trans, data={'phase': WorkOrder.Phase.IN_PROGRESS})
+        self.assertEqual(resp_success.status_code, 302)
+
+        wo.refresh_from_db()
+        self.assertEqual(wo.phase, WorkOrder.Phase.IN_PROGRESS)
+
+    # --------------------------------------------------------------------------
+    # TEST 3: Aislamiento del Técnico (Nivel 20) y Matriz de Permisos RBAC
+    # --------------------------------------------------------------------------
+    def test_technician_isolation_and_rbac_matrix(self):
+        """
+        Verifica:
+        1. Técnico 1 (perteneciente a Cuadrilla Alfa) solo ve las OTs de su cuadrilla
+           en /operations/ ("Mis Tareas de Hoy"). No ve las OTs de Cuadrilla Beta.
+        2. Técnico 1 puede marcar partidas técnicas ejecutadas y subir evidencias.
+        3. Técnico 1 recibe 403 si intenta acceder a planeación de cuadrillas (/crews/),
+           crear OTs manualmente o cambiar fases de ingeniería.
+        4. Ingeniero (50) NO puede cerrar definitivamente una OT (COMPLETED -> 403).
+        5. Coordinador (80) sí puede autorizar el cierre definitivo (COMPLETED).
+        """
+        # Crear Cuadrillas
+        crew_alpha = Crew.objects.create(
+            organization=self.org,
+            code="CUAD-01",
+            name="Cuadrilla Electromecánica Alfa",
+            specialty="Media y Alta Tensión",
+            leader=self.user_engineer,
+            vehicle_plate="M 345-890",
+            vehicle_description="Hilux 4x4",
+            is_active=True,
+        )
+        crew_alpha.members.add(self.user_tech1)
+
+        crew_beta = Crew.objects.create(
+            organization=self.org,
+            code="CUAD-02",
+            name="Cuadrilla de Obras Civiles Beta",
+            specialty="Fundaciones y Obra Gris",
+            leader=self.user_engineer,
+            vehicle_plate="M 987-654",
+            is_active=True,
+        )
+        crew_beta.members.add(self.user_tech2)
+
+        # Crear dos OTs asignadas a cada cuadrilla
+        ot_alpha = WorkOrder.objects.create(
+            organization=self.org,
+            account=self.account,
+            title="Instalación de Celdas de Media Tensión (Alfa)",
+            assigned_crew=crew_alpha,
+            phase=WorkOrder.Phase.IN_PROGRESS,
+        )
+        item_alpha = WorkOrderItem.objects.create(
+            organization=self.org,
+            work_order=ot_alpha,
+            code="INS-01",
+            description="Montaje físico de celda",
+            unit="UND",
+            planned_quantity=Decimal('1.00'),
+            executed_quantity=Decimal('0.00'),
+        )
+
+        ot_beta = WorkOrder.objects.create(
+            organization=self.org,
+            account=self.account,
+            title="Fundación de Concreto para Transformador (Beta)",
+            assigned_crew=crew_beta,
+            phase=WorkOrder.Phase.IN_PROGRESS,
+        )
+
+        # 1. Técnico 1 consulta el listado ("Mis Tareas de Hoy")
+        client_tech1 = self._get_client_for_user(self.user_tech1)
+        resp_list = client_tech1.get(reverse('operations:workorder_list'))
+        self.assertEqual(resp_list.status_code, 200)
+
+        html_list = resp_list.content.decode('utf-8')
+        # Ve su orden asignada (ot_alpha)
+        self.assertIn(ot_alpha.number, html_list)
+        # NUNCA ve la orden de la otra cuadrilla (ot_beta)
+        self.assertNotIn(ot_beta.number, html_list)
+
+        # 2. Técnico 1 ejecuta partida técnica
+        url_exec = reverse('operations:workorder_item_execute', kwargs={
+            'wo_pk': ot_alpha.pk,
+            'item_pk': item_alpha.pk,
+        })
+        resp_exec = client_tech1.post(url_exec, data={
+            'executed_quantity': '1.00',
+            'is_completed': '1',
+        })
+        self.assertEqual(resp_exec.status_code, 302)
+
+        item_alpha.refresh_from_db()
+        self.assertEqual(item_alpha.executed_quantity, Decimal('1.00'))
+        self.assertTrue(item_alpha.is_completed)
+        self.assertEqual(item_alpha.completed_by, self.user_tech1)
+
+        # 3. Técnico 1 sube evidencia técnica de campo
+        url_evidence = reverse('operations:workorder_evidence_add', kwargs={'pk': ot_alpha.pk})
+        resp_evid = client_tech1.post(url_evidence, data={
+            'evidence_type': WorkOrderEvidence.EvidenceType.PHOTO_PROGRESS,
+            'title': 'Fijación de tornillería y anclajes completada',
+            'notes': 'Torque aplicado según especificación del fabricante (45 Nm).',
+            'file_reference': 'FOTO-ANCLAJE-01.JPG',
+        })
+        self.assertEqual(resp_evid.status_code, 302)
+
+        evid = ot_alpha.evidences.first()
+        self.assertIsNotNone(evid)
+        self.assertEqual(evid.uploaded_by, self.user_tech1)
+        self.assertEqual(evid.title, 'Fijación de tornillería y anclajes completada')
+
+        # 4. Restricciones RBAC para Técnico (Nivel 20):
+        # Intentar acceder a Planeación de Cuadrillas -> 403 Forbidden
+        resp_crew_plan = client_tech1.get(reverse('operations:crew_planning'))
+        self.assertEqual(resp_crew_plan.status_code, 403)
+
+        # Intentar crear cuadrilla -> 403 Forbidden
+        resp_crew_create = client_tech1.get(reverse('operations:crew_create'))
+        self.assertEqual(resp_crew_create.status_code, 403)
+
+        # Intentar crear OT manual -> 403 Forbidden
+        resp_wo_create = client_tech1.get(reverse('operations:workorder_create'))
+        self.assertEqual(resp_wo_create.status_code, 403)
+
+        # Intentar cambiar de fase la OT -> 403 Forbidden
+        url_trans = reverse('operations:workorder_phase_transition', kwargs={'pk': ot_alpha.pk})
+        resp_tech_trans = client_tech1.post(url_trans, data={'phase': WorkOrder.Phase.QUALITY_CHECK})
+        self.assertEqual(resp_tech_trans.status_code, 403)
+
+        # 5. Ingeniero (Nivel 50) intenta Cierre Definitivo (COMPLETED) -> 403 Forbidden
+        client_eng = self._get_client_for_user(self.user_engineer)
+        resp_eng_close = client_eng.post(url_trans, data={'phase': WorkOrder.Phase.COMPLETED})
+        self.assertEqual(resp_eng_close.status_code, 403)
+
+        # 6. Coordinador de Operaciones (Nivel 80) sí puede autorizar el Cierre Definitivo
+        client_coord = self._get_client_for_user(self.user_ops_coord)
+        resp_coord_close = client_coord.post(url_trans, data={
+            'phase': WorkOrder.Phase.COMPLETED,
+            'notes': 'Acta de entrega técnica firmada a satisfacción por el cliente.',
+        })
+        self.assertEqual(resp_coord_close.status_code, 302)
+
+        ot_alpha.refresh_from_db()
+        self.assertEqual(ot_alpha.phase, WorkOrder.Phase.COMPLETED)
+        self.assertIsNotNone(ot_alpha.completed_at)
+
+    # --------------------------------------------------------------------------
+    # TEST 4: Inmutabilidad de la Bitácora Cronológica de Auditoría
+    # --------------------------------------------------------------------------
+    def test_timeline_log_immutability(self):
+        """
+        Verifica que WorkOrderTimelineLog sea estrictamente inmutable:
+        1. Modificar un registro existente lanza ValidationError.
+        2. Eliminar un registro existente lanza ValidationError.
+        """
+        wo = WorkOrder.objects.create(
+            organization=self.org,
+            account=self.account,
+            title="Prueba de Bitácora Inmutable",
+        )
+
+        log = WorkOrderTimelineLog.objects.create(
+            organization=self.org,
+            work_order=wo,
+            event_type='CREATED',
+            summary="Apertura inicial",
+            actor=self.user_ops_coord,
+        )
+        self.assertIsNotNone(log.pk)
+
+        # Intento de modificación posterior
+        log.summary = "Resumen modificado maliciosamente"
+        with self.assertRaises(ValidationError) as ctx:
+            log.save()
+        self.assertIn("inmutable", str(ctx.exception).lower())
+
+        # Intento de eliminación posterior
+        with self.assertRaises(ValidationError) as ctx_del:
+            log.delete()
+        self.assertIn("inmutable", str(ctx_del.exception).lower())
+
+    # --------------------------------------------------------------------------
+    # TEST 5: Aislamiento Multi-Tenant Estricto
+    # --------------------------------------------------------------------------
+    def test_multi_tenant_isolation(self):
+        """
+        Verifica que los modelos de operaciones respeten el aislamiento por organización.
+        """
+        # Crear OT en la organización invasora
+        acc_intruder = Account.objects.create(
+            organization=self.org_intruder,
+            commercial_name="Cliente de Empresa Competidora",
+            tax_id="J0310000188888",
+        )
+        wo_intruder = WorkOrder.objects.create(
+            organization=self.org_intruder,
+            account=acc_intruder,
+            title="OT Privada de la Competencia",
+        )
+
+        # Filtrar por self.org NUNCA debe retornar la OT de org_intruder
+        org_work_orders = WorkOrder.objects.for_org(self.org)
+        self.assertNotIn(wo_intruder, org_work_orders)
+
+        # Intento de acceso a la OT invasora mediante usuario de self.org -> 404 Not Found
+        client_coord = self._get_client_for_user(self.user_ops_coord, org=self.org)
+        url_intruder = reverse('operations:workorder_detail', kwargs={'pk': wo_intruder.pk})
+        resp = client_coord.get(url_intruder)
+        self.assertEqual(resp.status_code, 404)

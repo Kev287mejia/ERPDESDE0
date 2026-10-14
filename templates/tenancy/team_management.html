@@ -1,0 +1,353 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Gobierno Corporativo & Personal{% endblock %}
+{% block breadcrumb_section %}ADMINISTRACIÓN{% endblock %}
+{% block breadcrumb_page %}EQUIPO & GOBIERNO{% endblock %}
+{% block page_title %}Gobierno Corporativo & Nómina de Personal{% endblock %}
+
+{% block page_actions %}
+<button type="button" 
+        @click="$dispatch('open-create-member-drawer')"
+        class="h-8 px-3.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+    <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+    </svg>
+    <span>Registrar Colaborador</span>
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto" x-data="{ 
+    showDrawer: {% if show_modal_on_load %}true{% else %}false{% endif %},
+    search: '',
+    roleFilter: 'ALL'
+}" @open-create-member-drawer.window="showDrawer = true">
+
+    <!-- ===================================================================== -->
+    <!-- PANEL SUPERIOR: FICHA FISCAL Y GOBIERNO DE MÓDULOS EN CALIENTE         -->
+    <!-- ===================================================================== -->
+    <div class="bg-white border border-zinc-200 rounded-[4px] p-4 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-100">
+            <div class="flex items-center gap-2.5">
+                <span class="fi fi-{{ current_country.code|lower }} border border-zinc-200 rounded-[2px] text-base"></span>
+                <div>
+                    <h2 class="text-xs font-mono uppercase tracking-wider font-semibold text-zinc-900">
+                        Ficha Fiscal & Gobierno Modular del Tenant
+                    </h2>
+                    <p class="text-[11px] text-zinc-500">
+                        {{ current_org.legal_name }} &bull; Parámetros tributarios aplicados ante {{ current_country.tax_id_label }} {{ current_country.name }}
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-mono">
+                <span class="text-zinc-400">ESTADO TENANT:</span>
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-mono font-medium bg-zinc-50 text-zinc-700 border border-zinc-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    OPERATIVO
+                </span>
+            </div>
+        </div>
+
+        <!-- 6 Celdas de Parámetros Fiscales y Contables -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs font-mono">
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block">{{ current_country.tax_id_label }}:</span>
+                <span class="font-medium text-zinc-900 tabular-nums">{{ current_org.tax_id }}</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block">MONEDA BASE:</span>
+                <span class="font-medium text-zinc-900">{{ current_org.currency }} ({{ current_org.currency_symbol }})</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block">RÉGIMEN DGI:</span>
+                <span class="font-medium text-zinc-900 truncate block" title="{{ current_org.get_tax_regime_display }}">{{ current_org.get_tax_regime_display }}</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block">GIRO / RUBRO:</span>
+                <span class="font-medium text-zinc-900 truncate block" title="{{ current_org.get_industry_display }}">{{ current_org.get_industry_display }}</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block">PLAN CONTABLE:</span>
+                <span class="font-medium text-zinc-900 truncate block" title="{{ current_org.get_accounting_template_display }}">{{ current_org.get_accounting_template_display }}</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block">NÓMINA ACTIVA:</span>
+                <span class="font-medium text-zinc-900 tabular-nums">{{ members|length }} COLABORADORES</span>
+            </div>
+        </div>
+
+        <!-- Formulario de Activación de Módulos en Caliente -->
+        <form method="POST" action="{% url 'tenancy:update_modules' %}" class="pt-2 border-t border-zinc-100">
+            {% csrf_token %}
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="space-y-0.5">
+                    <span class="text-xs font-semibold text-zinc-900 block font-sans">Gestión Modular en Caliente</span>
+                    <span class="text-[10px] font-mono text-zinc-500 block">
+                        Active o desactive subsistemas. El cambio afectará de inmediato la navegación y los permisos RBAC.
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                        {% for mod in all_modules %}
+                        <label class="px-2.5 py-1 border rounded-[4px] flex items-center gap-2 cursor-pointer transition-colors {% if mod.code in current_org.enabled_modules %}border-zinc-900 bg-zinc-50 text-zinc-900 font-medium{% else %}border-zinc-200 bg-white text-zinc-500{% endif %}" title="{{ mod.name }} ({{ mod.min_role }})">
+                            <input type="checkbox" 
+                                   name="enabled_modules" 
+                                   value="{{ mod.code }}" 
+                                   {% if mod.code in current_org.enabled_modules %}checked{% endif %}
+                                   class="w-3.5 h-3.5 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
+                            <span class="text-[11px] font-mono">{{ mod.code|upper }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+
+                    <button type="submit" 
+                            class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-mono font-medium rounded-[4px] transition-colors whitespace-nowrap cursor-pointer">
+                        Guardar Módulos
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- PANEL PRINCIPAL: DIRECTORIO DE PERSONAL Y CADENA DE MANDO RBAC        -->
+    <!-- ===================================================================== -->
+    <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+        
+        <!-- Barra de Control y Búsqueda en Vivo de Personal -->
+        <div class="p-3.5 border-b border-zinc-200 bg-zinc-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <h3 class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider">
+                    Directorio de Personal & Cadena de Mando
+                </h3>
+                <span class="px-1.5 py-0.2 rounded-[3px] text-[10px] font-mono bg-zinc-200 text-zinc-700 font-medium tabular-nums">
+                    {{ members|length }} REGISTRADOS
+                </span>
+            </div>
+
+            <!-- Filtro Rápido en Cliente (Alpine.js) -->
+            <div class="flex items-center gap-2">
+                <div class="relative flex items-center">
+                    <svg class="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+                    </svg>
+                    <input type="text" 
+                           x-model="search"
+                           placeholder="Filtrar por nombre, cédula o cargo..."
+                           class="h-7 text-xs pl-8 pr-3 bg-white border border-zinc-200 rounded-[4px] text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 w-60 font-sans">
+                </div>
+
+                <select x-model="roleFilter" 
+                        class="h-7 text-[11px] font-mono bg-white border border-zinc-200 rounded-[4px] text-zinc-700 px-2 focus:outline-none focus:border-zinc-900 cursor-pointer">
+                    <option value="ALL">TODOS LOS ROLES</option>
+                    <option value="100">LVL 100 · OWNER</option>
+                    <option value="85">LVL 85 · COMERCIAL</option>
+                    <option value="80">LVL 80 · OPERACIONES</option>
+                    <option value="70">LVL 70 · SST</option>
+                    <option value="50">LVL 50 · INGENIERO</option>
+                    <option value="20">LVL 20 · TÉCNICO</option>
+                    <option value="10">LVL 10 · AUDITOR</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Tabla de Personal Estilo Hoja de Cálculo -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-zinc-200 bg-zinc-50 text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
+                        <th class="py-2.5 px-3 font-medium">COLABORADOR</th>
+                        <th class="py-2.5 px-3 font-medium">{{ current_country.personal_id_label|default:"CÉDULA / DNI"|upper }}</th>
+                        <th class="py-2.5 px-3 font-medium">CARGO OPERATIVO</th>
+                        <th class="py-2.5 px-3 font-medium">NIVEL JERÁRQUICO</th>
+                        <th class="py-2.5 px-3 font-medium text-center">ESTADO</th>
+                        <th class="py-2.5 px-3 font-medium text-center">ACTUALIZAR ROL</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 text-[13px] font-sans">
+                    {% for m in members %}
+                    <tr x-show="(roleFilter === 'ALL' || roleFilter === '{{ m.role_level }}') && (!search || '{{ m.user.full_name|lower }} {{ m.user.email|lower }} {{ m.user.personal_id_number|lower }} {{ m.job_title|lower }}'.includes(search.toLowerCase()))"
+                        class="hover:bg-zinc-50/70 transition-colors">
+                        
+                        <!-- Colaborador -->
+                        <td class="py-2.5 px-3">
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-[3px] bg-zinc-100 border border-zinc-200 flex items-center justify-center font-mono font-medium text-[10px] text-zinc-700">
+                                    {{ m.user.full_name|default:m.user.email|slice:":2"|upper }}
+                                </div>
+                                <div>
+                                    <span class="font-medium text-zinc-900 block leading-tight">{{ m.user.full_name }}</span>
+                                    <span class="text-[10px] font-mono text-zinc-400 block">{{ m.user.email }}</span>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Identificación Cédula en font-mono tabular-nums -->
+                        <td class="py-2.5 px-3 font-mono text-[11px] tabular-nums text-zinc-700 uppercase">
+                            {{ m.user.personal_id_number|default:"SIN DOCUMENTO" }}
+                        </td>
+
+                        <!-- Cargo -->
+                        <td class="py-2.5 px-3 text-zinc-600 text-xs">
+                            {{ m.job_title|default:"Colaborador General" }}
+                        </td>
+
+                        <!-- Nivel de Autoridad -->
+                        <td class="py-2.5 px-3">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-mono font-medium border border-zinc-200 bg-zinc-50 text-zinc-700">
+                                <span class="w-1.5 h-1.5 rounded-full {% if m.role_level >= 100 %}bg-emerald-600{% elif m.role_level >= 80 %}bg-zinc-800{% elif m.role_level >= 70 %}bg-amber-500{% else %}bg-zinc-400{% endif %}"></span>
+                                <span class="tabular-nums font-semibold">LVL-{{ m.role_level }}</span>
+                                <span class="text-zinc-300">/</span>
+                                <span>{{ m.get_role_level_display }}</span>
+                            </span>
+                        </td>
+
+                        <!-- Estado -->
+                        <td class="py-2.5 px-3 text-center">
+                            {% if m.is_active %}
+                            <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-[4px] text-[10px] font-mono font-medium bg-zinc-50 text-zinc-700 border border-zinc-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                                ACTIVO
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-[4px] text-[10px] font-mono font-medium bg-zinc-50 text-zinc-500 border border-zinc-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>
+                                INACTIVO
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Acciones: Formulario Rápido de Actualización -->
+                        <td class="py-2.5 px-3 text-center">
+                            <form method="POST" action="{% url 'tenancy:member_update' m.id %}" class="inline-flex items-center gap-1.5">
+                                {% csrf_token %}
+                                <input type="hidden" name="job_title" value="{{ m.job_title }}">
+                                <input type="hidden" name="is_active" value="on" {% if not m.is_active %}disabled{% endif %}>
+                                
+                                <select name="role_level" class="h-7 text-[11px] font-mono px-1.5 border rounded-[4px] border-zinc-200 bg-white text-zinc-800 focus:outline-none focus:border-zinc-900">
+                                    {% for val, label in role_choices %}
+                                    <option value="{{ val }}" {% if m.role_level == val %}selected{% endif %}>
+                                        {{ val }} - {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+
+                                <button type="submit" 
+                                        class="h-7 px-2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 rounded-[4px] transition-colors"
+                                        title="Guardar Cambio de Rol">
+                                    <svg class="w-3.5 h-3.5 text-zinc-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                                    </svg>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- SLIDE-OVER DRAWER DERECHO DE ALTA DE COLABORADOR (ALPINE.JS)          -->
+    <!-- ===================================================================== -->
+    <!-- Backdrop Traslúcido Sutil -->
+    <div x-show="showDrawer" 
+         x-cloak 
+         @click="showDrawer = false" 
+         class="fixed inset-0 bg-zinc-900/20 z-40 transition-opacity"></div>
+
+    <!-- Panel Lateral Deslizante -->
+    <div x-show="showDrawer" 
+         x-cloak
+         x-transition:enter="transform transition ease-in-out duration-200"
+         x-transition:enter-start="translate-x-full"
+         x-transition:enter-end="translate-x-0"
+         x-transition:leave="transform transition ease-in-out duration-150"
+         x-transition:leave-start="translate-x-0"
+         x-transition:leave-end="translate-x-full"
+         class="fixed inset-y-0 right-0 w-full max-w-md bg-white border-l border-zinc-200 z-50 flex flex-col justify-between shadow-none">
+        
+        <!-- Cabecera del Drawer -->
+        <div class="p-6 border-b border-zinc-200 bg-white flex items-center justify-between flex-shrink-0">
+            <div>
+                <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-medium block">RECLUTAMIENTO & ENROLAMIENTO</span>
+                <h3 class="text-sm font-semibold text-zinc-900 tracking-tight mt-0.5">Alta de Colaborador Operativo</h3>
+            </div>
+            <button type="button" @click="showDrawer = false" class="p-1.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-[3px] transition-colors">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Formulario en el Cuerpo del Drawer -->
+        <form method="POST" action="{% url 'tenancy:team_create' %}" class="flex-1 overflow-y-auto p-6 space-y-4">
+            {% csrf_token %}
+
+            <div>
+                <label class="block text-xs font-medium text-zinc-700 mb-1.5">Nombre Completo <span class="text-red-500">*</span></label>
+                {{ create_form.full_name }}
+                {% if create_form.full_name.errors %}
+                <p class="text-[10px] font-mono text-red-600 mt-1">{{ create_form.full_name.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-zinc-700 mb-1.5">Correo Corporativo <span class="text-red-500">*</span></label>
+                {{ create_form.email }}
+                {% if create_form.email.errors %}
+                <p class="text-[10px] font-mono text-red-600 mt-1">{{ create_form.email.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-zinc-700 mb-1.5">{{ current_country.personal_id_label }} <span class="text-red-500">*</span></label>
+                {{ create_form.personal_id_number }}
+                {% if create_form.personal_id_number.errors %}
+                <p class="text-[10px] font-mono text-red-600 mt-1">{{ create_form.personal_id_number.errors.0 }}</p>
+                {% else %}
+                <p class="text-[10px] font-mono text-zinc-400 mt-1">Formato oficial: 001-150897-0000A</p>
+                {% endif %}
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1.5">Teléfono Móvil</label>
+                    {{ create_form.phone }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1.5">Cargo Institucional</label>
+                    {{ create_form.job_title }}
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-zinc-700 mb-1.5">Nivel Jerárquico RBAC <span class="text-red-500">*</span></label>
+                {{ create_form.role_level }}
+                <p class="text-[10px] font-mono text-zinc-400 mt-1">Regla Anti-Inversión: Solo roles &le; {{ current_role_level }}.</p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-zinc-700 mb-1.5">Contraseña Provisional</label>
+                {{ create_form.password }}
+            </div>
+
+            <div class="pt-4 border-t border-zinc-100 flex items-center justify-end gap-2">
+                <button type="button" 
+                        @click="showDrawer = false" 
+                        class="h-9 px-3.5 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium rounded-[4px] transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        class="h-9 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors cursor-pointer">
+                    Enrolar Colaborador
+                </button>
+            </div>
+        </form>
+
+    </div>
+
+</div>
+{% endblock %}

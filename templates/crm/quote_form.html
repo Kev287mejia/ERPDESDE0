@@ -1,0 +1,134 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Nueva Cotización · CRM{% endblock %}
+{% block breadcrumb_section %}COMERCIAL & CRM{% endblock %}
+{% block breadcrumb_page %}NUEVA COTIZACIÓN{% endblock %}
+{% block page_title %}Elaboración de Cotización Formal Bimonetaria{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+
+    <div class="bg-white border border-slate-200 rounded p-5 space-y-4">
+        <div class="pb-3 border-b border-slate-100 flex items-center justify-between">
+            <div>
+                <h2 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Parámetros Comerciales y Tributarios de la Cotización
+                </h2>
+                <p class="text-[11px] text-slate-500">
+                    Emisión bajo normativa fiscal de {{ current_country.name }} ({{ current_country.code }})
+                </p>
+            </div>
+            <a href="{% url 'crm:quote_list' %}" class="text-xs font-mono text-slate-500 hover:text-slate-800">
+                &larr; Volver al Listado
+            </a>
+        </div>
+
+        <form method="POST" class="space-y-4">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Cliente / Cuenta -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Cliente Receptor <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.account }}
+                    {% if form.account.errors %}<p class="text-[11px] text-red-600 mt-1">{{ form.account.errors.0 }}</p>{% endif %}
+                </div>
+
+                <!-- Oportunidad Vinculada -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Oportunidad de Negocio (Opcional)
+                    </label>
+                    {{ form.opportunity }}
+                    {% if form.opportunity.errors %}<p class="text-[11px] text-red-600 mt-1">{{ form.opportunity.errors.0 }}</p>{% endif %}
+                </div>
+
+                <!-- Alcance / Referencia -->
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Alcance / Referencia del Proyecto <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.title }}
+                    {% if form.title.errors %}<p class="text-[11px] text-red-600 mt-1">{{ form.title.errors.0 }}</p>{% endif %}
+                </div>
+
+                <!-- Moneda de Emisión -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Moneda de Emisión
+                    </label>
+                    {{ form.currency_code }}
+                </div>
+
+                <!-- Tasa de Cambio Oficial Referencial -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Tipo de Cambio Referencial (NIO/USD)
+                    </label>
+                    {{ form.exchange_rate }}
+                    <p class="text-[10px] text-slate-400 mt-0.5">Tasa oficial BCN aplicada para equivalencias.</p>
+                </div>
+
+                <!-- Nombre Impuesto -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Impuesto Fiscal
+                    </label>
+                    {{ form.tax_name }}
+                </div>
+
+                <!-- Tasa de Impuesto -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Tasa de Impuesto (%)
+                    </label>
+                    {{ form.tax_rate }}
+                </div>
+
+                <!-- Fecha de Validez -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Vigencia de Oferta Hasta
+                    </label>
+                    {{ form.valid_until }}
+                </div>
+
+                <!-- Aplica Impuesto -->
+                <div class="flex items-center gap-2 pt-6">
+                    {{ form.apply_tax }}
+                    <label for="{{ form.apply_tax.id_for_label }}" class="text-xs font-medium text-slate-700 cursor-pointer">
+                        Liquidar {{ current_country.tax_name|default:"IVA" }} (Desmarcar solo para exportaciones o regímenes especiales)
+                    </label>
+                </div>
+
+                <!-- Condiciones Comerciales -->
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-medium text-slate-700 mb-1">
+                        Términos Comerciales, Garantía y Observaciones
+                    </label>
+                    {{ form.notes }}
+                </div>
+            </div>
+
+            <!-- Botones -->
+            <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                <a href="{% url 'crm:quote_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit" class="px-4 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded transition-colors shadow-none">
+                    Crear Cotización & Abrir Consola
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

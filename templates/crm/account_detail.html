@@ -1,0 +1,268 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}{{ account.code }} · {{ account.commercial_name }}{% endblock %}
+{% block breadcrumb_section %}COMERCIAL & CRM{% endblock %}
+{% block breadcrumb_page %}FICHA DE CLIENTE{% endblock %}
+{% block page_title %}{{ account.code }} · {{ account.commercial_name }}{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2">
+    <a href="{% url 'crm:account_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+        Volver al Directorio
+    </a>
+    {% if nav_access.can_manage_crm %}
+    <a href="{% url 'crm:quote_create' %}?account={{ account.pk }}" class="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded transition-colors flex items-center gap-1.5 shadow-none">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        <span>Nueva Cotización</span>
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto" x-data="{ showContactModal: false }">
+
+    <!-- Ficha Técnica Principal -->
+    <div class="bg-white border border-slate-200 rounded p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-mono font-bold text-blue-700 tabular-nums">{{ account.code }}</span>
+                    <h2 class="text-base font-semibold text-slate-900">{{ account.commercial_name }}</h2>
+                    {% if account.lifecycle_stage == 'ACTIVE' %}
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">CLIENTE ACTIVO</span>
+                    {% elif account.lifecycle_stage == 'PROSPECT' %}
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200">PROSPECTO</span>
+                    {% else %}
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-50 text-slate-600 border border-slate-200">INACTIVO</span>
+                    {% endif %}
+                </div>
+                {% if account.legal_name %}
+                <p class="text-xs text-slate-500 mt-0.5">Razón Social: <span class="font-medium text-slate-700">{{ account.legal_name }}</span></p>
+                {% endif %}
+            </div>
+
+            <div class="flex items-center gap-2 text-xs font-mono">
+                <span class="text-slate-400">TIPO:</span>
+                <span class="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded font-semibold text-slate-700">
+                    {{ account.get_account_type_display }}
+                </span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded">
+                <span class="text-[10px] font-mono uppercase text-slate-400 block tracking-wider">{{ current_country.tax_id_label|default:"RUC" }}</span>
+                <span class="font-mono font-bold text-slate-900 tabular-nums">
+                    {{ account.tax_id|default:"Sin Registrar" }}
+                </span>
+                {% if account.is_tax_exempt %}
+                <span class="block mt-1 text-[10px] font-mono text-blue-700 font-bold">EXENTO DE IVA</span>
+                {% endif %}
+            </div>
+
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded">
+                <span class="text-[10px] font-mono uppercase text-slate-400 block tracking-wider">CRÉDITO Y FACTURACIÓN</span>
+                <span class="font-mono font-bold text-slate-900">
+                    {{ account.default_currency }} · 
+                    {% if account.payment_terms_days == 0 %}Contado{% else %}{{ account.payment_terms_days }} Días{% endif %}
+                </span>
+                <span class="text-[10px] text-slate-400 block mt-1">Plazo autorizado</span>
+            </div>
+
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded">
+                <span class="text-[10px] font-mono uppercase text-slate-400 block tracking-wider">UBICACIÓN</span>
+                <span class="font-medium text-slate-900 block truncate">{{ account.city }}</span>
+                <span class="text-[11px] text-slate-500 block truncate">{{ account.address|default:"Sin dirección registrada" }}</span>
+            </div>
+
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded">
+                <span class="text-[10px] font-mono uppercase text-slate-400 block tracking-wider">RESPONSABLE COMERCIAL</span>
+                <span class="font-medium text-slate-900 block">
+                    {{ account.assigned_to.full_name|default:"Sin Asignar" }}
+                </span>
+                <span class="text-[11px] text-slate-500 block">{{ account.email|default:"Sin correo registrado" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contactos Técnicos y Comerciales -->
+    <div class="bg-white border border-slate-200 rounded p-5 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Contactos Técnicos y Comerciales ({{ contacts.count }})
+                </h3>
+                <p class="text-[11px] text-slate-500">Interlocutores para compras, operaciones y mantenimiento</p>
+            </div>
+            {% if nav_access.can_manage_crm %}
+            <button type="button" @click="showContactModal = true" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded transition-colors flex items-center gap-1 shadow-none">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                </svg>
+                <span>Agregar Contacto</span>
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {% for contact in contacts %}
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded text-xs space-y-1 relative">
+                {% if contact.is_primary %}
+                <span class="absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                    PRINCIPAL
+                </span>
+                {% endif %}
+                <div class="font-semibold text-slate-900">{{ contact.full_name }}</div>
+                <div class="text-[11px] text-slate-500">{{ contact.job_title|default:"Puesto no especificado" }}</div>
+                <div class="pt-2 border-t border-slate-200/60 font-mono text-[11px] text-slate-700 space-y-0.5">
+                    {% if contact.email %}<div>{{ contact.email }}</div>{% endif %}
+                    {% if contact.phone %}<div>{{ contact.phone }}</div>{% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="sm:col-span-3 py-6 text-center text-slate-400 text-xs">
+                No hay contactos registrados para esta cuenta.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Oportunidades y Cotizaciones Históricas -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Oportunidades Comerciales -->
+        <div class="bg-white border border-slate-200 rounded p-5 space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Propuestas en Gestión ({{ opportunities.count }})
+                </h3>
+                <a href="{% url 'crm:opportunity_kanban' %}" class="text-xs text-blue-700 hover:underline font-mono">
+                    Ver Tablero &rarr;
+                </a>
+            </div>
+
+            <div class="divide-y divide-slate-100 text-xs">
+                {% for opp in opportunities %}
+                <div class="py-2.5 flex items-center justify-between">
+                    <div>
+                        <div class="font-mono text-blue-700 font-bold text-[11px]">{{ opp.code }}</div>
+                        <div class="font-medium text-slate-900">{{ opp.title }}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-mono font-bold text-slate-800 tabular-nums">
+                            {{ opp.currency }} {{ opp.estimated_value|floatformat:2 }}
+                        </div>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                            {{ opp.get_stage_display }}
+                        </span>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="py-6 text-center text-slate-400 text-xs">
+                    Sin oportunidades registradas.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Cotizaciones Históricas -->
+        <div class="bg-white border border-slate-200 rounded p-5 space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Cotizaciones Emitidas ({{ quotes.count }})
+                </h3>
+                <a href="{% url 'crm:quote_list' %}" class="text-xs text-blue-700 hover:underline font-mono">
+                    Ver Cotizador &rarr;
+                </a>
+            </div>
+
+            <div class="divide-y divide-slate-100 text-xs">
+                {% for q in quotes %}
+                <div class="py-2.5 flex items-center justify-between">
+                    <div>
+                        <a href="{% url 'crm:quote_detail' pk=q.pk %}" class="font-mono text-blue-700 font-bold text-[11px] hover:underline">
+                            {{ q.number }}
+                        </a>
+                        <div class="text-slate-700 truncate max-w-xs">{{ q.title }}</div>
+                        <div class="text-[10px] text-slate-400 font-mono">{{ q.created_at|date:"d/m/Y" }}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-mono font-bold text-slate-900 tabular-nums">
+                            {{ q.currency_symbol }} {{ q.grand_total|floatformat:2 }}
+                        </div>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold 
+                            {% if q.status == 'APPROVED' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+                            {% elif q.status == 'SENT' %}bg-blue-50 text-blue-700 border border-blue-200
+                            {% elif q.status == 'DRAFT' %}bg-slate-100 text-slate-700 border border-slate-200
+                            {% else %}bg-red-50 text-red-700 border border-red-200{% endif %}">
+                            {{ q.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="py-6 text-center text-slate-400 text-xs">
+                    Sin cotizaciones registradas para este cliente.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal Agregar Contacto -->
+    {% if nav_access.can_manage_crm %}
+    <div x-show="showContactModal" 
+         x-cloak 
+         class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-md w-full p-5 space-y-4 shadow-none" @click.outside="showContactModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Nuevo Contacto para {{ account.commercial_name }}
+                </h3>
+                <button type="button" @click="showContactModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'crm:account_contact_create' pk=account.pk %}" class="space-y-3">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Nombre Completo <span class="text-red-500">*</span></label>
+                    {{ contact_form.full_name }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Cargo / Puesto</label>
+                    {{ contact_form.job_title }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Correo Electrónico</label>
+                    {{ contact_form.email }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Teléfono / Celular</label>
+                    {{ contact_form.phone }}
+                </div>
+                <div class="flex items-center gap-2 pt-2">
+                    {{ contact_form.is_primary }}
+                    <label for="{{ contact_form.is_primary.id_for_label }}" class="text-xs font-medium text-slate-700 cursor-pointer">
+                        Contacto Principal de la Cuenta
+                    </label>
+                </div>
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button type="button" @click="showContactModal = false" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded transition-colors shadow-none">
+                        Guardar Contacto
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-white">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>{% block title %}Acceso Institucional{% endblock %} | ERP SAS</title>
+
+    <!-- Tipografía Suiza: Inter (UI) & JetBrains Mono (Cifras/Datos) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Banderas Vectoriales Reales -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css">
+
+    <!-- Tailwind CSS (Play CDN configurado con tokens All-Light Swiss Grid) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Inter"', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.addEventListener('htmx:configRequest', (event) => {
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                if (csrfMeta) {
+                    event.detail.headers['X-CSRFToken'] = csrfMeta.getAttribute('content');
+                }
+            });
+        });
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            letter-spacing: -0.011em;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #FFFFFF;
+            color: #18181B;
+        }
+        .font-mono { font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em; }
+        .tabular-nums { font-variant-numeric: tabular-nums; }
+        [x-cloak] { display: none !important; }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full flex flex-col text-zinc-900 antialiased bg-white selection:bg-zinc-900 selection:text-white">
+
+    <!-- Topbar Técnica Suiza (48px / h-12 bg-white border-b border-zinc-200) -->
+    <header class="h-12 bg-white border-b border-zinc-200 flex items-center justify-between px-6 flex-shrink-0 z-20">
+        <div class="flex items-center gap-3">
+            <div class="w-5 h-5 bg-zinc-900 text-white font-mono text-[11px] font-bold rounded-[3px] flex items-center justify-center">
+                E
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold tracking-tight text-zinc-900 uppercase">ERP SAS</span>
+                <span class="text-zinc-300">/</span>
+                <span class="text-[11px] font-mono text-zinc-400 uppercase tracking-wider hidden sm:inline">
+                    ACCESO INSTITUCIONAL
+                </span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 text-xs font-mono text-zinc-500">
+            <div class="flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                <span class="text-[11px] text-zinc-700 font-medium">SSL 256-BIT</span>
+            </div>
+            <span class="text-zinc-300">/</span>
+            <div class="flex items-center gap-1.5">
+                <span class="fi fi-ni border border-zinc-200 rounded-[2px]"></span>
+                <span class="text-[11px] text-zinc-600 font-medium">NI · MANAGUA</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notificaciones Flash Estilo Toast Suizo -->
+    {% if messages %}
+    <div class="max-w-sm mx-auto w-full px-4 pt-4">
+        {% for message in messages %}
+        <div class="border border-zinc-200 bg-zinc-50 rounded-[4px] p-2.5 mb-2 text-xs font-mono flex items-center justify-between text-zinc-800">
+            <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full {% if message.tags == 'error' %}bg-red-600{% elif message.tags == 'warning' %}bg-amber-500{% else %}bg-emerald-600{% endif %}"></span>
+                <span class="font-sans text-[12px]">{{ message }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Contenedor Principal Blanco Puro con Cuadrícula Técnica Sutil -->
+    <main class="flex-1 overflow-y-auto py-12 px-4 sm:px-6 flex items-center justify-center bg-white">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer Arquitectónico Minimalista (40px / h-10 border-t border-zinc-200 bg-zinc-50/80) -->
+    <footer class="h-10 border-t border-zinc-200 bg-zinc-50/80 flex items-center justify-between px-6 text-[11px] font-mono text-zinc-500 flex-shrink-0">
+        <div>
+            <span>SISTEMA DE GESTIÓN EMPRESARIAL B2B</span>
+        </div>
+        <div>
+            <span>PL_VERSION 2026.1 &bull; PROTOCOLO SEGURO</span>
+        </div>
+    </footer>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

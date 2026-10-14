@@ -1,0 +1,728 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}{{ work_order.number }} · {{ work_order.title }}{% endblock %}
+{% block breadcrumb_section %}INGENIERÍA & CAMPO{% endblock %}
+{% block breadcrumb_page %}CONSOLA DE ORDEN DE TRABAJO{% endblock %}
+{% block page_title %}{{ work_order.number }} · {{ work_order.title }}{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2">
+    <a href="{% url 'operations:workorder_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+        Volver a Órdenes
+    </a>
+
+    <!-- Acciones de Cierre Definitivo (Exclusivo Coordinador Nivel 80+) -->
+    {% if can_close_ot and work_order.phase != 'COMPLETED' and work_order.phase != 'CANCELLED' %}
+    <form method="POST" action="{% url 'operations:workorder_phase_transition' pk=work_order.pk %}" class="inline-flex">
+        {% csrf_token %}
+        <input type="hidden" name="phase" value="COMPLETED">
+        <input type="hidden" name="notes" value="Cierre formal de obra y entrega técnica autorizada por Coordinación de Operaciones.">
+        <button type="submit" 
+                onclick="return confirm('¿Autorizar el CIERRE DEFINITIVO (COMPLETED) de esta Orden de Trabajo?');"
+                class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded transition-colors flex items-center gap-1.5 shadow-none">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+            </svg>
+            <span>Cierre Técnico Definitivo</span>
+        </button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto" x-data="{ showItemModal: false, showEvidenceModal: false, executeItemModal: false, currentItem: {}, showChecklistModal: false }">
+
+    <!-- ================================================================= -->
+    <!-- 1. EMBUDO TÉCNICO DE 6 FASES DE INGENIERÍA Y OPERACIONES          -->
+    <!-- ================================================================= -->
+    <div class="bg-white border border-slate-200 rounded p-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+            <span class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-800">
+                Flujo Operativo de Ejecución
+            </span>
+            <span class="text-xs font-mono font-bold text-blue-700">
+                FASE ACTUAL: {{ work_order.get_phase_display }}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs font-mono">
+            {% for phase_code, phase_label in phases %}
+            {% if phase_code != 'CANCELLED' %}
+            <div class="p-2 border rounded text-center transition-colors
+                {% if work_order.phase == phase_code %}
+                    bg-blue-50 border-blue-500 text-blue-900 font-bold ring-1 ring-blue-500
+                {% elif work_order.phase == 'COMPLETED' %}
+                    bg-slate-50 border-slate-200 text-slate-600
+                {% else %}
+                    bg-white border-slate-200 text-slate-400
+                {% endif %}">
+                <span class="block text-[10px]">{{ phase_label }}</span>
+                {% if work_order.phase == phase_code %}
+                <span class="block text-[9px] text-blue-600 font-bold mt-0.5">&bull; EN CURSO &bull;</span>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+
+        <!-- Controles de Transición de Fase (Ingeniero 50+) -->
+        {% if can_manage_phases and work_order.phase != 'COMPLETED' and work_order.phase != 'CANCELLED' %}
+        <div class="pt-3 mt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <span class="text-slate-500 font-mono text-[11px]">
+                Avanzar fase de ingeniería:
+            </span>
+            <form method="POST" action="{% url 'operations:workorder_phase_transition' pk=work_order.pk %}" class="flex items-center gap-2">
+                {% csrf_token %}
+                <select name="phase" class="text-xs font-mono py-1 px-2 border border-slate-300 rounded bg-white text-slate-800 focus:outline-none focus:border-blue-700">
+                    {% for code, label in phases %}
+                    {% if code != 'COMPLETED' and code != work_order.phase %}
+                    <option value="{{ code }}">Transicionar a: {{ label }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <input type="text" name="notes" placeholder="Motivo o referencia técnica..." class="text-xs px-2.5 py-1 border border-slate-300 rounded bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-700">
+                <button type="submit" class="px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white font-medium rounded text-xs transition-colors shadow-none">
+                    Actualizar Fase
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- 2. FICHA TÉCNICA, CLIENTE, UBICACIÓN Y SST INDUSTRIAL             -->
+    <!-- ================================================================= -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Columna 1 y 2: Datos de la Obra y Cuadrilla -->
+        <div class="lg:col-span-2 bg-white border border-slate-200 rounded p-5 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                    <span class="text-xs font-mono font-bold text-blue-700 tabular-nums">{{ work_order.number }}</span>
+                    <h2 class="text-base font-semibold text-slate-900">{{ work_order.title }}</h2>
+                </div>
+                <div class="text-right font-mono text-xs">
+                    <span class="text-slate-400 block text-[10px]">PRIORIDAD:</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold 
+                        {% if work_order.priority == 'CRITICAL' %}bg-red-50 text-red-700 border border-red-200
+                        {% elif work_order.priority == 'HIGH' %}bg-amber-50 text-amber-700 border border-amber-200
+                        {% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                        {{ work_order.get_priority_display }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <!-- Cliente Receptor -->
+                <div class="p-3 bg-slate-50 border border-slate-200 rounded space-y-1">
+                    <span class="text-[10px] font-mono uppercase text-slate-400 font-semibold block">CLIENTE / PLANTA</span>
+                    <div class="font-bold text-slate-900">{{ work_order.account.commercial_name }}</div>
+                    <div class="text-slate-600">{{ work_order.site_address|default:work_order.account.city }}</div>
+                    {% if work_order.source_quote %}
+                    <div class="pt-1 text-[11px] font-mono text-blue-700">
+                        Cotización Origen: <a href="{% url 'crm:quote_detail' pk=work_order.source_quote.pk %}" class="hover:underline">{{ work_order.source_quote.number }}</a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Cuadrilla Operativa & Vehículo -->
+                <div class="p-3 bg-slate-50 border border-slate-200 rounded space-y-1">
+                    <span class="text-[10px] font-mono uppercase text-slate-400 font-semibold block">BRIGADA / CUADRILLA ASIGNADA</span>
+                    {% if work_order.assigned_crew %}
+                    <div class="font-bold text-slate-900 font-mono">{{ work_order.assigned_crew.code }} · {{ work_order.assigned_crew.name }}</div>
+                    <div class="text-slate-600 text-[11px]">Líder: {{ work_order.assigned_crew.leader.full_name|default:"Sin Líder Asignado" }}</div>
+                    <div class="text-slate-500 font-mono text-[11px]">
+                        Vehículo: <strong>{{ work_order.assigned_crew.vehicle_plate|default:"Sin Vehículo" }}</strong> ({{ work_order.assigned_crew.vehicle_description }})
+                    </div>
+                    {% else %}
+                    <div class="text-slate-400">Sin cuadrilla asignada en la planeación.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Alcance Técnico -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded text-xs space-y-1">
+                <span class="text-[10px] font-mono uppercase text-slate-400 font-semibold block">ALCANCE E INSTRUCCIONES TÉCNICAS</span>
+                <p class="text-slate-700 whitespace-pre-line leading-relaxed">
+                    {{ work_order.technical_scope|default:"Sin instrucciones técnicas detalladas registradas." }}
+                </p>
+            </div>
+        </div>
+
+        <!-- Columna 3: Panel de Seguridad Industrial (SST) -->
+        <div class="bg-white border border-slate-200 rounded p-5 space-y-4">
+            <div class="pb-3 border-b border-slate-100 flex items-center justify-between">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Seguridad Industrial (SST)
+                </h3>
+                <span class="text-[10px] font-mono text-slate-400">NORMA MITRAB</span>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div>
+                    <span class="text-[10px] font-mono uppercase text-slate-400 block mb-1">NIVEL DE RIESGO:</span>
+                    {% if work_order.is_high_risk %}
+                    <div class="p-2.5 bg-red-50 border border-red-200 rounded text-red-800 font-mono text-xs flex items-center gap-2">
+                        <svg class="w-4 h-4 text-red-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        <span class="font-bold">LABOR DE ALTO RIESGO</span>
+                    </div>
+                    {% else %}
+                    <div class="p-2 bg-slate-50 border border-slate-200 rounded text-slate-700 font-mono text-xs">
+                        Riesgo Convencional / Estándar
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <span class="text-[10px] font-mono uppercase text-slate-400 block mb-1">ESTADO DE LIBERACIÓN PARA CAMPO:</span>
+                    {% if work_order.is_high_risk %}
+                        {% if work_order.sst_cleared %}
+                        <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded text-emerald-800 font-mono text-xs flex items-center gap-2">
+                            <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <div>
+                                <div class="font-bold">LIBERADO POR SST</div>
+                                <div class="text-[10px] text-emerald-600 font-sans">Condiciones de campo verificadas.</div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="p-2.5 bg-amber-50 border border-amber-200 rounded text-amber-800 font-mono text-xs flex items-center gap-2">
+                            <svg class="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <div>
+                                <div class="font-bold">BLOQUEO PREVENTIVO SST</div>
+                                <div class="text-[10px] text-amber-700 font-sans">Prohibido iniciar campo sin aval de Oficial SST.</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                    <div class="p-2 bg-slate-50 border border-slate-200 rounded text-slate-600 text-xs">
+                        No requiere permiso especial de alto riesgo.
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Acciones para Oficial SST (Nivel 70+) -->
+                {% if can_manage_sst and work_order.is_high_risk %}
+                <div class="pt-3 border-t border-slate-100">
+                    <form method="POST" action="{% url 'operations:workorder_sst_clearance' pk=work_order.pk %}" class="space-y-2">
+                        {% csrf_token %}
+                        <input type="text" name="notes" placeholder="Observaciones de inspección SST..." class="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-700">
+                        <div class="flex items-center gap-2">
+                            {% if not work_order.sst_cleared %}
+                            <input type="hidden" name="action" value="grant">
+                            <button type="submit" class="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded text-xs transition-colors shadow-none">
+                                Otorgar Liberación SST
+                            </button>
+                            {% else %}
+                            <input type="hidden" name="action" value="revoke">
+                            <button type="submit" class="w-full py-1.5 bg-red-700 hover:bg-red-800 text-white font-semibold rounded text-xs transition-colors shadow-none">
+                                Revocar / Bloquear
+                            </button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+
+                <!-- Checklists Pre-Operacionales Vinculados a esta OT -->
+                <div class="pt-3 border-t border-slate-100 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-mono uppercase text-slate-500 font-bold block">
+                            CHECKLISTS PRE-OPERACIONALES ({{ safety_checklists|length }})
+                        </span>
+                        <button type="button" @click="showChecklistModal = true" class="text-[10px] font-mono font-bold text-slate-900 hover:text-slate-700 underline">
+                            + Registrar Checklist
+                        </button>
+                    </div>
+
+                    {% if safety_checklists %}
+                    <div class="space-y-1.5">
+                        {% for sc in safety_checklists %}
+                        <div class="p-2 bg-slate-50 border border-slate-200 rounded text-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="font-mono font-bold text-slate-900">{{ sc.number }}</span>
+                                {% if sc.status == 'APPROVED' %}
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">APROBADO</span>
+                                {% elif sc.status == 'REJECTED' %}
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-rose-50 text-rose-800 border border-rose-200">RECHAZADO</span>
+                                {% else %}
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">PENDIENTE</span>
+                                {% endif %}
+                            </div>
+                            <span class="text-[11px] text-slate-600 block mt-0.5">{{ sc.get_work_type_display }}</span>
+                            <div class="flex items-center justify-between mt-1 text-[10px] font-mono text-slate-400">
+                                <span>Por {{ sc.submitted_by.full_name|default:sc.submitted_by.email|truncatechars:15 }}</span>
+                                <span>{{ sc.created_at|date:"d/m/Y H:i" }}</span>
+                            </div>
+
+                            {% if can_manage_sst and sc.status == 'PENDING' %}
+                            <div class="flex items-center gap-1 mt-2 pt-1.5 border-t border-slate-200">
+                                <form method="POST" action="{% url 'sst:checklist_review' sc.pk %}" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="approve">
+                                    <input type="hidden" name="next" value="{{ request.path }}">
+                                    <button type="submit" class="px-2 py-0.5 text-[9px] font-mono font-bold bg-emerald-700 hover:bg-emerald-800 text-white rounded transition shadow-none">
+                                        Aprobar Checklist
+                                    </button>
+                                </form>
+                                <form method="POST" action="{% url 'sst:checklist_review' sc.pk %}" class="inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="reject">
+                                    <input type="hidden" name="next" value="{{ request.path }}">
+                                    <button type="submit" class="px-2 py-0.5 text-[9px] font-mono font-bold bg-rose-700 hover:bg-rose-800 text-white rounded transition shadow-none">
+                                        Rechazar
+                                    </button>
+                                </form>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-[11px] text-slate-400 italic">Sin checklists pre-operacionales presentados.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- 3. LISTA DE MATERIALES Y PARTIDAS TÉCNICAS (BOM SIN PRECIOS)     -->
+    <!-- ================================================================= -->
+    <div class="bg-white border border-slate-200 rounded overflow-hidden">
+        <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+            <div>
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Partidas Técnicas & Lista de Materiales (BOM) — {{ completed_items }} de {{ total_items }} Ejecutadas
+                </h3>
+                <p class="text-[11px] text-slate-500">
+                    Especificaciones técnicas y cantidades físicas de instalación (Confidencialidad: Cero Precios Comerciales)
+                </p>
+            </div>
+            {% if can_manage_phases %}
+            <button type="button" @click="showItemModal = true" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded transition-colors flex items-center gap-1 shadow-none">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                </svg>
+                <span>Agregar Partida Técnica</span>
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-mono text-[11px] uppercase tracking-wider">
+                        <th class="py-2.5 px-3">Estado</th>
+                        <th class="py-2.5 px-3">Tipo</th>
+                        <th class="py-2.5 px-3">Código</th>
+                        <th class="py-2.5 px-3">Descripción de la Partida</th>
+                        <th class="py-2.5 px-3 text-center">Unidad</th>
+                        <th class="py-2.5 px-3 text-right">Planificado</th>
+                        <th class="py-2.5 px-3 text-right">Ejecutado</th>
+                        <th class="py-2.5 px-3">Registrado Por</th>
+                        <th class="py-2.5 px-3 text-right">Avance Campo</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-mono">
+                    {% for item in items %}
+                    <tr class="hover:bg-slate-50/70 transition-colors">
+                        <td class="py-2.5 px-3">
+                            {% if item.is_completed %}
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                COMPLETADO
+                            </span>
+                            {% else %}
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                PENDIENTE
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3 text-[10px]">
+                            {% if item.item_type == 'SERVICE' %}
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">SERVICIO</span>
+                            {% elif item.item_type == 'MATERIAL' %}
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">MATERIAL</span>
+                            {% else %}
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-200">EQUIPO</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-700 tabular-nums">
+                            {{ item.code|default:"—" }}
+                        </td>
+                        <td class="py-2.5 px-3 font-sans font-medium text-slate-900">
+                            {{ item.description }}
+                        </td>
+                        <td class="py-2.5 px-3 text-center text-slate-600">
+                            {{ item.unit }}
+                        </td>
+                        <td class="py-2.5 px-3 text-right text-slate-900 tabular-nums font-bold">
+                            {{ item.planned_quantity|floatformat:2 }}
+                        </td>
+                        <td class="py-2.5 px-3 text-right tabular-nums 
+                            {% if item.executed_quantity >= item.planned_quantity %}text-emerald-700 font-bold{% else %}text-slate-700{% endif %}">
+                            {{ item.executed_quantity|floatformat:2 }}
+                        </td>
+                        <td class="py-2.5 px-3 font-sans text-slate-600 text-[11px]">
+                            {{ item.completed_by.full_name|default:"—" }}
+                        </td>
+                        <td class="py-2.5 px-3 text-right">
+                            {% if can_execute_items and work_order.phase != 'COMPLETED' and work_order.phase != 'CANCELLED' %}
+                            <form method="POST" action="{% url 'operations:workorder_item_execute' wo_pk=work_order.pk item_pk=item.pk %}" class="inline-flex items-center gap-1">
+                                {% csrf_token %}
+                                <input type="hidden" name="executed_quantity" value="{{ item.planned_quantity }}">
+                                <input type="hidden" name="is_completed" value="1">
+                                <button type="submit" 
+                                        class="px-2 py-0.5 rounded text-[10px] font-mono font-medium border border-slate-300 hover:bg-slate-100 text-slate-700 transition-colors shadow-none"
+                                        title="Marcar como ejecutado completamente">
+                                    Ejecutar
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="py-6 text-center text-slate-400 font-sans">
+                            Sin partidas técnicas registradas en el BOM.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- 4. EVIDENCIAS TÉCNICAS Y FOTOGRÁFICAS DE CAMPO                    -->
+    <!-- ================================================================= -->
+    <div class="bg-white border border-slate-200 rounded p-5 space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Evidencias Técnicas & Registro Fotográfico ({{ evidences|length }})
+                </h3>
+                <p class="text-[11px] text-slate-500">Fotografías antes/durante/después e informes de conformidad</p>
+            </div>
+            {% if can_execute_items and work_order.phase != 'COMPLETED' and work_order.phase != 'CANCELLED' %}
+            <button type="button" @click="showEvidenceModal = true" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded transition-colors flex items-center gap-1 shadow-none">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/>
+                </svg>
+                <span>Subir Evidencia</span>
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {% for ev in evidences %}
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded text-xs space-y-1.5">
+                <div class="flex items-center justify-between">
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border
+                        {% if ev.evidence_type == 'PHOTO_BEFORE' %}bg-purple-50 text-purple-700 border-purple-200
+                        {% elif ev.evidence_type == 'PHOTO_AFTER' %}bg-emerald-50 text-emerald-700 border-emerald-200
+                        {% else %}bg-blue-50 text-blue-700 border-blue-200{% endif %}">
+                        {{ ev.get_evidence_type_display }}
+                    </span>
+                    <span class="text-[10px] font-mono text-slate-400">{{ ev.created_at|date:"d/m/Y H:i" }}</span>
+                </div>
+                <div class="font-semibold text-slate-900">{{ ev.title }}</div>
+                {% if ev.notes %}
+                <p class="text-[11px] text-slate-600 font-sans leading-snug">{{ ev.notes }}</p>
+                {% endif %}
+                <div class="pt-2 border-t border-slate-200/60 font-mono text-[10px] text-slate-500 flex items-center justify-between">
+                    <span>{{ ev.uploaded_by.full_name|default:"Técnico" }}</span>
+                    {% if ev.file_reference %}
+                    <span class="truncate max-w-[120px] text-slate-400">{{ ev.file_reference }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="sm:col-span-4 py-8 text-center text-slate-400 text-xs">
+                Sin evidencias fotográficas o reportes técnicos registrados aún.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- DESPACHOS DE ALMACÉN Y MOVIMIENTOS KARDEX VINCULADOS              -->
+    <!-- ================================================================= -->
+    <div class="bg-white border border-slate-200 rounded overflow-hidden">
+        <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+            <div>
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Despachos de Almacén & Movimientos de Kardex ({{ stock_movements|length }})
+                </h3>
+                <p class="text-[11px] text-slate-500">
+                    Materiales e insumos reales despachados desde bodegas centrales o unidades móviles a esta OT
+                </p>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700 font-bold">
+                KARDEX FISCAL
+            </span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
+                        <th class="py-2.5 px-3">Folio Kardex</th>
+                        <th class="py-2.5 px-3">Fecha</th>
+                        <th class="py-2.5 px-3">Bodega Origen</th>
+                        <th class="py-2.5 px-3">SKU & Descripción</th>
+                        <th class="py-2.5 px-3 text-right font-mono">Cantidad</th>
+                        <th class="py-2.5 px-3">Despachado Por</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-mono">
+                    {% for sm in stock_movements %}
+                    <tr class="hover:bg-slate-50/70 transition">
+                        <td class="py-2.5 px-3 font-bold text-slate-900">
+                            {{ sm.number }}
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-500 text-[11px]">
+                            {{ sm.created_at|date:"d/m/Y H:i" }}
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-700 font-sans">
+                            <span class="font-mono font-bold">{{ sm.warehouse.code }}</span> &middot; {{ sm.warehouse.name }}
+                        </td>
+                        <td class="py-2.5 px-3 font-sans text-slate-900">
+                            <span class="font-mono font-bold">{{ sm.item.sku }}</span> &middot; {{ sm.item.name }}
+                        </td>
+                        <td class="py-2.5 px-3 text-right tabular-nums font-bold text-slate-900">
+                            {{ sm.quantity|floatformat:2 }} {{ sm.item.unit }}
+                        </td>
+                        <td class="py-2.5 px-3 font-sans text-slate-600 text-[11px]">
+                            {{ sm.performed_by.full_name|default:sm.performed_by.email|default:"Sistema" }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="py-6 text-center text-xs text-slate-400 font-sans">
+                            Sin despachos de inventario registrados para esta orden de trabajo.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- 5. TIMELINE / BITÁCORA CRONOLÓGICA INMUTABLE DE AUDITORÍA         -->
+    <!-- ================================================================= -->
+    <div class="bg-white border border-slate-200 rounded p-5 space-y-4">
+        <div class="pb-3 border-b border-slate-100 flex items-center justify-between">
+            <div>
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Bitácora Cronológica Inmutable de Auditoría Operativa
+                </h3>
+                <p class="text-[11px] text-slate-500">Trazabilidad legal de eventos: fases, liberaciones SST, avances y evidencias</p>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-bold">
+                AUDIT LOG: INMUTABLE
+            </span>
+        </div>
+
+        <div class="relative pl-4 space-y-4 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 text-xs">
+            {% for log in timeline_logs %}
+            <div class="relative pl-3">
+                <span class="absolute -left-[14px] top-1.5 w-2.5 h-2.5 rounded-full bg-slate-400 border-2 border-white"></span>
+                <div class="flex items-center gap-2 font-mono text-[11px]">
+                    <span class="text-slate-400 tabular-nums">{{ log.created_at|date:"d/m/Y H:i:s" }}</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        {{ log.event_type }}
+                    </span>
+                    <span class="font-semibold text-slate-800">{{ log.actor.full_name|default:"Sistema" }}</span>
+                </div>
+                <div class="font-medium text-slate-900 mt-0.5 font-sans">
+                    {{ log.summary }}
+                </div>
+                {% if log.details %}
+                <p class="text-[11px] text-slate-500 font-sans mt-0.5 whitespace-pre-line leading-relaxed">
+                    {{ log.details }}
+                </p>
+                {% endif %}
+            </div>
+            {% empty %}
+            <div class="py-4 text-slate-400 text-xs">
+                Sin eventos registrados en la bitácora.
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Modal Agregar Partida Técnica (BOM) -->
+    {% if can_manage_phases %}
+    <div x-show="showItemModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-lg w-full p-5 space-y-4 shadow-none" @click.outside="showItemModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Nueva Partida Técnica para {{ work_order.number }}
+                </h3>
+                <button type="button" @click="showItemModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'operations:workorder_add_item' pk=work_order.pk %}" class="space-y-3">
+                {% csrf_token %}
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Tipo de Partida</label>
+                        {{ item_form.item_type }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Código</label>
+                        {{ item_form.code }}
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Descripción Técnica <span class="text-red-500">*</span></label>
+                    {{ item_form.description }}
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Unidad de Medida</label>
+                        {{ item_form.unit }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Cantidad Planificada</label>
+                        {{ item_form.planned_quantity }}
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button type="button" @click="showItemModal = false" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded transition-colors shadow-none">
+                        Guardar Partida
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Modal Subir Evidencia Técnica -->
+    {% if can_execute_items %}
+    <div x-show="showEvidenceModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-lg w-full p-5 space-y-4 shadow-none" @click.outside="showEvidenceModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Cargar Evidencia Técnica / Fotográfica
+                </h3>
+                <button type="button" @click="showEvidenceModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'operations:workorder_evidence_create' pk=work_order.pk %}" class="space-y-3">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Tipo de Evidencia</label>
+                    {{ evidence_form.evidence_type }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Título / Asunto <span class="text-red-500">*</span></label>
+                    {{ evidence_form.title }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Referencia o Nombre de Archivo</label>
+                    {{ evidence_form.file_reference }}
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Observaciones Técnicas</label>
+                    {{ evidence_form.notes }}
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button type="button" @click="showEvidenceModal = false" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded transition-colors shadow-none">
+                        Registrar Evidencia
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Modal Registrar Checklist Pre-Operacional para esta OT -->
+    <div x-show="showChecklistModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded max-w-xl w-full p-5 space-y-4 shadow-none" @click.outside="showChecklistModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="text-xs font-mono uppercase tracking-wider font-semibold text-slate-900">
+                    Checklist Pre-Operacional · {{ work_order.number }}
+                </h3>
+                <button type="button" @click="showChecklistModal = false" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form method="POST" action="{% url 'sst:checklist_create' %}" class="space-y-3">
+                {% csrf_token %}
+                <input type="hidden" name="work_order" value="{{ work_order.pk }}">
+                <input type="hidden" name="next" value="{{ request.path }}">
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Cuadrilla Asignada</label>
+                        {{ checklist_form.crew }}
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Tipo de Riesgo Operativo</label>
+                        {{ checklist_form.work_type }}
+                    </div>
+                </div>
+
+                <div class="p-3 bg-slate-50 border border-slate-200 rounded space-y-1.5 text-xs">
+                    <span class="text-[10px] font-mono uppercase text-slate-600 font-bold block mb-1">
+                        5 Verificaciones Obligatorias
+                    </span>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        {{ checklist_form.epp_verified }}
+                        <span class="text-[11px] text-slate-800">1. EPP completo inspeccionado y en uso</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        {{ checklist_form.loto_verified }}
+                        <span class="text-[11px] text-slate-800">2. Bloqueo LOTO / Desenergización</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        {{ checklist_form.tools_inspected }}
+                        <span class="text-[11px] text-slate-800">3. Herramientas y equipos en buen estado</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        {{ checklist_form.area_signaled }}
+                        <span class="text-[11px] text-slate-800">4. Área señalizada y delimitada</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        {{ checklist_form.risk_briefing_done }}
+                        <span class="text-[11px] text-slate-800">5. Charla pre-operacional 5 min realizada</span>
+                    </label>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Hallazgos o Condiciones Inseguras</label>
+                    {{ checklist_form.hazard_notes }}
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <button type="button" @click="showChecklistModal = false" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded transition-colors shadow-none">
+                        Presentar Checklist
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

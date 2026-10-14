@@ -1,0 +1,261 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Tecnología & Soporte IT · ERP SAS{% endblock %}
+{% block breadcrumb_section %}TECNOLOGÍA & ACTIVOS TI{% endblock %}
+{% block breadcrumb_page %}MESA DE AYUDA & HARDWARE{% endblock %}
+{% block page_title %}Tecnología, Soporte IT & Gestión de Activos Digitales{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2" x-data>
+    <button type="button" 
+            onclick="alert('Módulo de Apertura de Incidencia / Ticket de Soporte TI en línea.')"
+            class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        <span>Nuevo Ticket de Soporte</span>
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto" x-data="{ activeTab: 'assets' }">
+
+    <!-- ===================================================================== -->
+    <!-- BANDA TELEMÉTRICA DE KPIS TI (SWISS GRID 4 CELDAS DIVIDE-1PX)          -->
+    <!-- ===================================================================== -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 border border-zinc-200 rounded-[4px] bg-white">
+        <!-- KPI 1: Activos Inventariados -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">ACTIVOS TI REGISTRADOS</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    HARDWARE
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    {{ total_assets_count }} EQUIPOS
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    EN SERVICIO
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Estaciones, laptops & servidores</span>
+                <span class="font-mono text-[10px] text-zinc-500">100% Asignados</span>
+            </div>
+        </div>
+
+        <!-- KPI 2: Tickets de Mesa de Ayuda -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">MESA DE AYUDA / TICKETS</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    INCIDENCIAS
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    {{ open_tickets_count }} PENDIENTES
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    SLA AL DÍA
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Tiempo de respuesta promedio</span>
+                <span class="font-mono text-[10px] text-zinc-500">&lt; 25 min</span>
+            </div>
+        </div>
+
+        <!-- KPI 3: Licencias Cloud & Software -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">LICENCIAS DE SOFTWARE</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    SAAS & CLOUD
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    {{ total_licenses_assigned }} USUARIOS
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    ACTIVAS
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Microsoft 365, Autodesk, GitHub</span>
+                <span class="font-mono text-[10px] text-zinc-500">Conformidad 100%</span>
+            </div>
+        </div>
+
+        <!-- KPI 4: SLA Operativo TI -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">DISPONIBILIDAD INFRAESTRUCTURA</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    UPTIME
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    {{ system_uptime }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    SISTEMAS OK
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Red interna, VPN y Servidores</span>
+                <span class="font-mono text-[10px] text-zinc-500">30 Días Seguidos</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pestañas de Vista Rápida -->
+    <div class="border-b border-zinc-200">
+        <nav class="flex gap-6 text-xs font-mono">
+            <button type="button" @click="activeTab = 'assets'"
+                    :class="activeTab === 'assets' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
+                    class="py-2.5 transition-colors cursor-pointer">
+                1. Inventario de Hardware & Equipos ({{ hardware_assets|length }})
+            </button>
+            <button type="button" @click="activeTab = 'tickets'"
+                    :class="activeTab === 'tickets' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
+                    class="py-2.5 transition-colors cursor-pointer">
+                2. Mesa de Ayuda & Tickets ({{ active_tickets|length }})
+            </button>
+            <button type="button" @click="activeTab = 'licenses'"
+                    :class="activeTab === 'licenses' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
+                    class="py-2.5 transition-colors cursor-pointer">
+                3. Licencias Software & Nube ({{ software_licenses|length }})
+            </button>
+        </nav>
+    </div>
+
+    <!-- TAB 1: Hardware Assets -->
+    <div x-show="activeTab === 'assets'" class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="p-3 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+            <span class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider">
+                Catálogo de Equipos y Activos Asignados a Personal
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500">Normativa de Seguridad de Datos</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                        <th class="py-2 px-3 font-semibold">CÓDIGO ACTIVO</th>
+                        <th class="py-2 px-3 font-semibold">CATEGORÍA</th>
+                        <th class="py-2 px-3 font-semibold">MODELO / ESPECIFICACIÓN</th>
+                        <th class="py-2 px-3 font-semibold">RESPONSABLE ASIGNADO</th>
+                        <th class="py-2 px-3 font-semibold">GARANTÍA</th>
+                        <th class="py-2 px-3 text-center font-semibold">ESTADO</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 font-mono">
+                    {% for asset in hardware_assets %}
+                    <tr class="hover:bg-zinc-50/60 transition-colors">
+                        <td class="py-2.5 px-3 font-semibold text-zinc-900">{{ asset.code }}</td>
+                        <td class="py-2.5 px-3 text-zinc-600 font-sans">{{ asset.type }}</td>
+                        <td class="py-2.5 px-3 font-medium text-zinc-900 font-sans">{{ asset.model }}</td>
+                        <td class="py-2.5 px-3 text-zinc-700 font-sans">{{ asset.assigned_to }}</td>
+                        <td class="py-2.5 px-3 text-zinc-500 tabular-nums">{{ asset.warranty }}</td>
+                        <td class="py-2.5 px-3 text-center">
+                            <span class="px-2 py-0.5 text-[10px] font-mono border rounded-[3px] bg-zinc-50 border-zinc-200 text-zinc-800">
+                                {{ asset.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB 2: Support Tickets -->
+    <div x-show="activeTab === 'tickets'" class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="p-3 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+            <span class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider">
+                Mesa de Ayuda, Soporte Técnico y Solicitudes de Usuario
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500">Gestión de Incidentes</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                        <th class="py-2 px-3 font-semibold">FOLIO</th>
+                        <th class="py-2 px-3 font-semibold">ASUNTO / REQUERIMIENTO</th>
+                        <th class="py-2 px-3 font-semibold">SOLICITANTE</th>
+                        <th class="py-2 px-3 font-semibold">PRIORIDAD</th>
+                        <th class="py-2 px-3 font-semibold">FECHA</th>
+                        <th class="py-2 px-3 text-center font-semibold">ESTADO</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 font-mono">
+                    {% for ticket in active_tickets %}
+                    <tr class="hover:bg-zinc-50/60 transition-colors">
+                        <td class="py-2.5 px-3 font-semibold text-zinc-900">{{ ticket.folio }}</td>
+                        <td class="py-2.5 px-3 font-sans font-medium text-zinc-900">{{ ticket.subject }}</td>
+                        <td class="py-2.5 px-3 font-sans text-zinc-700">{{ ticket.requester }}</td>
+                        <td class="py-2.5 px-3">
+                            <span class="px-1.5 py-0.5 text-[10px] font-mono border rounded-[3px] {% if ticket.priority == 'CRÍTICA' %}border-red-200 bg-red-50 text-red-700{% elif ticket.priority == 'ALTA' %}border-amber-200 bg-amber-50 text-amber-700{% else %}border-zinc-200 bg-zinc-50 text-zinc-700{% endif %}">
+                                {{ ticket.priority }}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3 text-zinc-500 text-[11px] font-sans">{{ ticket.created_at }}</td>
+                        <td class="py-2.5 px-3 text-center">
+                            <span class="px-2 py-0.5 text-[10px] font-mono border rounded-[3px] {% if ticket.status == 'RESUELTO' or ticket.status == 'CERRADO' %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-zinc-200 bg-zinc-50 text-zinc-800{% endif %}">
+                                {{ ticket.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB 3: Software Licenses -->
+    <div x-show="activeTab === 'licenses'" class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="p-3 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+            <span class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider">
+                Suscripciones Corporativas, Software Profesional & Cloud
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500">Auditoría de Cumplimiento</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                        <th class="py-2 px-3 font-semibold">SOFTWARE / PLATAFORMA</th>
+                        <th class="py-2 px-3 font-semibold">PROVEEDOR</th>
+                        <th class="py-2 px-3 text-right font-semibold">LICENCIAS EN USO</th>
+                        <th class="py-2 px-3 text-right font-semibold">CUPO MÁXIMO</th>
+                        <th class="py-2 px-3 font-semibold">CICLO DE RENOVACIÓN</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 font-mono">
+                    {% for lic in software_licenses %}
+                    <tr class="hover:bg-zinc-50/60 transition-colors">
+                        <td class="py-2.5 px-3 font-sans font-medium text-zinc-900">{{ lic.name }}</td>
+                        <td class="py-2.5 px-3 font-sans text-zinc-600">{{ lic.vendor }}</td>
+                        <td class="py-2.5 px-3 text-right font-semibold text-zinc-900 tabular-nums">{{ lic.assigned }}</td>
+                        <td class="py-2.5 px-3 text-right text-zinc-500 tabular-nums">{{ lic.total }}</td>
+                        <td class="py-2.5 px-3 text-zinc-600 text-[11px] font-sans">{{ lic.renewal }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

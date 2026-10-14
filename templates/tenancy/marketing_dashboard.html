@@ -1,0 +1,223 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Marketing & Growth · ERP SAS{% endblock %}
+{% block breadcrumb_section %}MARKETING & CRECIMIENTO{% endblock %}
+{% block breadcrumb_page %}CAMPAÑAS & LEADS INBOUND{% endblock %}
+{% block page_title %}Marketing Digital, Campañas & Captación de Clientes{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2" x-data>
+    <button type="button" 
+            onclick="alert('Módulo de Alta y Lanzamiento de Nueva Campaña de Crecimiento en línea.')"
+            class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        <span>Nueva Campaña</span>
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto" x-data="{ activeTab: 'campaigns' }">
+
+    <!-- ===================================================================== -->
+    <!-- BANDA TELEMÉTRICA DE MARKETING (SWISS GRID 4 CELDAS DIVIDE-1PX)        -->
+    <!-- ===================================================================== -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 border border-zinc-200 rounded-[4px] bg-white">
+        <!-- KPI 1: Leads Inbound -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">LEADS CAPTADOS (MES)</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    INBOUND
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    {{ total_monthly_leads }} PROSPECTOS
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    +18% VS MES ANT.
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Canales: Google, LinkedIn & Web</span>
+                <span class="font-mono text-[10px] text-zinc-500">MQL Calificados</span>
+            </div>
+        </div>
+
+        <!-- KPI 2: Conversión a Cotización -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">CONVERSIÓN MQL &rarr; SQL</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    EMBUDO
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    {{ conversion_rate }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    OBJETIVO CUMPLIDO
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Leads transferidos al pipeline CRM</span>
+                <span class="font-mono text-[10px] text-zinc-500">23 Cotizados</span>
+            </div>
+        </div>
+
+        <!-- KPI 3: Inversión Publicitaria -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">PRESUPUESTO EJECUTADO</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    PAUTA ACTIVA
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    {{ active_ad_spend }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
+                    EN CONTROL
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Inversión bimonetaria distribuida</span>
+                <span class="font-mono text-[10px] text-zinc-500">3 Canales</span>
+            </div>
+        </div>
+
+        <!-- KPI 4: Costo de Adquisición (CPL) -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">COSTO POR LEAD (CPL)</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    UNITARIO
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    {{ avg_cpl }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    EFICIENTE
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Retorno sobre inversión publicitaria</span>
+                <span class="font-mono text-[10px] text-zinc-500">ROAS 4.8x</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pestañas de Vista Rápida -->
+    <div class="border-b border-zinc-200">
+        <nav class="flex gap-6 text-xs font-mono">
+            <button type="button" @click="activeTab = 'campaigns'"
+                    :class="activeTab === 'campaigns' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
+                    class="py-2.5 transition-colors cursor-pointer">
+                1. Campañas Publicitarias & Canales ({{ campaigns|length }})
+            </button>
+            <button type="button" @click="activeTab = 'leads'"
+                    :class="activeTab === 'leads' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
+                    class="py-2.5 transition-colors cursor-pointer">
+                2. Prospectos Entrantes & Leads ({{ inbound_leads|length }})
+            </button>
+        </nav>
+    </div>
+
+    <!-- TAB 1: Campaigns -->
+    <div x-show="activeTab === 'campaigns'" class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="p-3 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+            <span class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider">
+                Rendimiento de Campañas Activas por Canal de Adquisición
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500">Crecimiento B2B</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                        <th class="py-2 px-3 font-semibold">NOMBRE DE CAMPAÑA</th>
+                        <th class="py-2 px-3 font-semibold">CANAL / RED</th>
+                        <th class="py-2 px-3 text-right font-semibold">PRESUPUESTO</th>
+                        <th class="py-2 px-3 text-right font-semibold">EJECUTADO</th>
+                        <th class="py-2 px-3 text-right font-semibold">CLICS</th>
+                        <th class="py-2 px-3 text-right font-semibold">LEADS</th>
+                        <th class="py-2 px-3 text-center font-semibold">ESTADO</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 font-mono">
+                    {% for camp in campaigns %}
+                    <tr class="hover:bg-zinc-50/60 transition-colors">
+                        <td class="py-2.5 px-3 font-medium text-zinc-900 font-sans">{{ camp.name }}</td>
+                        <td class="py-2.5 px-3 text-zinc-600 font-sans">{{ camp.channel }}</td>
+                        <td class="py-2.5 px-3 text-right text-zinc-700 tabular-nums">{{ camp.budget }}</td>
+                        <td class="py-2.5 px-3 text-right font-semibold text-zinc-900 tabular-nums">{{ camp.spent }}</td>
+                        <td class="py-2.5 px-3 text-right text-zinc-600 tabular-nums">{{ camp.clicks }}</td>
+                        <td class="py-2.5 px-3 text-right font-semibold text-zinc-900 tabular-nums">{{ camp.leads }}</td>
+                        <td class="py-2.5 px-3 text-center">
+                            <span class="px-2 py-0.5 text-[10px] font-mono border rounded-[3px] {% if camp.status == 'ACTIVA' %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-zinc-200 bg-zinc-50 text-zinc-700{% endif %}">
+                                {{ camp.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB 2: Inbound Leads -->
+    <div x-show="activeTab === 'leads'" class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="p-3 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+            <span class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider">
+                Directorio de Prospectos Inbound y Oportunidades Entrantes
+            </span>
+            <span class="text-[11px] font-mono text-zinc-500">Integración Directa a CRM</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                        <th class="py-2 px-3 font-semibold">EMPRESA / PROSPECTO</th>
+                        <th class="py-2 px-3 font-semibold">CONTACTO PRINCIPAL</th>
+                        <th class="py-2 px-3 font-semibold">CANAL ORIGEN</th>
+                        <th class="py-2 px-3 font-semibold">INTERÉS COMERCIAL</th>
+                        <th class="py-2 px-3 font-semibold">FECHA</th>
+                        <th class="py-2 px-3 text-center font-semibold">ESTADO</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 font-mono">
+                    {% for lead in inbound_leads %}
+                    <tr class="hover:bg-zinc-50/60 transition-colors">
+                        <td class="py-2.5 px-3 font-medium text-zinc-900 font-sans">{{ lead.company }}</td>
+                        <td class="py-2.5 px-3 text-zinc-700 font-sans">
+                            <span class="block">{{ lead.contact }}</span>
+                            <span class="block text-[10px] text-zinc-400 font-mono">{{ lead.email }}</span>
+                        </td>
+                        <td class="py-2.5 px-3 text-zinc-600 font-sans">{{ lead.channel }}</td>
+                        <td class="py-2.5 px-3 text-zinc-800 font-sans">{{ lead.interest }}</td>
+                        <td class="py-2.5 px-3 text-zinc-500 text-[11px] font-sans">{{ lead.date }}</td>
+                        <td class="py-2.5 px-3 text-center">
+                            <span class="px-2 py-0.5 text-[10px] font-mono border rounded-[3px] {% if 'SQL' in lead.status or 'COTIZACIÓN' in lead.status %}border-emerald-200 bg-emerald-50 text-emerald-800 font-medium{% else %}border-zinc-200 bg-zinc-50 text-zinc-700{% endif %}">
+                                {{ lead.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

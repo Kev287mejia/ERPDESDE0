@@ -1,0 +1,204 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Consola Operativa & Autoridad RBAC{% endblock %}
+{% block breadcrumb_section %}GOBERNANZA{% endblock %}
+{% block breadcrumb_page %}CENTRO DE CONTROL{% endblock %}
+{% block page_title %}Consola Operativa & Matriz de Autoridad{% endblock %}
+
+{% block page_actions %}
+<button type="button" class="h-8 px-3 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5">
+    <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+    </svg>
+    <span>Sincronizar Métricas</span>
+</button>
+
+{% if nav_access.can_manage_org %}
+<a href="{% url 'tenancy:onboarding' %}" class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5">
+    <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+    </svg>
+    <span>Añadir Organización</span>
+</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-7xl mx-auto">
+
+    <!-- ===================================================================== -->
+    <!-- BANDA TELEMÉTRICA DE KPIS ADAPTATIVA (SWISS GRID MODULAR ESTRICTO)    -->
+    <!-- ===================================================================== -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-{{ kpi_cards|length|default:4 }} divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 border border-zinc-200 rounded-[4px] bg-white">
+        {% for card in kpi_cards %}
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">{{ card.title }}</span>
+                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
+                    {{ card.badge }}
+                </span>
+            </div>
+            <div class="flex items-baseline justify-between pt-1">
+                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
+                    {{ card.value }}
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    {{ card.badge_status }}
+                </span>
+            </div>
+            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span class="truncate">{{ card.subtitle }}</span>
+                <span class="font-mono text-[10px] text-zinc-500 flex-shrink-0">{{ card.tag }}</span>
+            </div>
+        </div>
+        {% empty %}
+        <!-- Fallback de compatibilidad -->
+        <div class="p-4 space-y-2">
+            <div class="flex items-center justify-between text-zinc-500">
+                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">MÓDULOS ACTIVOS</span>
+            </div>
+            <div class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight pt-1">
+                {{ kpis.enabled_modules_count }} / {{ kpis.total_modules_count|default:"7" }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- BANDA TÉCNICA DE IDENTIDAD FISCAL Y CONFIGURACIÓN CONTABLE EN VIVO   -->
+    <!-- ===================================================================== -->
+    <div class="border border-zinc-200 rounded-[4px] bg-zinc-50/60 p-3.5 text-xs font-mono text-zinc-600 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 divide-y sm:divide-y-0 divide-zinc-200">
+        <div>
+            <span class="text-[10px] text-zinc-400 block uppercase">EMPRESA / RAZÓN SOCIAL:</span>
+            <span class="font-medium text-zinc-900 truncate block font-sans text-xs" title="{{ current_org.legal_name }}">{{ current_org.legal_name|default:current_org.name }}</span>
+        </div>
+        <div>
+            <span class="text-[10px] text-zinc-400 block uppercase">{{ current_country.tax_id_label|default:"RUC" }} TRIBUTARIO:</span>
+            <span class="font-medium text-zinc-900 tabular-nums">{{ current_org.tax_id }}</span>
+        </div>
+        <div>
+            <span class="text-[10px] text-zinc-400 block uppercase">RÉGIMEN FISCAL DGI:</span>
+            <span class="font-medium text-zinc-900 truncate block" title="{{ current_org.get_tax_regime_display }}">{{ current_org.get_tax_regime_display }}</span>
+        </div>
+        <div>
+            <span class="text-[10px] text-zinc-400 block uppercase">GIRO / RUBRO:</span>
+            <span class="font-medium text-zinc-900 truncate block" title="{{ current_org.get_industry_display }}">{{ current_org.get_industry_display }}</span>
+        </div>
+        <div>
+            <span class="text-[10px] text-zinc-400 block uppercase">MONEDA OPERATIVA:</span>
+            <span class="font-medium text-zinc-900">{{ current_org.currency }} ({{ current_org.currency_symbol }})</span>
+        </div>
+        <div>
+            <span class="text-[10px] text-zinc-400 block uppercase">PLAN CONTABLE:</span>
+            <span class="font-medium text-zinc-900 truncate block" title="{{ current_org.get_accounting_template_display }}">{{ current_org.get_accounting_template_display }}</span>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TABLA DE ALTA DENSIDAD: MATRIZ DE AUTORIDAD JERÁRQUICA RBAC          -->
+    <!-- ===================================================================== -->
+    <div class="border border-zinc-200 rounded-[4px] bg-white overflow-hidden">
+        
+        <!-- Cabecera de la Consola -->
+        <div class="p-4 border-b border-zinc-200 bg-zinc-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-zinc-900"></span>
+                    <h2 class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider">
+                        Matriz de Autoridad Jerárquica & Gobierno Corporativo
+                    </h2>
+                </div>
+                <p class="text-xs text-zinc-500 mt-1">
+                    Políticas de delegación, segregación de funciones y firmas autorizadas para <strong class="text-zinc-800">{{ current_org.name }}</strong>.
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-[10px] font-mono text-zinc-400 uppercase">SU NIVEL ACTIVO:</span>
+                <span class="px-2.5 py-1 rounded-[4px] text-xs font-mono font-medium bg-zinc-900 text-white">
+                    LVL-{{ current_role_level }} · {{ current_role_label|upper }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Tabla de Datos RBAC Estilo Hoja de Cálculo -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-zinc-200 bg-zinc-50 text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
+                        <th class="py-2.5 px-4 font-medium w-24">NIVEL</th>
+                        <th class="py-2.5 px-4 font-medium">ROL JERÁRQUICO</th>
+                        <th class="py-2.5 px-4 font-medium">ALCANCE OPERATIVO</th>
+                        <th class="py-2.5 px-4 font-medium">DESCRIPCIÓN DE PRIVILEGIOS & PERMISOS</th>
+                        <th class="py-2.5 px-4 font-medium text-center w-32">ESTADO SESIÓN</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 text-[13px] font-sans">
+                    {% for row in rbac_matrix %}
+                    <tr class="{% if current_role_level == row.level %}bg-zinc-100/70 border-l-2 border-l-zinc-900 font-medium{% else %}hover:bg-zinc-50/70{% endif %} transition-colors">
+                        
+                        <!-- Nivel Numérico -->
+                        <td class="py-2.5 px-4 font-mono font-medium tabular-nums text-zinc-900 whitespace-nowrap">
+                            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-[4px] text-[11px] font-mono {% if current_role_level == row.level %}bg-zinc-900 text-white{% else %}bg-zinc-50 text-zinc-700 border border-zinc-200{% endif %}">
+                                {{ row.level }}
+                            </span>
+                        </td>
+
+                        <!-- Nombre del Rol -->
+                        <td class="py-2.5 px-4 font-medium text-zinc-900 whitespace-nowrap">
+                            {{ row.name }}
+                        </td>
+
+                        <!-- Alcance Operativo -->
+                        <td class="py-2.5 px-4 font-mono text-[11px] text-zinc-600 whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded-[4px] bg-zinc-50 border border-zinc-200 text-zinc-600 font-medium">
+                                {{ row.scope }}
+                            </span>
+                        </td>
+
+                        <!-- Descripción -->
+                        <td class="py-2.5 px-4 text-zinc-600 text-xs leading-relaxed">
+                            {{ row.description }}
+                        </td>
+
+                        <!-- Estado en la Sesión Actual -->
+                        <td class="py-2.5 px-4 text-center whitespace-nowrap font-mono text-[10px]">
+                            {% if current_role_level == row.level %}
+                            <span class="inline-flex items-center gap-1.5 text-white font-medium bg-zinc-900 px-2 py-0.5 rounded-[4px]">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                ASIGNADO
+                            </span>
+                            {% elif current_role_level > row.level %}
+                            <span class="inline-flex items-center gap-1.5 text-zinc-700 font-medium bg-zinc-50 px-2 py-0.5 rounded-[4px] border border-zinc-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                                AUTORIZADO
+                            </span>
+                            {% else %}
+                            <span class="text-zinc-400 font-medium">
+                                RESTRINGIDO
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pie de Tabla con Respaldo Normativo -->
+        <div class="p-3 border-t border-zinc-200 bg-zinc-50/50 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 gap-2">
+            <div class="flex items-center gap-2">
+                <span class="font-medium text-zinc-700">Marco Normativo:</span>
+                <span class="text-zinc-500 text-[11px]">Ley 618 Higiene & Seguridad MITRAB &bull; Ley 822 Concertación Tributaria DGI</span>
+            </div>
+            <div class="flex items-center gap-2 font-mono text-[11px]">
+                <span class="text-zinc-400">RUC TENANT:</span>
+                <span class="text-zinc-900 font-medium tabular-nums">{{ current_org.tax_id }}</span>
+                <span class="text-zinc-300">/</span>
+                <span class="text-zinc-600">Jurisdicción {{ current_country.name }} ({{ current_country.code }})</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

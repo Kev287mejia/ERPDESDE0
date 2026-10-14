@@ -1,0 +1,268 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}
+{% if is_field_tech %}Mis Tareas de Hoy · Operaciones{% else %}Órdenes de Trabajo (OT) · Operaciones{% endif %}
+{% endblock %}
+
+{% block breadcrumb_section %}INGENIERÍA & CAMPO{% endblock %}
+{% block breadcrumb_page %}
+{% if is_field_tech %}MIS TAREAS DE CAMPO{% else %}ÓRDENES DE TRABAJO{% endif %}
+{% endblock %}
+
+{% block page_title %}
+{% if is_field_tech %}
+Consola de Campo & Tareas Asignadas (Técnico)
+{% else %}
+Tablero Maestro de Órdenes de Trabajo & Ejecución
+{% endif %}
+{% endblock %}
+
+{% block page_actions %}
+{% if not is_field_tech and current_role_level >= 80 %}
+<a href="{% url 'operations:workorder_create' %}" 
+   class="px-3.5 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 shadow-xs">
+    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+    </svg>
+    <span>Nueva Orden de Trabajo</span>
+</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="space-y-5 max-w-7xl mx-auto">
+
+    {% if is_field_tech %}
+    <!-- ================================================================= -->
+    <!-- VISTA PERSONALIZADA TÉCNICO DE CAMPO (NIVEL 20): MIS TAREAS      -->
+    <!-- ================================================================= -->
+    <div class="p-4 bg-white border border-slate-200/90 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono shadow-subtle">
+        <div class="flex items-center gap-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
+                CUADRILLAS VINCULADAS
+            </span>
+            <div class="text-slate-700 font-sans">
+                {% for c in user_crews %}
+                <span class="font-bold text-slate-900 font-mono">{{ c.code }}</span> ({{ c.name }}){% if not forloop.last %} &bull; {% endif %}
+                {% empty %}
+                <span class="text-slate-400">Sin cuadrilla activa asignada</span>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div>
+                <span class="text-slate-400 text-[10px] uppercase font-semibold">TOTAL OTs ASIGNADAS:</span>
+                <span class="font-bold text-slate-900 text-sm tabular-nums ml-1">{{ total_tasks }}</span>
+            </div>
+            <div>
+                <span class="text-slate-400 text-[10px] uppercase font-semibold">EN CAMPO:</span>
+                <span class="font-bold text-emerald-700 text-sm tabular-nums ml-1">{{ in_progress_tasks }}</span>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- ================================================================= -->
+    <!-- CONSOLA MAESTRA INGENIERÍA / COORDINACIÓN (NIVEL 50+)             -->
+    <!-- ================================================================= -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 text-xs font-mono">
+        <div class="p-3 bg-white border border-slate-200/90 rounded-xl shadow-xs border-t-2 border-t-slate-800">
+            <span class="text-[9px] uppercase text-slate-400 block tracking-wider font-semibold">TOTAL OTs</span>
+            <span class="text-lg font-bold text-slate-900 tabular-nums mt-0.5 block">{{ total_count }}</span>
+        </div>
+        <div class="p-3 bg-white border border-slate-200/90 rounded-xl shadow-xs border-t-2 border-t-slate-400">
+            <span class="text-[9px] uppercase text-slate-500 block tracking-wider font-semibold">01 · APERTURA</span>
+            <span class="text-lg font-bold text-slate-700 tabular-nums mt-0.5 block">{{ draft_count }}</span>
+        </div>
+        <div class="p-3 bg-white border border-slate-200/90 rounded-xl shadow-xs border-t-2 border-t-blue-500">
+            <span class="text-[9px] uppercase text-blue-600 block tracking-wider font-semibold">02 · INGENIERÍA</span>
+            <span class="text-lg font-bold text-blue-700 tabular-nums mt-0.5 block">{{ engineering_count }}</span>
+        </div>
+        <div class="p-3 bg-white border border-slate-200/90 rounded-xl shadow-xs border-t-2 border-t-purple-500">
+            <span class="text-[9px] uppercase text-purple-600 block tracking-wider font-semibold">03 · PROGRAMADA</span>
+            <span class="text-lg font-bold text-purple-700 tabular-nums mt-0.5 block">{{ scheduled_count }}</span>
+        </div>
+        <div class="p-3 bg-white border border-slate-200/90 rounded-xl shadow-xs border-t-2 border-t-amber-500">
+            <span class="text-[9px] uppercase text-amber-600 block tracking-wider font-semibold">04 · EN CAMPO</span>
+            <span class="text-lg font-bold text-amber-700 tabular-nums mt-0.5 block">{{ in_progress_count }}</span>
+        </div>
+        <div class="p-3 bg-white border border-slate-200/90 rounded-xl shadow-xs border-t-2 border-t-emerald-500">
+            <span class="text-[9px] uppercase text-emerald-600 block tracking-wider font-semibold">05 · CALIDAD</span>
+            <span class="text-lg font-bold text-emerald-700 tabular-nums mt-0.5 block">{{ quality_count }}</span>
+        </div>
+        <div class="p-3 bg-white border border-slate-200/90 rounded-xl shadow-xs border-t-2 border-t-slate-700">
+            <span class="text-[9px] uppercase text-slate-700 block tracking-wider font-semibold">06 · CERRADAS</span>
+            <span class="text-lg font-bold text-slate-900 tabular-nums mt-0.5 block">{{ completed_count }}</span>
+        </div>
+    </div>
+
+    <!-- Barra de Filtros Técnicos -->
+    <div class="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-subtle">
+        <form method="GET" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div class="relative flex-1">
+                <svg class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+                </svg>
+                <input type="text" 
+                       name="q" 
+                       value="{{ search_query }}"
+                       placeholder="Buscar por folio OT, título de obra, cliente o sitio..."
+                       class="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 font-sans text-slate-800 placeholder-slate-400 shadow-xs transition-colors">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+                <select name="phase" class="text-xs py-2 px-2.5 border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono shadow-xs">
+                    <option value="">— Todas las Fases —</option>
+                    {% for code, label in phase_choices %}
+                    <option value="{{ code }}" {% if current_phase == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+
+                <select name="priority" class="text-xs py-2 px-2.5 border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono shadow-xs">
+                    <option value="">— Prioridad —</option>
+                    {% for code, label in priority_choices %}
+                    <option value="{{ code }}" {% if current_priority == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+
+                <select name="crew" class="text-xs py-2 px-2.5 border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-600 shadow-xs">
+                    <option value="">— Cuadrilla —</option>
+                    {% for c in crews %}
+                    <option value="{{ c.id }}" {% if current_crew == c.id|stringformat:"s" %}selected{% endif %}>{{ c.code }} · {{ c.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <label class="flex items-center gap-1.5 px-2.5 py-2 border border-slate-200 rounded-lg bg-slate-50 text-[11px] font-mono text-slate-700 cursor-pointer shadow-xs">
+                    <input type="checkbox" name="high_risk" value="1" {% if current_high_risk == '1' %}checked{% endif %} class="rounded border-slate-300 text-slate-900 focus:ring-slate-900 h-3.5 w-3.5">
+                    <span class="font-semibold text-slate-800">ALTO RIESGO</span>
+                </label>
+
+                <button type="submit" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs">
+                    Filtrar
+                </button>
+
+                {% if search_query or current_phase or current_priority or current_crew or current_high_risk %}
+                <a href="{% url 'operations:workorder_list' %}" class="px-3 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs rounded-lg transition-colors">
+                    Limpiar
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Tabla Técnica de Órdenes de Trabajo (Confidencialidad: CERO PRECIOS) -->
+    <div class="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-subtle">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-slate-50/75 border-b border-slate-200/80 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
+                        <th class="py-2.5 px-3.5 font-semibold">Folio OT</th>
+                        <th class="py-2.5 px-3.5 font-semibold">Cliente / Ubicación</th>
+                        <th class="py-2.5 px-3.5 font-semibold">Trabajo / Alcance</th>
+                        <th class="py-2.5 px-3.5 font-semibold text-center">Prioridad</th>
+                        <th class="py-2.5 px-3.5 font-semibold text-center">Fase de Ingeniería</th>
+                        <th class="py-2.5 px-3.5 font-semibold text-center">Seguridad SST</th>
+                        <th class="py-2.5 px-3.5 font-semibold">Cuadrilla / Vehículo</th>
+                        <th class="py-2.5 px-3.5 font-semibold">Programación</th>
+                        <th class="py-2.5 px-3.5 text-right font-semibold">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for wo in work_orders %}
+                    <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="py-2.5 px-3.5 font-mono font-bold text-blue-700 tabular-nums whitespace-nowrap">
+                            <a href="{% url 'operations:workorder_detail' pk=wo.pk %}" class="hover:underline">
+                                {{ wo.number }}
+                            </a>
+                        </td>
+                        <td class="py-2.5 px-3.5">
+                            <div class="font-semibold text-slate-900">{{ wo.account.commercial_name }}</div>
+                            <div class="text-[11px] text-slate-400 truncate max-w-xs mt-0.5">{{ wo.site_address|default:wo.account.city }}</div>
+                        </td>
+                        <td class="py-2.5 px-3.5 text-slate-800">
+                            <div class="font-medium truncate max-w-xs">{{ wo.title }}</div>
+                            {% if wo.source_quote %}
+                            <div class="text-[10px] font-mono text-slate-400 mt-0.5">Origen: {{ wo.source_quote.number }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 font-mono text-[11px] text-center whitespace-nowrap">
+                            {% if wo.priority == 'CRITICAL' %}
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60">CRÍTICA</span>
+                            {% elif wo.priority == 'HIGH' %}
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">ALTA</span>
+                            {% elif wo.priority == 'NORMAL' %}
+                            <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200/80">NORMAL</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-500 border border-slate-200/60">BAJA</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-center whitespace-nowrap">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold border
+                                {% if wo.phase == 'IN_PROGRESS' %}bg-amber-50 text-amber-700 border-amber-200/70
+                                {% elif wo.phase == 'COMPLETED' %}bg-emerald-50 text-emerald-700 border-emerald-200/70
+                                {% elif wo.phase == 'QUALITY_CHECK' %}bg-blue-50 text-blue-700 border-blue-200/70
+                                {% elif wo.phase == 'SCHEDULED' %}bg-purple-50 text-purple-700 border-purple-200/70
+                                {% elif wo.phase == 'ENGINEERING' %}bg-cyan-50 text-cyan-700 border-cyan-200/70
+                                {% else %}bg-slate-100 text-slate-700 border-slate-200/80{% endif %}">
+                                <span class="w-1.5 h-1.5 rounded-full {% if wo.phase == 'IN_PROGRESS' %}bg-amber-500{% elif wo.phase == 'COMPLETED' %}bg-emerald-500{% elif wo.phase == 'QUALITY_CHECK' %}bg-blue-500{% elif wo.phase == 'SCHEDULED' %}bg-purple-500{% elif wo.phase == 'ENGINEERING' %}bg-cyan-500{% else %}bg-slate-400{% endif %}"></span>
+                                {{ wo.get_phase_display }}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3.5 font-mono text-[11px] text-center whitespace-nowrap">
+                            {% if wo.is_high_risk %}
+                                {% if wo.sst_cleared %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70">LIBERADO SST</span>
+                                {% else %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200/70">BLOQUEO SST</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-slate-400 text-[10px]">Riesgo Estándar</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 font-mono text-slate-700 whitespace-nowrap">
+                            {% if wo.assigned_crew %}
+                            <div class="font-bold text-slate-900">{{ wo.assigned_crew.code }}</div>
+                            <div class="text-[10px] text-slate-400">{{ wo.assigned_crew.vehicle_plate|default:"Sin Vehículo" }}</div>
+                            {% else %}
+                            <span class="text-slate-400">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 font-mono text-[11px] text-slate-600 tabular-nums whitespace-nowrap">
+                            {% if wo.scheduled_start %}
+                            {{ wo.scheduled_start|date:"d/m" }}{% if wo.scheduled_end %} - {{ wo.scheduled_end|date:"d/m" }}{% endif %}
+                            {% else %}
+                            <span class="text-slate-400">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-right whitespace-nowrap">
+                            <a href="{% url 'operations:workorder_detail' pk=wo.pk %}" 
+                               class="px-2.5 py-1 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md text-xs font-medium transition-colors inline-flex items-center gap-1 shadow-xs">
+                                <span>Consola OT</span>
+                                <svg class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                                </svg>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="py-12 text-center text-slate-400">
+                            <p class="font-semibold text-slate-700 text-xs">No hay Órdenes de Trabajo en este tablero.</p>
+                            <p class="text-[11px] text-slate-400 mt-1">
+                                {% if is_field_tech %}
+                                No tiene tareas asignadas a su cuadrilla operativa en este momento.
+                                {% else %}
+                                Genere una OT desde una Cotización aprobada o cree una manualmente.
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

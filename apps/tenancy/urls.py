@@ -1,0 +1,30 @@
+from django.urls import path
+from apps.tenancy import views_modules, views_onboarding, views_team
+
+app_name = 'tenancy'
+
+urlpatterns = [
+    # Espacio de Trabajo Principal (Dashboard Operativo)
+    path('', views_onboarding.DashboardWorkspaceView.as_view(), name='dashboard'),
+
+    # Flujo de Onboarding Multi-País
+    path('onboarding/', views_onboarding.OnboardingWizardView.as_view(), name='onboarding'),
+    path('onboarding/validate-ruc/', views_onboarding.validate_ruc_htmx, name='validate_ruc_htmx'),
+
+    # Conmutador de Organizaciones Activas
+    path('switch-org/<uuid:org_id>/', views_onboarding.SwitchOrganizationView.as_view(), name='switch_org'),
+    path('switch-org/', views_onboarding.SwitchOrganizationView.as_view(), name='switch_org_post'),
+
+    # Simulador de Rol Jerárquico en Tiempo Real (Exclusivo Owner 100)
+    path('settings/simulate-role/', views_team.SimulateRoleView.as_view(), name='simulate_role'),
+
+    # Gobierno Corporativo, Nómina y Módulos en Caliente
+    path('settings/team/', views_team.TeamListView.as_view(), name='team_management'),
+    path('settings/team/create/', views_team.TeamCreateMemberView.as_view(), name='team_create'),
+    path('settings/team/<uuid:membership_id>/update/', views_team.MemberRoleUpdateView.as_view(), name='member_update'),
+    path('settings/modules/', views_team.OrganizationModulesUpdateView.as_view(), name='update_modules'),
+
+    # Subsistemas Dinámicos Opcionales
+    path('tech/', views_modules.TechDashboardView.as_view(), name='tech_dashboard'),
+    path('marketing/', views_modules.MarketingDashboardView.as_view(), name='marketing_dashboard'),
+]
