@@ -490,3 +490,113 @@ class TenancyOnboardingAndStrictModularTestCase(TestCase):
         self.assertIn('http://127.0.0.1:8000/auth/register/', output)
 
 
+class SandboxViewControlsTestCase(TestCase):
+    """
+    Suite de pruebas para los controladores interactivos de carga y vaciado del Sandbox.
+    """
+
+    def setUp(self):
+        self.country_ni, _ = CountryConfig.objects.get_or_create(
+            code='NI',
+            defaults={
+                'name': 'Nicaragua',
+                'flag_emoji': 'NI',
+                'primary_currency_code': 'NIO',
+                'primary_currency_symbol': 'C$',
+                'tax_id_label': 'RUC',
+                'tax_id_regex': r'^[A-Z]\d{13}$',
+                'is_active': True,
+                'default_tax_rate': Decimal('15.00'),
+                'default_tax_name': 'IVA',
+            }
+        )
+        self.owner = User.objects.create_user(
+            email='owner.sandbox@empresa.ni',
+            password='Password123!',
+            full_name='Owner Sandbox',
+        )
+        self.subordinate = User.objects.create_user(
+            email='subordinate@empresa.ni',
+            password='Password123!',
+            full_name='Subordinate User',
+        )
+        self.org = Organization.objects.create(
+            name='CONSTRUCCIONES S.A.',
+            legal_name='Construcciones de Nicaragua S.A.',
+            tax_id='J0310000112233',
+            country=self.country_ni,
+            currency=Organization.Currency.NIO,
+            tax_regime=Organization.TaxRegime.GENERAL,
+            industry=Organization.Industry.CONSTRUCTION,
+            accounting_template=Organization.AccountingTemplate.NIIF_PYMES,
+            enabled_modules=['crm', 'operations', 'sst', 'inventory', 'finance'],
+        )
+        OrganizationMembership.objects.create(
+            user=self.owner,
+            organization=self.org,
+            role_level=RoleLevel.OWNER_ADMIN,
+            job_title='Director General',
+            is_active=True,
+            is_default_org=True,
+        )
+        OrganizationMembership.objects.create(
+            user=self.subordinate,
+            organization=self.org,
+            role_level=RoleLevel.ENGINEER,
+            job_title='Ingeniero Residente',
+            is_active=True,
+        )
+        self.client = Client()
+
+    def test_load_sandbox_data_allowed_for_owner(self):
+        """Verifica que el Owner pueda cargar el escenario mediante POST a /settings/sandbox/load/."""
+        self.client.force_login(self.owner)
+        session = self.client.session
+        session['active_org_id'] = str(self.org.id)
+        session.save()
+
+        response = self.client.post(reverse('tenancy:sandbox_load'), follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        from apps.crm.models import Account
+        self.assertEqual(Account.objects.filter(organization=self.org).count(), 5)
+
+    def test_load_sandbox_data_forbidden_for_subordinate(self):
+        """Verifica que un rol inferior a 100 reciba 403 Forbidden al intentar cargar el escenario."""
+        self.client.force_login(self.subordinate)
+        session = self.client.session
+        session['active_org_id'] = str(self.org.id)
+        session.save()
+
+        response = self.client.post(reverse('tenancy:sandbox_load'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_reset_sandbox_data_allowed_for_owner(self):
+        """Verifica que el Owner pueda vaciar el escenario mediante POST a /settings/sandbox/reset/."""
+        self.client.force_login(self.owner)
+        session = self.client.session
+        session['active_org_id'] = str(self.org.id)
+        session.save()
+
+        # Poblar primero
+        self.client.post(reverse('tenancy:sandbox_load'), follow=True)
+
+        # Vaciar
+        response = self.client.post(reverse('tenancy:sandbox_reset'), follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        from apps.crm.models import Account
+        self.assertEqual(Account.objects.filter(organization=self.org).count(), 0)
+
+    def test_reset_sandbox_data_forbidden_for_subordinate(self):
+        """Verifica que un subordinado reciba 403 Forbidden al intentar vaciar datos de la empresa."""
+        self.client.force_login(self.subordinate)
+        session = self.client.session
+        session['active_org_id'] = str(self.org.id)
+        session.save()
+
+        response = self.client.post(reverse('tenancy:sandbox_reset'))
+        self.assertEqual(response.status_code, 403)
+
+
+

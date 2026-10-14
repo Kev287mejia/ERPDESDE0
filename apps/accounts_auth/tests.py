@@ -63,3 +63,30 @@ class CorporateRegisterTestCase(TestCase):
 
         register_res = self.client.get(reverse('accounts_auth:register'))
         self.assertContains(register_res, reverse('accounts_auth:login'))
+
+
+class QuickSandboxLoginTestCase(TestCase):
+    """
+    Suite de pruebas para el acceso instantáneo de 1-Clic al Sandbox Demo.
+    """
+
+    def setUp(self):
+        self.client = Client()
+
+    def test_quick_sandbox_login_post_authenticates_and_redirects(self):
+        """Verifica que POST a sandbox_login cree o autentique al usuario demo y redirija al dashboard."""
+        response = self.client.post(reverse('accounts_auth:sandbox_login'))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('tenancy:dashboard'))
+
+        # Comprueba que el usuario evaluador existe y la sesión está activa
+        user = User.objects.filter(email='evaluador@eternallabs.ni').first()
+        self.assertIsNotNone(user)
+        self.assertEqual(self.client.session.get('_auth_user_id'), str(user.pk))
+
+        # Comprueba que la organización de IMESA fue creada y seteada en la sesión
+        from apps.tenancy.models import Organization
+        org = Organization.objects.filter(slug='imesa-ingenieria').first()
+        self.assertIsNotNone(org)
+        self.assertEqual(self.client.session.get('active_org_id'), str(org.id))
+

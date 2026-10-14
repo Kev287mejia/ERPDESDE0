@@ -103,6 +103,27 @@
             </div>
         </form>
 
+        <!-- Separador Técnico: Modo Evaluación de Producto & UX -->
+        <div class="px-6 py-4 border-t border-zinc-200 bg-zinc-50/50">
+            <div class="flex items-center justify-between mb-2.5">
+                <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-semibold">
+                    MODO EVALUACIÓN DE PRODUCTO &amp; UX
+                </span>
+                <span class="text-[10px] font-mono text-zinc-400">DEMO-LIVE</span>
+            </div>
+            <form method="POST" action="{% url 'accounts_auth:sandbox_login' %}">
+                {% csrf_token %}
+                <button type="submit"
+                        class="w-full h-9 bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 text-xs font-medium rounded-[4px] transition-colors flex items-center justify-center gap-2 cursor-pointer">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                    <span>Ingresar al Sandbox Industrial (1-Clic Demo)</span>
+                </button>
+            </form>
+            <p class="text-[10px] font-mono text-zinc-400 mt-2 text-center">
+                Acceso directo con privilegios Root (100) y datos operativos precargados
+            </p>
+        </div>
+
         <!-- Selector Rápido de Roles para Simulación / Pruebas -->
         <div class="bg-zinc-50 border-t border-zinc-200 p-4 rounded-b-[4px]">
             <div class="flex items-center justify-between mb-2">

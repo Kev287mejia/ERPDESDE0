@@ -10,12 +10,14 @@ from django.views import View
 from django.views.decorators.http import require_GET
 
 from apps.core.models import CountryConfig
+from apps.core.services.sandbox_seeder import SandboxScenarioSeeder
 from apps.crm.models import Quote
 from apps.operations.models import WorkOrder
 from apps.sst.models import SafetyChecklist, LeaveRequest
 from apps.tenancy.constants import ERP_MODULES_CATALOG
 from apps.tenancy.forms import OrganizationOnboardingForm
 from apps.tenancy.models import Organization, OrganizationMembership, RoleLevel
+from apps.tenancy.permissions import RoleLevelRequiredMixin
 
 
 class OnboardingWizardView(LoginRequiredMixin, View):
@@ -451,3 +453,47 @@ def validate_ruc_htmx(request):
             f'<span>Formato inválido (requiere 14 dígitos o cédula ej: 001-290590-0001A).</span>'
             f'</div>'
         )
+
+
+class LoadSandboxDataView(RoleLevelRequiredMixin, View):
+    """
+    Carga interactiva de escenario industrial real para Nicaragua.
+    Exclusivo para Owner / Administrador General (Nivel 100).
+    """
+    min_role_level = RoleLevel.OWNER_ADMIN
+
+    def post(self, request, *args, **kwargs):
+        if getattr(request, 'real_role_level', 0) < RoleLevel.OWNER_ADMIN:
+            messages.error(request, "Solo el Administrador General puede ejecutar la carga del escenario demo.")
+            return redirect('tenancy:dashboard')
+
+        stats = SandboxScenarioSeeder.populate_for_organization(request.organization, request.user)
+        messages.success(
+            request,
+            f"Escenario industrial de Nicaragua cargado con éxito: {stats['accounts_count']} cuentas, "
+            f"{stats['quotes_count']} cotizaciones, {stats['work_orders_count']} OTs, "
+            f"{stats['warehouses_count']} bodegas y cuentas bancarias actualizadas."
+        )
+        referer = request.META.get('HTTP_REFERER')
+        return redirect(referer if referer else 'tenancy:dashboard')
+
+
+class ResetSandboxDataView(RoleLevelRequiredMixin, View):
+    """
+    Vaciado de datos de prueba del tenant para pruebas en blanco.
+    Exclusivo para Owner / Administrador General (Nivel 100).
+    """
+    min_role_level = RoleLevel.OWNER_ADMIN
+
+    def post(self, request, *args, **kwargs):
+        if getattr(request, 'real_role_level', 0) < RoleLevel.OWNER_ADMIN:
+            messages.error(request, "Solo el Administrador General puede reiniciar los datos del tenant.")
+            return redirect('tenancy:dashboard')
+
+        SandboxScenarioSeeder.reset_organization_data(request.organization)
+        messages.warning(
+            request,
+            "Datos operativos de prueba vaciados. La organización y su usuario administrador se conservan limpios."
+        )
+        referer = request.META.get('HTTP_REFERER')
+        return redirect(referer if referer else 'tenancy:dashboard')

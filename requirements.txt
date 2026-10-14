@@ -17,6 +17,9 @@ dj-database-url>=2.1.0
 # Servidor de Archivos Estáticos de Alto Rendimiento
 whitenoise>=6.6.0
 
+# Servidor de Aplicaciones WSGI para Producción
+gunicorn>=22.0.0
+
 # Utilidades de Zona Horaria y Tipado
 tzdata>=2025.1
 typing-extensions>=4.12.0

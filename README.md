@@ -76,33 +76,84 @@ La interfaz del sistema prescinde completamente del panel genérico administrati
 
 ## 4. Guía Rápida para Evaluadores (UX / Marketing & Producto)
 
-Esta sección permite a los evaluadores de diseño, mercadeo y analistas funcionales desplegar y auditar el sistema en menos de dos minutos sin requerir configuración técnica manual previa:
+Esta sección permite a los evaluadores de diseño, mercadeo y analistas de producto auditar el sistema en menos de un minuto con datos industriales reales de Nicaragua (cero configuraciones manuales requeridas):
 
-### Paso 1: Inicialización Autónoma del Entorno Sandbox
-Tras clonar el repositorio e instalar las dependencias, ejecute el comando integral de preparación:
+### Acceso Inmediato: Botón "1-Clic Demo Sandbox"
+1. Inicie el servidor local (`python manage.py runserver`) o acceda a la URL de producción y navegue a:
+   ```
+   http://127.0.0.1:8000/auth/login/
+   ```
+2. Debajo del formulario de acceso, en el panel **MODO EVALUACIÓN DE PRODUCTO & UX**, pulse el botón:
+   `Ingresar al Sandbox Industrial (1-Clic Demo)`
+3. El sistema autenticará automáticamente la sesión del evaluador (`evaluador@eternallabs.ni`) con privilegios completos de Owner (Nivel 100) en la organización industrial demostrativa **IMESA INGENIERÍA S.A.** (RUC `J0310000458912`) y redirigirá directamente al Centro de Control.
+
+### Controles Interactivos de Datos en Interfaz (Swiss Grid Controls)
+En el Centro de Control (`/tenancy/dashboard/`) y en la Consola de Personal (`/tenancy/team/`), el usuario Nivel 100 dispone de un panel técnico superior con dos acciones inmediatas:
+- **Cargar Escenario Industrial NI:** Regenera de forma idempotente todas las entidades operativas en los 6 subsistemas (personal RBAC, cuentas corporativas, oportunidades, cotizaciones NIO/USD, cuadrillas, OTs con bitácora, checklists Ley 618 MITRAB, bodegas, materiales, Kardex y cajas chicas).
+- **Vaciar Datos de Prueba:** Purga de forma segura todos los registros operativos de prueba, conservando intacta la organización y la cuenta del evaluador para auditoría de estados vacíos.
+
+### Inicialización por Terminal (CLI Alternativo)
+Si prefiere aprovisionar el entorno desde la consola de comandos, ejecute:
 ```bash
 python manage.py prepare_sandbox
 ```
-*Este comando aplica las migraciones estructurales, precarga la matriz de jurisdicciones fiscales de Centroamérica y deja la plataforma lista para interacción inmediata. Si desea purgar organizaciones residuales de pruebas previas, puede añadir el argumento `--reset`.*
+*Argumentos opcionales:*
+- `python manage.py prepare_sandbox --reset`: Limpia previamente las organizaciones residuales de pruebas antes de sembrar los datos.
 
-### Paso 2: Registro Corporativo Autónomo
-Inicie el servidor local (`python manage.py runserver`) e ingrese a la interfaz de registro corporativo:
-```
-http://127.0.0.1:8000/auth/register/
-```
-Complete el registro con su nombre, correo y contraseña. El sistema iniciará su sesión de forma automática y lo transferirá al **Onboarding Wizard** en 3 fases:
-1. **Jurisdicción Fiscal:** Seleccione el país de operación correspondiente (Nicaragua activa por defecto).
-2. **Identidad Tributaria:** Ingrese la marca comercial, razón social, identificador fiscal (RUC) y rubro industrial.
-3. **Arquitectura Modular:** Habilite únicamente los subsistemas operativos que desea contratar (CRM, Operaciones, SST, Inventarios, Finanzas, Tecnología o Marketing).
-
-### Paso 3: Auditoría con el Simulador de Roles en Tiempo Real
-Al culminar el Onboarding, accederá a la Consola Operativa central como Administrador General (Nivel 100).
-- Localice el selector **Simulador de Rol** en la esquina superior derecha de la barra de navegación.
-- Alterne entre los diferentes rangos jerárquicos (Gerente Comercial Nivel 85, Jefe de Operaciones Nivel 80, Oficial SST Nivel 70, Ingeniero Nivel 50 o Técnico Nivel 20).
-- Verifique cómo la barra lateral de navegación, las métricas telemétricas del dashboard y los controles de aprobación se restringen o despliegan en tiempo real según el nivel de autoridad asignado.
+### Auditoría con el Simulador de Roles en Tiempo Real
+Desde la barra superior de navegación, el evaluador puede alternar en caliente entre los niveles jerárquicos:
+- **Gerente Comercial (85):** Visualización de pipeline corporativo, cotizaciones y clientes.
+- **Coordinador Operativo (80):** Asignación de cuadrillas y seguimiento de órdenes de trabajo.
+- **Oficial SST (70):** Bloqueos de seguridad, checklists normativos MITRAB y dotación EPP.
+- **Ingeniero Residente (50):** Ejecución técnica de partidas de obra y rendición de caja chica.
+- **Técnico de Campo (20):** Reportes diarios de bitácora y comprobantes de gasto menor.
+- **Auditor Externo (10):** Vistas exclusivas de lectura pasiva.
 
 ---
 
-## 5. Propiedad Intelectual y Créditos
+## 5. Despliegue en la Nube y Contenedores
+
+La plataforma está optimizada para despliegue automatizado y continuo en proveedores PaaS (Render, Railway, Fly.io) o infraestructura propia sobre Kubernetes/Docker:
+
+### A. Despliegue Automatizado en Render (`render.yaml`)
+El repositorio incluye el blueprint formal `render.yaml` que aprovisiona conjuntamente el servicio web Python y la base de datos PostgreSQL administrada:
+1. Conecte el repositorio en el panel de Render.
+2. Render detectará automáticamente `render.yaml` y ejecutará el script `build.sh`:
+   - Instalación de dependencias optimizadas de `requirements.txt`.
+   - Recopilación de archivos estáticos con WhiteNoise (`collectstatic`).
+   - Aplicación de migraciones de base de datos relacionales (`migrate`).
+   - Ejecución automática de `seed_countries` y `prepare_sandbox`.
+3. El servicio web arrancará mediante Gunicorn con balanceo de trabajadores concurrentes:
+   ```bash
+   gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --threads 2
+   ```
+
+### B. Despliegue Mediante Contenedores Docker (`Dockerfile`)
+Para ejecutar la plataforma en cualquier servidor o clúster local:
+```bash
+# Construcción de la imagen de producción
+docker build -t erp-vector:latest .
+
+# Ejecución del contenedor
+docker run -d \
+  -p 8000:8000 \
+  -e SECRET_KEY="clave-de-produccion-corporativa" \
+  -e DEBUG="False" \
+  -e ALLOWED_HOSTS="localhost,127.0.0.1,tudominio.com" \
+  --name erp-vector-app erp-vector:latest
+```
+
+### C. Variables de Entorno de Producción
+| Variable | Descripción | Valor Predeterminado / Ejemplo |
+| :--- | :--- | :--- |
+| `SECRET_KEY` | Clave criptográfica para firmas de sesión | Generada en despliegue |
+| `DEBUG` | Indicador de depuración en desarrollo | `False` en producción |
+| `DATABASE_URL` | URI de conexión a PostgreSQL relacional | Fallback a `sqlite:///db.sqlite3` |
+| `ALLOWED_HOSTS` | Lista de dominios permitidos separados por coma | `.onrender.com,localhost` |
+| `CSRF_TRUSTED_ORIGINS` | Orígenes HTTPS válidos para peticiones POST | `https://*.onrender.com` |
+
+---
+
+## 6. Propiedad Intelectual y Créditos
 
 Copyright (c) 2026 Eternal Labs. Todos los derechos reservados. Arquitectura y dirección técnica desarrollada por Eternal Labs.

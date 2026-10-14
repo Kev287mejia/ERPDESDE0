@@ -27,4 +27,8 @@ urlpatterns = [
     # Subsistemas Dinámicos Opcionales
     path('tech/', views_modules.TechDashboardView.as_view(), name='tech_dashboard'),
     path('marketing/', views_modules.MarketingDashboardView.as_view(), name='marketing_dashboard'),
+
+    # Controles de Escenario Demo / Sandbox (Exclusivo Owner 100)
+    path('settings/sandbox/load/', views_onboarding.LoadSandboxDataView.as_view(), name='sandbox_load'),
+    path('settings/sandbox/reset/', views_onboarding.ResetSandboxDataView.as_view(), name='sandbox_reset'),
 ]

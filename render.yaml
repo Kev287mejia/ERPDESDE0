@@ -1,0 +1,35 @@
+# ==============================================================================
+# ETERNAL LABS - ENTERPRISE SOFTWARE DIVISION
+# BLUEPRINT DE INFRAESTRUCTURA CLOUD (render.yaml)
+# Proyecto: ERP SAS Multi-Tenant B2B (Nicaragua Industrial Core)
+# ==============================================================================
+
+services:
+  - type: web
+    name: erp-vector-core
+    env: python
+    region: oregon
+    plan: standard
+    buildCommand: ./build.sh
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --threads 2 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: erp-vector-postgres
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost,127.0.0.1"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://*.onrender.com"
+
+databases:
+  - name: erp-vector-postgres
+    plan: standard
+    region: oregon
+    postgresMajorVersion: 16
