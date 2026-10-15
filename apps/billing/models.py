@@ -1,5 +1,6 @@
 import datetime
 from decimal import Decimal, ROUND_HALF_UP
+import hashlib
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -546,3 +547,299 @@ class PaymentReceipt(TenantScopedModel):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Un Recibo Oficial de Caja (ROC) emitido no puede ser eliminado por razones de auditoría y trazabilidad fiscal.")
+
+
+class CashRegisterSession(TenantScopedModel):
+    """
+    Sesión y Arqueo de Caja Z Bimonetario (C$ / $).
+    Control estricto de apertura, recaudaciones por método de pago (Efectivo / Transferencias),
+    conteo físico declarado en gaveta y cálculo de sobrantes/faltantes con sello criptográfico SHA-256.
+    """
+    class Status(models.TextChoices):
+        OPEN = 'OPEN', 'Turno Abierto'
+        CLOSED = 'CLOSED', 'Arqueo Cerrado y Sellado (Corte Z)'
+
+    number = models.CharField(
+        max_length=25,
+        db_index=True,
+        verbose_name="Folio de Arqueo",
+        help_text="Consecutivo oficial ej: ARQ-2026-0001",
+    )
+    cashier = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='cash_sessions',
+        verbose_name="Cajero Responsable",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OPEN,
+        db_index=True,
+        verbose_name="Estado de Sesión",
+    )
+    opened_at = models.DateTimeField(
+        default=timezone.now,
+        verbose_name="Fecha y Hora de Apertura",
+    )
+    closed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha y Hora de Cierre",
+    )
+    exchange_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        default=Decimal('36.6243'),
+        verbose_name="Tipo de Cambio BCN",
+    )
+
+    # Fondos Iniciales de Apertura
+    opening_cash_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Fondo Inicial Córdobas (C$)",
+    )
+    opening_cash_usd = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Fondo Inicial Dólares ($)",
+    )
+
+    # Totales Calculados por el Sistema desde PaymentReceipt
+    system_cash_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Efectivo Sistema Córdobas (C$)",
+    )
+    system_cash_usd = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Efectivo Sistema Dólares ($)",
+    )
+    system_transfer_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Transferencias Sistema Córdobas (C$)",
+    )
+    system_transfer_usd = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Transferencias Sistema Dólares ($)",
+    )
+
+    # Efectivo Físico Declarado en Gaveta al Cerrar
+    declared_cash_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Efectivo Declarado Córdobas (C$)",
+    )
+    declared_cash_usd = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Efectivo Declarado Dólares ($)",
+    )
+
+    # Totales Esperados
+    expected_cash_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Total Esperado Córdobas (C$)",
+    )
+    expected_cash_usd = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Total Esperado Dólares ($)",
+    )
+
+    # Diferencias de Arqueo (Sobrante + / Faltante -)
+    difference_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Diferencia Córdobas (C$)",
+    )
+    difference_usd = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Diferencia Dólares ($)",
+    )
+
+    notes = models.TextField(
+        blank=True,
+        verbose_name="Observaciones del Turno / Arqueo",
+    )
+    audit_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        editable=False,
+        verbose_name="Sello Criptográfico SHA-256 (Corte Z)",
+        help_text="Firma inmutable que certifica el arqueo de caja",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Sesión de Caja (Arqueo Z)"
+        verbose_name_plural = "Sesiones de Caja (Arqueos Z)"
+        ordering = ['-opened_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'number'],
+                name='unique_cash_session_number_per_tenant',
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.number} · {self.cashier.get_full_name() or self.cashier.email} [{self.get_status_display()}]"
+
+    def recalculate_system_totals(self):
+        """
+        Consulta todos los PaymentReceipt creados en la organización desde opened_at
+        hasta closed_at (o timezone.now() si sigue abierta) y computa los montos
+        recaudados por moneda y método de pago.
+        """
+        end_time = self.closed_at or timezone.now()
+        receipts = PaymentReceipt.objects.filter(
+            organization_id=self.organization_id,
+            created_at__gte=self.opened_at,
+            created_at__lte=end_time,
+        )
+
+        cash_nio = (
+            receipts.filter(
+                payment_method=PaymentReceipt.PaymentMethod.CASH,
+                currency_paid='NIO',
+            ).aggregate(t=models.Sum('amount_in_payment_currency'))['t']
+            or Decimal('0.00')
+        )
+        cash_usd = (
+            receipts.filter(
+                payment_method=PaymentReceipt.PaymentMethod.CASH,
+                currency_paid='USD',
+            ).aggregate(t=models.Sum('amount_in_payment_currency'))['t']
+            or Decimal('0.00')
+        )
+
+        transfer_nio = (
+            receipts.exclude(payment_method=PaymentReceipt.PaymentMethod.CASH)
+            .filter(currency_paid='NIO')
+            .aggregate(t=models.Sum('amount_in_payment_currency'))['t']
+            or Decimal('0.00')
+        )
+        transfer_usd = (
+            receipts.exclude(payment_method=PaymentReceipt.PaymentMethod.CASH)
+            .filter(currency_paid='USD')
+            .aggregate(t=models.Sum('amount_in_payment_currency'))['t']
+            or Decimal('0.00')
+        )
+
+        self.system_cash_nio = cash_nio
+        self.system_cash_usd = cash_usd
+        self.system_transfer_nio = transfer_nio
+        self.system_transfer_usd = transfer_usd
+
+        self.expected_cash_nio = self.opening_cash_nio + self.system_cash_nio
+        self.expected_cash_usd = self.opening_cash_usd + self.system_cash_usd
+
+    def close_and_seal_session(self, declared_nio: Decimal, declared_usd: Decimal, notes: str = ''):
+        """
+        Cierra y sella el turno de caja de forma inmutable:
+        1. Valida que no esté previamente cerrada.
+        2. Recalcula los totales del sistema.
+        3. Fija el efectivo físico declarado y calcula faltantes/sobrantes.
+        4. Genera el sello criptográfico SHA-256 del Corte Z.
+        5. Guarda y bloquea la sesión.
+        """
+        if self.status == self.Status.CLOSED:
+            raise ValidationError("Este arqueo de caja ya fue cerrado y sellado de forma inmutable.")
+
+        self.declared_cash_nio = Decimal(str(declared_nio))
+        self.declared_cash_usd = Decimal(str(declared_usd))
+        if notes:
+            self.notes = notes
+
+        self.closed_at = timezone.now()
+        self.recalculate_system_totals()
+
+        self.difference_nio = self.declared_cash_nio - self.expected_cash_nio
+        self.difference_usd = self.declared_cash_usd - self.expected_cash_usd
+        self.status = self.Status.CLOSED
+
+        # Generación del Sello SHA-256
+        payload = (
+            f"{self.organization_id}|{self.number}|{self.opened_at.isoformat()}|{self.closed_at.isoformat()}|"
+            f"{self.opening_cash_nio:.2f}|{self.opening_cash_usd:.2f}|"
+            f"{self.system_cash_nio:.2f}|{self.system_cash_usd:.2f}|"
+            f"{self.declared_cash_nio:.2f}|{self.declared_cash_usd:.2f}|"
+            f"{self.difference_nio:.2f}|{self.difference_usd:.2f}|"
+            f"{self.exchange_rate:.4f}"
+        )
+        self.audit_hash = hashlib.sha256(payload.encode('utf-8')).hexdigest()
+        self.save()
+
+    def clean(self):
+        super().clean()
+        if self.pk and not self._state.adding:
+            original = CashRegisterSession.objects.filter(pk=self.pk).first()
+            if original and original.status == self.Status.CLOSED and original.audit_hash:
+                if (
+                    self.declared_cash_nio != original.declared_cash_nio
+                    or self.declared_cash_usd != original.declared_cash_usd
+                    or self.expected_cash_nio != original.expected_cash_nio
+                    or self.expected_cash_usd != original.expected_cash_usd
+                    or self.difference_nio != original.difference_nio
+                    or self.difference_usd != original.difference_usd
+                    or self.audit_hash != original.audit_hash
+                ):
+                    raise ValidationError("Un Arqueo de Caja (Corte Z) cerrado y sellado es estrictamente inmutable.")
+
+    def save(self, *args, **kwargs):
+        if self.pk and not self._state.adding:
+            original = CashRegisterSession.objects.filter(pk=self.pk).first()
+            if original and original.status == self.Status.CLOSED and original.audit_hash:
+                if (
+                    self.declared_cash_nio != original.declared_cash_nio
+                    or self.declared_cash_usd != original.declared_cash_usd
+                    or self.expected_cash_nio != original.expected_cash_nio
+                    or self.expected_cash_usd != original.expected_cash_usd
+                    or self.difference_nio != original.difference_nio
+                    or self.difference_usd != original.difference_usd
+                    or self.audit_hash != original.audit_hash
+                ):
+                    raise ValidationError("Un Arqueo de Caja (Corte Z) cerrado y sellado es estrictamente inmutable.")
+
+        if not self.number and self.organization_id:
+            year = self.opened_at.year if self.opened_at else timezone.now().year
+            prefix = f"ARQ-{year}-"
+            count = (
+                CashRegisterSession.objects.filter(
+                    organization_id=self.organization_id,
+                    number__startswith=prefix,
+                ).count()
+                + 1
+            )
+            candidate = f"{prefix}{count:04d}"
+            while CashRegisterSession.objects.filter(
+                organization_id=self.organization_id, number=candidate
+            ).exists():
+                count += 1
+                candidate = f"{prefix}{count:04d}"
+            self.number = candidate
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.status == self.Status.CLOSED and self.audit_hash:
+            raise ValidationError("No se puede eliminar un Arqueo de Caja (Corte Z) sellado con hash de auditoría.")
+        super().delete(*args, **kwargs)
+

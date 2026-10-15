@@ -27,6 +27,9 @@
                 <span class="text-zinc-300">|</span>
                 <span>MONEDA: <strong>{{ current_org.currency }}</strong> ({{ current_org.currency_symbol }})</span>
             </div>
+            <a href="{% url 'billing:cash_session_list' %}" class="px-2.5 py-1 text-xs font-mono text-zinc-700 bg-white border border-zinc-200 rounded-[4px] hover:bg-zinc-50 transition-colors">
+                Arqueo de Caja (Corte Z)
+            </a>
             <a href="{% url 'billing:invoice_list' %}" class="px-2.5 py-1 text-xs font-mono text-zinc-700 bg-white border border-zinc-200 rounded-[4px] hover:bg-zinc-50 transition-colors">
                 &larr; Facturas &amp; Cartera
             </a>

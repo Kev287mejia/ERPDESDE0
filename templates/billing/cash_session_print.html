@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Corte Z - {{ session.number }} | {{ org.name }}</title>
+    <style>
+        @page {
+            size: 80mm auto;
+            margin: 4mm;
+        }
+        body {
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.35;
+            color: #000;
+            background: #fff;
+            margin: 0;
+            padding: 8px;
+            width: 72mm;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .font-bold { font-weight: bold; }
+        .uppercase { text-transform: uppercase; }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 6px 0;
+        }
+        .double-divider {
+            border-top: 2px solid #000;
+            margin: 8px 0;
+        }
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+        }
+        .hash-box {
+            word-break: break-all;
+            font-size: 8px;
+            background: #f4f4f4;
+            padding: 4px;
+            border: 1px solid #ccc;
+            margin-top: 4px;
+        }
+        .signatures {
+            margin-top: 24px;
+        }
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-top: 24px;
+            padding-top: 3px;
+            font-size: 9px;
+            text-align: center;
+        }
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="margin-bottom: 12px; text-align: center;">
+        <button onclick="window.print()" style="padding: 6px 12px; font-size: 11px; cursor: pointer; background: #000; color: #fff; border: none; border-radius: 3px;">
+            Imprimir Comprobante Corte Z
+        </button>
+    </div>
+
+    <div class="text-center font-bold uppercase" style="font-size: 13px;">
+        {{ org.name }}
+    </div>
+    <div class="text-center" style="font-size: 10px;">
+        RUC: {{ org.tax_id|default:"N/D" }}
+    </div>
+    {% if org.legal_address %}
+    <div class="text-center" style="font-size: 9px;">
+        {{ org.legal_address }}
+    </div>
+    {% endif %}
+
+    <div class="divider"></div>
+
+    <div class="text-center font-bold uppercase" style="font-size: 12px;">
+        ARQUEO DE CAJA Z (CORTE FISCAL)
+    </div>
+    <div class="text-center font-bold">
+        FOLIO: {{ session.number }}
+    </div>
+    <div class="text-center" style="font-size: 9px;">
+        ESTADO: {% if session.status == 'CLOSED' %}CERRADO Y SELLADO{% else %}TURNO ABIERTO (PRE-CORTE){% endif %}
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="flex-between">
+        <span>CAJERO:</span>
+        <span class="font-bold">{{ session.cashier.get_full_name|default:session.cashier.email }}</span>
+    </div>
+    <div class="flex-between">
+        <span>APERTURA:</span>
+        <span>{{ session.opened_at|date:"d/m/Y H:i" }}</span>
+    </div>
+    <div class="flex-between">
+        <span>CIERRE:</span>
+        <span>{% if session.closed_at %}{{ session.closed_at|date:"d/m/Y H:i" }}{% else %}EN CURSO{% endif %}</span>
+    </div>
+    <div class="flex-between">
+        <span>T/C OFICIAL:</span>
+        <span>C$ {{ session.exchange_rate|floatformat:4 }}</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="font-bold uppercase text-center" style="margin-bottom: 4px;">DESGLOSE BIMONETARIO</div>
+
+    <!-- Fondo Inicial -->
+    <div class="flex-between">
+        <span>Fondo Inicial C$:</span>
+        <span class="font-bold">C$ {{ session.opening_cash_nio|floatformat:2 }}</span>
+    </div>
+    <div class="flex-between">
+        <span>Fondo Inicial $:</span>
+        <span class="font-bold">$ {{ session.opening_cash_usd|floatformat:2 }}</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Recaudaciones Sistema -->
+    <div class="flex-between">
+        <span>Efectivo Sistema C$:</span>
+        <span>C$ {{ session.system_cash_nio|floatformat:2 }}</span>
+    </div>
+    <div class="flex-between">
+        <span>Efectivo Sistema $:</span>
+        <span>$ {{ session.system_cash_usd|floatformat:2 }}</span>
+    </div>
+    <div class="flex-between">
+        <span>Transf/Cheques C$:</span>
+        <span>C$ {{ session.system_transfer_nio|floatformat:2 }}</span>
+    </div>
+    <div class="flex-between">
+        <span>Transf/Cheques $:</span>
+        <span>$ {{ session.system_transfer_usd|floatformat:2 }}</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Totales Esperados -->
+    <div class="flex-between font-bold">
+        <span>TOTAL ESPERADO C$:</span>
+        <span>C$ {{ session.expected_cash_nio|floatformat:2 }}</span>
+    </div>
+    <div class="flex-between font-bold">
+        <span>TOTAL ESPERADO $:</span>
+        <span>$ {{ session.expected_cash_usd|floatformat:2 }}</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Conteo Físico Declarado -->
+    <div class="flex-between">
+        <span>Declarado Gaveta C$:</span>
+        <span class="font-bold">C$ {{ session.declared_cash_nio|floatformat:2 }}</span>
+    </div>
+    <div class="flex-between">
+        <span>Declarado Gaveta $:</span>
+        <span class="font-bold">$ {{ session.declared_cash_usd|floatformat:2 }}</span>
+    </div>
+
+    <div class="double-divider"></div>
+
+    <!-- Diferencias de Arqueo -->
+    <div class="flex-between font-bold" style="font-size: 12px;">
+        <span>DIFERENCIA C$:</span>
+        <span>C$ {{ session.difference_nio|floatformat:2 }}</span>
+    </div>
+    <div class="flex-between font-bold" style="font-size: 11px;">
+        <span>DIFERENCIA $:</span>
+        <span>$ {{ session.difference_usd|floatformat:2 }}</span>
+    </div>
+    <div style="font-size: 8px; text-align: right; color: #555;">
+        (+ Sobrante / - Faltante)
+    </div>
+
+    {% if session.notes %}
+    <div class="divider"></div>
+    <div style="font-size: 9px;">
+        <strong>OBSERVACIONES:</strong><br>
+        {{ session.notes }}
+    </div>
+    {% endif %}
+
+    <div class="divider"></div>
+
+    <div class="font-bold uppercase text-center" style="font-size: 9px;">
+        SELLO CRIPTOGRÁFICO DE AUDITORÍA SHA-256
+    </div>
+    <div class="hash-box text-center">
+        {{ session.audit_hash|default:"DOCUMENTO NO SELLADO (SESION ACTIVA)" }}
+    </div>
+
+    <div class="signatures">
+        <div class="signature-line">
+            FIRMA DEL CAJERO<br>
+            {{ session.cashier.get_full_name|default:session.cashier.email }}
+        </div>
+        <div class="signature-line">
+            FIRMA SUPERVISOR / GERENCIA COMERCIAL<br>
+            AUDITORÍA INTERNA
+        </div>
+    </div>
+
+    <div class="text-center" style="font-size: 8px; margin-top: 14px; color: #666;">
+        SISTEMA ERP VECTOR · SEGURIDAD CRIPTOGRÁFICA<br>
+        IMPRESO: {% now "d/m/Y H:i:s" %}
+    </div>
+</body>
+</html>

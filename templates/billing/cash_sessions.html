@@ -1,0 +1,342 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Arqueo de Caja Z Bimonetario (C$/$) · DGI Nicaragua{% endblock %}
+{% block breadcrumb_section %}FINANZAS &amp; FISCAL{% endblock %}
+{% block breadcrumb_page %}ARQUEO DE CAJA Z{% endblock %}
+{% block page_title %}Control de Caja &amp; Arqueo Z Bimonetario (C$ / $){% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2">
+    <a href="{% url 'billing:pos_terminal' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+        Terminal POS
+    </a>
+    <a href="{% url 'billing:invoice_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+        Facturación &amp; Cartera
+    </a>
+    <a href="{% url 'billing:vet_dgi_center' %}" class="px-3 py-1.5 bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium rounded transition-colors">
+        Anexos Fiscales VET-DGI
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-5 max-w-7xl mx-auto">
+
+    <!-- KPI Summary Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+        <div class="p-3.5 bg-white border border-slate-200 rounded border-t-2 border-t-slate-800">
+            <span class="text-[10px] font-mono uppercase text-slate-500 block tracking-wider font-semibold">SESIONES DE CAJA</span>
+            <span class="text-lg font-mono font-bold text-slate-900 tabular-nums mt-0.5 block">
+                {{ total_sessions }} <span class="text-xs font-normal text-slate-500">({{ total_closed_sessions }} cerradas)</span>
+            </span>
+            <span class="text-[10px] text-slate-500 font-mono mt-0.5 block">Historial registrado</span>
+        </div>
+
+        <div class="p-3.5 bg-white border border-slate-200 rounded border-t-2 border-t-emerald-600">
+            <span class="text-[10px] font-mono uppercase text-emerald-700 block tracking-wider font-semibold">TOTAL EFECTIVO SELLADO (C$)</span>
+            <span class="text-lg font-mono font-bold text-emerald-800 tabular-nums mt-0.5 block">
+                C$ {{ total_sealed_nio|floatformat:2 }}
+            </span>
+            <span class="text-[10px] text-emerald-700 font-mono mt-0.5 block">Arqueos cerrados Z</span>
+        </div>
+
+        <div class="p-3.5 bg-white border border-slate-200 rounded border-t-2 border-t-blue-600">
+            <span class="text-[10px] font-mono uppercase text-blue-700 block tracking-wider font-semibold">TOTAL EFECTIVO SELLADO ($)</span>
+            <span class="text-lg font-mono font-bold text-blue-800 tabular-nums mt-0.5 block">
+                $ {{ total_sealed_usd|floatformat:2 }}
+            </span>
+            <span class="text-[10px] text-blue-700 font-mono mt-0.5 block">Moneda extranjera</span>
+        </div>
+
+        <div class="p-3.5 bg-white border border-slate-200 rounded border-t-2 {% if total_diff_nio < 0 %}border-t-rose-600{% else %}border-t-slate-600{% endif %}">
+            <span class="text-[10px] font-mono uppercase {% if total_diff_nio < 0 %}text-rose-700{% else %}text-slate-600{% endif %} block tracking-wider font-semibold">DIFERENCIA NETA (C$)</span>
+            <span class="text-lg font-mono font-bold {% if total_diff_nio < 0 %}text-rose-700{% else %}text-slate-900{% endif %} tabular-nums mt-0.5 block">
+                C$ {{ total_diff_nio|floatformat:2 }}
+            </span>
+            <span class="text-[10px] text-slate-500 font-mono mt-0.5 block">Sobrante (+) / Faltante (-)</span>
+        </div>
+    </div>
+
+    <!-- Active Session or Open New Session Card -->
+    {% if active_session %}
+    <div class="bg-white border border-slate-200 rounded p-4 space-y-4" x-data="{
+        openingNio: {{ active_session.opening_cash_nio|stringformat:'.2f' }},
+        openingUsd: {{ active_session.opening_cash_usd|stringformat:'.2f' }},
+        systemNio: {{ active_session.system_cash_nio|stringformat:'.2f' }},
+        systemUsd: {{ active_session.system_cash_usd|stringformat:'.2f' }},
+        declaredNio: '{{ active_session.expected_cash_nio|stringformat:'.2f' }}',
+        declaredUsd: '{{ active_session.expected_cash_usd|stringformat:'.2f' }}',
+        get expectedNio() { return (parseFloat(this.openingNio) + parseFloat(this.systemNio)).toFixed(2); },
+        get expectedUsd() { return (parseFloat(this.openingUsd) + parseFloat(this.systemUsd)).toFixed(2); },
+        get diffNio() { return (parseFloat(this.declaredNio || 0) - parseFloat(this.expectedNio)).toFixed(2); },
+        get diffUsd() { return (parseFloat(this.declaredUsd || 0) - parseFloat(this.expectedUsd)).toFixed(2); }
+    }">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+            <div class="flex items-center gap-3">
+                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-mono font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                    TURNO ACTIVO EN LÍNEA
+                </span>
+                <span class="font-mono text-sm font-bold text-slate-900">{{ active_session.number }}</span>
+                <span class="text-xs text-slate-500">· Cajero: <strong class="text-slate-800">{{ active_session.cashier.get_full_name|default:active_session.cashier.email }}</strong></span>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-mono text-slate-600">
+                <span>Apertura: <strong>{{ active_session.opened_at|date:"d/m/Y H:i" }}</strong></span>
+                <span class="text-slate-300">|</span>
+                <span>T/C BCN: <strong>C$ {{ active_session.exchange_rate|floatformat:4 }}</strong></span>
+                <a href="{% url 'billing:cash_session_print' active_session.pk %}" target="_blank" class="ml-2 px-2.5 py-1 border border-slate-200 hover:bg-slate-50 rounded text-slate-700">
+                    Vista Previa Slip
+                </a>
+            </div>
+        </div>
+
+        <!-- Real-Time Cash Grid Breakdown -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded">
+                <div class="text-[10px] text-slate-500 uppercase tracking-tight font-sans">1. Fondo Inicial Apertura</div>
+                <div class="text-sm font-bold text-slate-800 tabular-nums mt-1">C$ {{ active_session.opening_cash_nio|floatformat:2 }}</div>
+                <div class="text-xs text-slate-600 tabular-nums">$ {{ active_session.opening_cash_usd|floatformat:2 }}</div>
+            </div>
+
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded">
+                <div class="text-[10px] text-slate-500 uppercase tracking-tight font-sans">2. Recaudado Efectivo (ROC)</div>
+                <div class="text-sm font-bold text-emerald-700 tabular-nums mt-1">C$ {{ active_session.system_cash_nio|floatformat:2 }}</div>
+                <div class="text-xs text-emerald-600 tabular-nums">$ {{ active_session.system_cash_usd|floatformat:2 }}</div>
+            </div>
+
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded">
+                <div class="text-[10px] text-slate-500 uppercase tracking-tight font-sans">3. Transferencias Bancarias (BAC/LAFISE)</div>
+                <div class="text-sm font-bold text-blue-700 tabular-nums mt-1">C$ {{ active_session.system_transfer_nio|floatformat:2 }}</div>
+                <div class="text-xs text-blue-600 tabular-nums">$ {{ active_session.system_transfer_usd|floatformat:2 }}</div>
+            </div>
+
+            <div class="p-3 bg-slate-100 border border-slate-300 rounded">
+                <div class="text-[10px] text-slate-600 uppercase tracking-tight font-sans font-semibold">4. Total Esperado en Gaveta</div>
+                <div class="text-sm font-bold text-slate-900 tabular-nums mt-1">C$ <span x-text="expectedNio"></span></div>
+                <div class="text-xs text-slate-700 tabular-nums">$ <span x-text="expectedUsd"></span></div>
+            </div>
+        </div>
+
+        <!-- Formulario de Cierre de Caja (Corte Z) -->
+        {% if can_manage_cash %}
+        <form method="POST" action="{% url 'billing:cash_session_close' active_session.pk %}" class="border-t border-slate-200 pt-3 space-y-3">
+            {% csrf_token %}
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-xs font-bold uppercase tracking-tight text-slate-900 font-sans">Cierre de Turno y Declaración Física (Corte Z)</h3>
+                    <p class="text-[11px] text-slate-500 font-sans">Ingrese el conteo físico en gaveta. El sistema calculará el faltante o sobrante y sellará la sesión con hash SHA-256.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                <div>
+                    <label class="block text-[11px] font-sans font-medium text-slate-700 mb-1">Efectivo Físico Córdobas (C$)</label>
+                    <input type="number" step="0.01" name="declared_cash_nio" x-model="declaredNio" required
+                           class="w-full h-8 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:border-slate-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-sans font-medium text-slate-700 mb-1">Efectivo Físico Dólares ($)</label>
+                    <input type="number" step="0.01" name="declared_cash_usd" x-model="declaredUsd" required
+                           class="w-full h-8 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:border-slate-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-sans font-medium text-slate-700 mb-1">Observaciones / Incidencias</label>
+                    <input type="text" name="notes" placeholder="ej: Turno matutino sin novedades"
+                           class="w-full h-8 px-2 text-xs font-sans bg-white border border-slate-300 rounded focus:border-slate-500 focus:outline-none">
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="submit" 
+                            onclick="return confirm('¿Está seguro de cerrar y sellar el Corte Z? Una vez cerrado no podrá ser modificado ni reabierto.');"
+                            class="w-full h-8 px-3 bg-rose-700 hover:bg-rose-800 text-white font-medium text-xs rounded transition-colors flex items-center justify-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
+                        </svg>
+                        <span>Cerrar y Sellar Corte Z</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Live Difference Monitor -->
+            <div class="p-2.5 bg-slate-50 border border-slate-200 rounded flex flex-wrap items-center justify-between text-xs font-mono">
+                <div class="flex items-center gap-4">
+                    <span>Diferencia C$: 
+                        <strong :class="diffNio < 0 ? 'text-rose-600' : (diffNio > 0 ? 'text-emerald-600' : 'text-slate-800')" 
+                                x-text="'C$ ' + diffNio"></strong>
+                    </span>
+                    <span>Diferencia $: 
+                        <strong :class="diffUsd < 0 ? 'text-rose-600' : (diffUsd > 0 ? 'text-emerald-600' : 'text-slate-800')" 
+                                x-text="'$ ' + diffUsd"></strong>
+                    </span>
+                </div>
+                <div class="text-[10px] text-slate-500 font-sans">
+                    Sobrante (+) / Faltante (-). Sello criptográfico SHA-256 generado al presionar cerrar.
+                </div>
+            </div>
+        </form>
+        {% else %}
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800 font-sans">
+            <strong>Permiso restringido:</strong> Su rol actual (Nivel {{ current_role_level }}) tiene acceso de solo lectura. Para cerrar y sellar el Corte Z se requiere rol de Gerente Comercial (Nivel 85+) o Administrador.
+        </div>
+        {% endif %}
+    </div>
+
+    {% else %}
+    <!-- No Active Session - Open Session Box -->
+    <div class="bg-white border border-slate-200 rounded p-4 space-y-4">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-sm font-bold text-slate-900">Apertura de Nuevo Turno de Caja</h3>
+                <p class="text-xs text-slate-500">No hay ningún turno abierto en esta sucursal. Ingrese los fondos iniciales en Córdobas y Dólares para iniciar operaciones.</p>
+            </div>
+            <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-mono bg-slate-100 text-slate-700 border border-slate-200 rounded">
+                CAJA CERRADA
+            </span>
+        </div>
+
+        {% if can_manage_cash %}
+        <form method="POST" action="{% url 'billing:cash_session_open' %}" class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end border-t border-slate-200 pt-3">
+            {% csrf_token %}
+            <div>
+                <label class="block text-[11px] font-medium text-slate-700 mb-1">Fondo Inicial Córdobas (C$)</label>
+                <input type="number" step="0.01" name="opening_cash_nio" value="5000.00" required
+                       class="w-full h-8 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:border-slate-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-[11px] font-medium text-slate-700 mb-1">Fondo Inicial Dólares ($)</label>
+                <input type="number" step="0.01" name="opening_cash_usd" value="100.00" required
+                       class="w-full h-8 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:border-slate-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-[11px] font-medium text-slate-700 mb-1">Tipo de Cambio BCN</label>
+                <input type="number" step="0.0001" name="exchange_rate" value="36.6243" required
+                       class="w-full h-8 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:border-slate-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-[11px] font-medium text-slate-700 mb-1">Observaciones</label>
+                <input type="text" name="notes" placeholder="Apertura turno matutino"
+                       class="w-full h-8 px-2 text-xs bg-white border border-slate-300 rounded focus:border-slate-500 focus:outline-none">
+            </div>
+            <div>
+                <button type="submit" class="w-full h-8 px-3 bg-emerald-700 hover:bg-emerald-800 text-white font-medium text-xs rounded transition-colors flex items-center justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+                    </svg>
+                    <span>Aperturar Turno</span>
+                </button>
+            </div>
+        </form>
+        {% else %}
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-600">
+            Para aperturar un nuevo turno de caja se requiere nivel de autoridad comercial (85+) o Administrador.
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Historical Sessions Table -->
+    <div class="bg-white border border-slate-200 rounded overflow-hidden">
+        <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
+                HISTORIAL DE ARQUEOS Y CORTES Z SELLADOS
+            </h3>
+            <span class="text-[11px] font-mono text-slate-500">Mostrando {{ sessions_history|length }} registros</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-slate-200 bg-slate-100/50 text-[11px] font-mono text-slate-600">
+                        <th class="p-2.5 font-semibold">FOLIO</th>
+                        <th class="p-2.5 font-semibold">ESTADO</th>
+                        <th class="p-2.5 font-semibold">CAJERO</th>
+                        <th class="p-2.5 font-semibold">APERTURA / CIERRE</th>
+                        <th class="p-2.5 font-semibold text-right">FONDO INICIAL</th>
+                        <th class="p-2.5 font-semibold text-right">RECAUDADO SISTEMA</th>
+                        <th class="p-2.5 font-semibold text-right">DECLARADO GAVETA</th>
+                        <th class="p-2.5 font-semibold text-right">DIFERENCIA</th>
+                        <th class="p-2.5 font-semibold">SELLO SHA-256</th>
+                        <th class="p-2.5 font-semibold text-center">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 font-mono text-[11px]">
+                    {% for s in sessions_history %}
+                    <tr class="hover:bg-slate-50/70 transition-colors">
+                        <td class="p-2.5 font-bold text-slate-900">
+                            {{ s.number }}
+                        </td>
+                        <td class="p-2.5">
+                            {% if s.status == 'OPEN' %}
+                            <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">ABIERTO</span>
+                            {% else %}
+                            <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 border border-slate-200 font-semibold">SELLADO Z</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-2.5 text-slate-700 font-sans">
+                            {{ s.cashier.get_full_name|default:s.cashier.email }}
+                        </td>
+                        <td class="p-2.5 text-slate-600">
+                            <div>{{ s.opened_at|date:"d/m/Y H:i" }}</div>
+                            {% if s.closed_at %}
+                            <div class="text-[10px] text-slate-500">{{ s.closed_at|date:"d/m/Y H:i" }}</div>
+                            {% else %}
+                            <div class="text-[10px] text-emerald-600">En curso</div>
+                            {% endif %}
+                        </td>
+                        <td class="p-2.5 text-right tabular-nums">
+                            <div class="text-slate-800">C$ {{ s.opening_cash_nio|floatformat:2 }}</div>
+                            <div class="text-[10px] text-slate-500">$ {{ s.opening_cash_usd|floatformat:2 }}</div>
+                        </td>
+                        <td class="p-2.5 text-right tabular-nums">
+                            <div class="text-slate-800">C$ {{ s.system_cash_nio|floatformat:2 }}</div>
+                            <div class="text-[10px] text-slate-500">$ {{ s.system_cash_usd|floatformat:2 }}</div>
+                        </td>
+                        <td class="p-2.5 text-right tabular-nums">
+                            {% if s.status == 'CLOSED' %}
+                            <div class="text-slate-900 font-bold">C$ {{ s.declared_cash_nio|floatformat:2 }}</div>
+                            <div class="text-[10px] text-slate-600">$ {{ s.declared_cash_usd|floatformat:2 }}</div>
+                            {% else %}
+                            <span class="text-slate-400">---</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-2.5 text-right tabular-nums">
+                            {% if s.status == 'CLOSED' %}
+                            <div class="{% if s.difference_nio < 0 %}text-rose-600 font-bold{% elif s.difference_nio > 0 %}text-emerald-600 font-bold{% else %}text-slate-700{% endif %}">
+                                C$ {{ s.difference_nio|floatformat:2 }}
+                            </div>
+                            <div class="text-[10px] {% if s.difference_usd < 0 %}text-rose-600{% elif s.difference_usd > 0 %}text-emerald-600{% else %}text-slate-500{% endif %}">
+                                $ {{ s.difference_usd|floatformat:2 }}
+                            </div>
+                            {% else %}
+                            <span class="text-slate-400">---</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-2.5">
+                            {% if s.audit_hash %}
+                            <span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200 text-[10px] font-mono" title="{{ s.audit_hash }}">
+                                {{ s.audit_hash|slice:":16" }}...
+                            </span>
+                            {% else %}
+                            <span class="text-slate-400 text-[10px]">Sin Sellar</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-2.5 text-center">
+                            <a href="{% url 'billing:cash_session_print' s.pk %}" target="_blank" 
+                               class="px-2 py-1 text-[11px] font-sans border border-slate-300 hover:bg-slate-50 rounded text-slate-700 transition-colors">
+                                Imprimir Slip
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="p-6 text-center text-slate-500 font-sans">
+                            No se han registrado sesiones de caja en esta organización.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -242,3 +242,204 @@ def disburse_petty_cash_replenishment(
         performed_by=user,
     )
     return trx
+
+
+def ensure_default_chart_of_accounts(organization):
+    """
+    Garantiza la existencia del catálogo básico NIIF / DGI Nicaragua para el tenant.
+    Idempotente: crea únicamente las cuentas faltantes.
+    """
+    from apps.finance.models import AccountingAccount
+
+    default_accounts = [
+        ('1101-01', 'Caja General y Mostrador', AccountingAccount.AccountType.ASSET),
+        ('1102-01', 'Bancos Institucionales', AccountingAccount.AccountType.ASSET),
+        ('1103-01', 'Clientes por Cobrar (CxC)', AccountingAccount.AccountType.ASSET),
+        ('1104-01', 'IVA Crédito Fiscal Acreditable (15%)', AccountingAccount.AccountType.ASSET),
+        ('1105-01', 'Anticipo Retención IR Sufrida (1% - 2%)', AccountingAccount.AccountType.ASSET),
+        ('1105-02', 'Anticipo Retención IMI Municipal Sufrida (1%)', AccountingAccount.AccountType.ASSET),
+        ('2101-01', 'Proveedores Nacionales (CxP)', AccountingAccount.AccountType.LIABILITY),
+        ('2102-01', 'IVA Débito Fiscal por Pagar (15%)', AccountingAccount.AccountType.LIABILITY),
+        ('2103-01', 'Retenciones IR en la Fuente por Enterar DGI', AccountingAccount.AccountType.LIABILITY),
+        ('2103-02', 'Retenciones IMI Alcaldía por Enterar', AccountingAccount.AccountType.LIABILITY),
+        ('4101-01', 'Ingresos por Ventas de Bienes y Servicios', AccountingAccount.AccountType.INCOME),
+        ('5101-01', 'Costo de Ventas, Compras e Insumos', AccountingAccount.AccountType.EXPENSE),
+    ]
+    accounts_map = {}
+    for code, name, acct_type in default_accounts:
+        acc, _ = AccountingAccount.objects.get_or_create(
+            organization=organization,
+            code=code,
+            defaults={'name': name, 'account_type': acct_type, 'is_active': True}
+        )
+        accounts_map[code] = acc
+    return accounts_map
+
+
+@transaction.atomic
+def sync_commercial_and_purchasing_to_ledger(organization, user):
+    """
+    Puente de Sincronización Contable Automática:
+    Asienta pólizas de diario cuadradas (Debe == Haber) para todas las Facturas
+    y Órdenes de Compra no sincronizadas previamente.
+    """
+    from apps.billing.models import Invoice
+    from apps.purchasing.models import PurchaseOrder
+    from apps.finance.models import JournalEntry, JournalEntryLine
+
+    accounts = ensure_default_chart_of_accounts(organization)
+    synced_invoices = 0
+    synced_purchases = 0
+
+    # 1. Pólizas de Ventas (Facturas Emitidas / Cobradas)
+    invoices = Invoice.objects.filter(
+        organization=organization,
+        status__in=[Invoice.Status.ISSUED, Invoice.Status.PARTIAL, Invoice.Status.PAID],
+    ).exclude(journal_entries__isnull=False)
+
+    for inv in invoices:
+        entry = JournalEntry.objects.create(
+            organization=organization,
+            date=inv.issue_date or timezone.now().date(),
+            entry_type=JournalEntry.EntryType.SALES,
+            concept=f"Facturación DGI {inv.number} - {inv.account.commercial_name if inv.account else 'Cliente'}",
+            reference=inv.number,
+            source_invoice=inv,
+            created_by=user,
+        )
+
+        # DEBE: Clientes por Cobrar (Neto a cobrar)
+        JournalEntryLine.objects.create(
+            organization=organization,
+            entry=entry,
+            account=accounts['1103-01'],
+            concept=f"CxC Factura {inv.number}",
+            debit=inv.net_receivable,
+            credit=Decimal('0.00'),
+        )
+
+        # DEBE: Retención IR sufrida (si aplica)
+        if inv.ir_retention_amount > Decimal('0.00'):
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry,
+                account=accounts['1105-01'],
+                concept=f"Retención IR 1%-2% Sufrida {inv.number}",
+                debit=inv.ir_retention_amount,
+                credit=Decimal('0.00'),
+            )
+
+        # DEBE: Retención IMI sufrida (si aplica)
+        if inv.imi_retention_amount > Decimal('0.00'):
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry,
+                account=accounts['1105-02'],
+                concept=f"Retención IMI 1% Sufrida {inv.number}",
+                debit=inv.imi_retention_amount,
+                credit=Decimal('0.00'),
+            )
+
+        # HABER: Ventas / Ingresos (Base Imponible)
+        JournalEntryLine.objects.create(
+            organization=organization,
+            entry=entry,
+            account=accounts['4101-01'],
+            concept=f"Ingreso Gravado/Exento {inv.number}",
+            debit=Decimal('0.00'),
+            credit=inv.subtotal,
+        )
+
+        # HABER: IVA Débito Fiscal (si aplica)
+        if inv.tax_total > Decimal('0.00'):
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry,
+                account=accounts['2102-01'],
+                concept=f"IVA 15% Débito Fiscal {inv.number}",
+                debit=Decimal('0.00'),
+                credit=inv.tax_total,
+            )
+
+        entry.verify_and_save_balance()
+        synced_invoices += 1
+
+    # 2. Pólizas de Compras (Órdenes Recibidas / En Cartera)
+    purchases = PurchaseOrder.objects.filter(
+        organization=organization,
+        status__in=[PurchaseOrder.Status.RECEIVED, PurchaseOrder.Status.PARTIAL_PAID, PurchaseOrder.Status.PAID],
+    ).exclude(journal_entries__isnull=False)
+
+    for po in purchases:
+        entry = JournalEntry.objects.create(
+            organization=organization,
+            date=po.issue_date or timezone.now().date(),
+            entry_type=JournalEntry.EntryType.PURCHASES,
+            concept=f"Compra Recibida {po.number} - {po.supplier.commercial_name if po.supplier else 'Proveedor'}",
+            reference=po.number,
+            source_purchase_order=po,
+            created_by=user,
+        )
+
+        # DEBE: Compras / Inventarios (Subtotal)
+        JournalEntryLine.objects.create(
+            organization=organization,
+            entry=entry,
+            account=accounts['5101-01'],
+            concept=f"Inventario/Gasto OC {po.number}",
+            debit=po.subtotal,
+            credit=Decimal('0.00'),
+        )
+
+        # DEBE: IVA Crédito Fiscal Acreditable (si aplica)
+        if po.tax_total > Decimal('0.00'):
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry,
+                account=accounts['1104-01'],
+                concept=f"IVA Crédito Fiscal 15% OC {po.number}",
+                debit=po.tax_total,
+                credit=Decimal('0.00'),
+            )
+
+        # HABER: Retención IR DGI por pagar (si aplica)
+        if po.ir_withheld_amount > Decimal('0.00'):
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry,
+                account=accounts['2103-01'],
+                concept=f"Retención IR DGI {po.withholding_certificate_number or po.number}",
+                debit=Decimal('0.00'),
+                credit=po.ir_withheld_amount,
+            )
+
+        # HABER: Retención IMI Alcaldía por pagar (si aplica)
+        if po.imi_withheld_amount > Decimal('0.00'):
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry,
+                account=accounts['2103-02'],
+                concept=f"Retención IMI Alcaldía {po.withholding_certificate_number or po.number}",
+                debit=Decimal('0.00'),
+                credit=po.imi_withheld_amount,
+            )
+
+        # HABER: Proveedores Nacionales CxP (Neto a Pagar)
+        JournalEntryLine.objects.create(
+            organization=organization,
+            entry=entry,
+            account=accounts['2101-01'],
+            concept=f"CxP Proveedor Fact. {po.supplier_invoice_number or po.number}",
+            debit=Decimal('0.00'),
+            credit=po.net_payable,
+        )
+
+        entry.verify_and_save_balance()
+        synced_purchases += 1
+
+    return {
+        'invoices_synced': synced_invoices,
+        'purchases_synced': synced_purchases,
+        'total_entries': synced_invoices + synced_purchases,
+    }
+

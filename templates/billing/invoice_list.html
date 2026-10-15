@@ -6,12 +6,15 @@
 {% block page_title %}Consola de Facturación Fiscal DGI & Control de Cartera{% endblock %}
 
 {% block page_actions %}
-<div class="flex items-center gap-2">
-    <a href="{% url 'crm:quote_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
-        Ver Cotizaciones
+<div class="flex flex-wrap items-center gap-2">
+    <a href="{% url 'billing:pos_terminal' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+        Terminal POS
     </a>
-    <a href="{% url 'operations:workorder_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
-        Ver Órdenes de Trabajo
+    <a href="{% url 'billing:cash_session_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+        Arqueo de Caja (Corte Z)
+    </a>
+    <a href="{% url 'billing:vet_dgi_center' %}" class="px-3 py-1.5 bg-slate-900 text-white hover:bg-slate-800 text-xs font-medium rounded transition-colors">
+        Anexos Fiscales VET-DGI
     </a>
 </div>
 {% endblock %}

@@ -10,7 +10,7 @@ from django.db import transaction
 from django.utils import timezone
 
 import hashlib
-from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt
+from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt, CashRegisterSession
 from apps.core.models import CountryConfig
 from apps.crm.models import Account, AccountContact, Opportunity, Quote, QuoteItem
 from apps.purchasing.models import PurchaseOrder, PurchaseOrderItem, Supplier, SupplierPayment
@@ -25,7 +25,11 @@ from apps.finance.models import (
     PettyCashExpense,
     PettyCashFund,
     PettyCashReplenishment,
+    AccountingAccount,
+    JournalEntry,
+    JournalEntryLine,
 )
+from apps.finance.services import sync_commercial_and_purchasing_to_ledger
 from apps.inventory.models import InventoryItem, StockBalance, StockMovement, Warehouse, InventoryBatch
 from apps.inventory.services import record_stock_entry
 from apps.operations.models import (
@@ -79,7 +83,14 @@ class SandboxScenarioSeeder:
         PurchaseOrder.objects.filter(organization=organization).delete()
         Supplier.objects.filter(organization=organization).delete()
 
-        # 2. Facturación Fiscal, Retenciones DGI y Recibos Oficiales de Caja (ROC)
+        # 1.8 Asientos de Partida Doble y Catálogo Contable (apps/finance)
+        JournalEntryLine.objects.filter(organization=organization).delete()
+        JournalEntry.objects.filter(organization=organization).delete()
+        AccountingAccount.objects.filter(organization=organization).delete()
+
+        # 2. Facturación Fiscal, Retenciones DGI, Recibos Oficiales de Caja (ROC) y Arqueos Z
+        CashRegisterSession.objects.filter(organization=organization).update(status=CashRegisterSession.Status.OPEN, audit_hash='')
+        CashRegisterSession.objects.filter(organization=organization).delete()
         PaymentReceipt.objects.filter(organization=organization).delete()
         InvoiceItem.objects.filter(organization=organization).delete()
         Invoice.objects.filter(organization=organization).delete()
@@ -1379,6 +1390,91 @@ class SandboxScenarioSeeder:
             notes='Abono inicial 50,000.00 C$ mediante transferencia directa BAC de ENATREL.',
         )
 
+        # Factura 2: Venta de Insumos / Medicamentos Exentos de IVA (Ley 822)
+        cli_claro = Account.objects.get(organization=organization, code='CLI-002')
+        inv2 = Invoice.objects.create(
+            organization=organization,
+            number='FAC-2026-0002',
+            account=cli_claro,
+            status=Invoice.Status.PAID,
+            payment_condition=Invoice.PaymentCondition.CASH,
+            issue_date=timezone.now().date() - datetime.timedelta(days=2),
+            due_date=timezone.now().date() - datetime.timedelta(days=2),
+            currency_code='NIO',
+            currency_symbol='C$',
+            exchange_rate=Decimal('36.6243'),
+            apply_tax=False,
+            tax_name='EXENTO LEY 822',
+            tax_rate=Decimal('0.00'),
+            ir_retention_rate=Decimal('0.00'),
+            imi_retention_rate=Decimal('0.00'),
+            created_by=commercial_mgr,
+            notes='Venta de insumos y medicamentos de botiquín industrial exentos de IVA según Ley 822.',
+        )
+        InvoiceItem.objects.create(
+            organization=organization,
+            invoice=inv2,
+            item_type='PRODUCT',
+            code='MED-AMX-01',
+            description='Amoxicilina + Ácido Clavulánico 500/125mg Caja x 30 tabs (Exento Ley 822)',
+            unit='CJ',
+            quantity=Decimal('20.00'),
+            unit_price=Decimal('450.00'),
+            discount_percent=Decimal('0.00'),
+        )
+        inv2.recalculate_totals()
+        inv2.save()
+
+        # Recibo Oficial de Caja (ROC) al contado en efectivo para la factura 2
+        PaymentReceipt.objects.create(
+            organization=organization,
+            number='ROC-2026-0002',
+            invoice=inv2,
+            payment_date=timezone.now().date() - datetime.timedelta(days=2),
+            payment_method=PaymentReceipt.PaymentMethod.CASH,
+            reference_number='REC-CAJA-002',
+            currency_paid='NIO',
+            amount_in_payment_currency=inv2.net_receivable,
+            exchange_rate_applied=inv2.exchange_rate,
+            amount_applied_to_invoice=inv2.net_receivable,
+            received_by=commercial_mgr,
+            notes='Pago de contado en efectivo en mostrador.',
+        )
+
+        # -------------------------------------------------------------------------
+        # ARQUEO DE CAJA Z BIMONETARIO (apps/billing)
+        # -------------------------------------------------------------------------
+        # 1. Sesión de Caja Z Cerrada y Sellada con Hash SHA-256 (ARQ-2026-0001)
+        arq1 = CashRegisterSession.objects.create(
+            organization=organization,
+            number='ARQ-2026-0001',
+            cashier=commercial_mgr,
+            status=CashRegisterSession.Status.OPEN,
+            opened_at=timezone.now() - datetime.timedelta(days=2, hours=8),
+            opening_cash_nio=Decimal('5000.00'),
+            opening_cash_usd=Decimal('100.00'),
+            exchange_rate=Decimal('36.6243'),
+            notes='Turno inicial de apertura comercial con fondo en Córdobas y Dólares.',
+        )
+        arq1.close_and_seal_session(
+            declared_nio=Decimal('14000.00'),  # 5,000 inicial + 9,000 de inv2
+            declared_usd=Decimal('100.00'),
+            notes='Corte Z sellado sin discrepancias en caja física.',
+        )
+
+        # 2. Sesión de Caja Activa en Línea para pruebas interactivas de mostrador
+        CashRegisterSession.objects.create(
+            organization=organization,
+            number='ARQ-2026-0002',
+            cashier=commercial_mgr,
+            status=CashRegisterSession.Status.OPEN,
+            opened_at=timezone.now() - datetime.timedelta(hours=3),
+            opening_cash_nio=Decimal('5000.00'),
+            opening_cash_usd=Decimal('100.00'),
+            exchange_rate=Decimal('36.6243'),
+            notes='Turno activo de operaciones en mostrador y ventas rápidas POS.',
+        )
+
         # =========================================================================
         # 8. COMPRAS, PROVEEDORES Y CUENTAS POR PAGAR (apps/purchasing)
         # =========================================================================
@@ -1416,7 +1512,7 @@ class SandboxScenarioSeeder:
             is_active=True,
         )
 
-        # Orden de Compra Recibida en Bodega con Entrada a Kardex y Constancia RET
+        # Orden de Compra 1: Gravada con IVA 15% y Retenciones RET-2026-0001
         po1 = PurchaseOrder.objects.create(
             organization=organization,
             number='OC-2026-0001',
@@ -1440,7 +1536,6 @@ class SandboxScenarioSeeder:
             received_by=ops_coord,
         )
 
-        # Partida de compra: 5.00 MTS de cable a C$ 20,000.00 c/u = Subtotal C$ 100,000.00
         PurchaseOrderItem.objects.create(
             organization=organization,
             purchase_order=po1,
@@ -1465,6 +1560,46 @@ class SandboxScenarioSeeder:
             reference_note=f"Recepción {po1.number} · Factura {po1.supplier_invoice_number}",
             user=ops_coord,
         )
+
+        # Orden de Compra 2: Servicios de Conectividad y Licenciamiento Exento de IVA con RET-2026-0002
+        po2 = PurchaseOrder.objects.create(
+            organization=organization,
+            number='OC-2026-0002',
+            supplier=supplier_comtech,
+            target_warehouse=bod1,
+            supplier_invoice_number='FAC-COM-8832',
+            status=PurchaseOrder.Status.RECEIVED,
+            issue_date=timezone.now().date() - datetime.timedelta(days=4),
+            due_date=timezone.now().date() + datetime.timedelta(days=11),
+            received_at=timezone.now() - datetime.timedelta(days=3),
+            currency_code='NIO',
+            currency_symbol='C$',
+            exchange_rate=Decimal('36.6243'),
+            apply_tax=False,
+            tax_rate=Decimal('0.00'),
+            ir_withholding_rate=Decimal('1.00'),
+            imi_withholding_rate=Decimal('1.00'),
+            withholding_certificate_number='RET-2026-0002',
+            stock_received=True,
+            created_by=commercial_mgr,
+            received_by=ops_coord,
+        )
+        PurchaseOrderItem.objects.create(
+            organization=organization,
+            purchase_order=po2,
+            inventory_item=items.get('MAT-CON-01'),
+            description='Suministro de conectores y accesorios de comunicación (Exento)',
+            unit='SRV',
+            quantity=Decimal('2.00'),
+            unit_cost=Decimal('15000.00'),
+            line_total=Decimal('30000.00'),
+        )
+        po2.recalculate_totals()
+        po2.withholding_certificate_number = 'RET-2026-0002'
+        po2.save()
+
+        # Sincronización Contable Automática con apps/finance (Partida Doble NIIF/DGI)
+        sync_commercial_and_purchasing_to_ledger(organization, owner_user)
 
         # =========================================================================
         # 8. REPOSITORIO DOCUMENTAL INSTITUCIONAL (apps/repository)

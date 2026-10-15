@@ -501,3 +501,227 @@ class FinancialTransaction(TenantScopedModel):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("El registro de auditoría financiera es inmutable. Prohibido eliminar transacciones históricas.")
+
+
+class AccountingAccount(TenantScopedModel):
+    """
+    Catálogo de Cuentas Contables NIIF / DGI Nicaragua.
+    Estructura jerárquica para partida doble de compras, ventas, impuestos y cartera.
+    """
+    class AccountType(models.TextChoices):
+        ASSET = 'ASSET', 'Activo'
+        LIABILITY = 'LIABILITY', 'Pasivo'
+        EQUITY = 'EQUITY', 'Patrimonio'
+        INCOME = 'INCOME', 'Ingresos'
+        EXPENSE = 'EXPENSE', 'Costos y Gastos'
+
+    code = models.CharField(
+        max_length=30,
+        db_index=True,
+        verbose_name="Código de Cuenta",
+        help_text="ej: 1101-01, 2101-01",
+    )
+    name = models.CharField(
+        max_length=150,
+        verbose_name="Nombre de la Cuenta",
+        help_text="ej: Caja General, Clientes por Cobrar",
+    )
+    account_type = models.CharField(
+        max_length=20,
+        choices=AccountType.choices,
+        default=AccountType.ASSET,
+        verbose_name="Tipo de Cuenta",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Cuenta Activa",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Cuenta Contable"
+        verbose_name_plural = "Catálogo de Cuentas Contables"
+        ordering = ['code']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'code'],
+                name='unique_accounting_account_code_per_tenant',
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.code} · {self.name} [{self.get_account_type_display()}]"
+
+
+class JournalEntry(TenantScopedModel):
+    """
+    Póliza Contable / Asiento de Partida Doble Cuadrada (Debe == Haber).
+    Trazabilidad de operaciones comerciales, fiscales y de tesorería.
+    """
+    class EntryType(models.TextChoices):
+        SALES = 'SALES', 'Póliza de Ventas / Facturación DGI'
+        PURCHASES = 'PURCHASES', 'Póliza de Compras / Recepción'
+        COLLECTIONS = 'COLLECTIONS', 'Póliza de Recaudación / Caja'
+        PAYMENTS = 'PAYMENTS', 'Póliza de Egresos / Pagos'
+        ADJUSTMENT = 'ADJUSTMENT', 'Póliza de Diario / Ajuste'
+
+    number = models.CharField(
+        max_length=25,
+        db_index=True,
+        verbose_name="N° Póliza Contable",
+        help_text="Consecutivo oficial ej: POL-2026-0001",
+    )
+    date = models.DateField(
+        default=timezone.now,
+        verbose_name="Fecha Contable",
+    )
+    entry_type = models.CharField(
+        max_length=20,
+        choices=EntryType.choices,
+        default=EntryType.SALES,
+        verbose_name="Tipo de Póliza",
+    )
+    concept = models.CharField(
+        max_length=255,
+        verbose_name="Concepto de la Póliza",
+    )
+    reference = models.CharField(
+        max_length=80,
+        blank=True,
+        verbose_name="Documento Fuente / Folio",
+        help_text="ej: FAC-2026-0001, OC-2026-0001",
+    )
+    source_invoice = models.ForeignKey(
+        'billing.Invoice',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='journal_entries',
+        verbose_name="Factura Fuente",
+    )
+    source_purchase_order = models.ForeignKey(
+        'purchasing.PurchaseOrder',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='journal_entries',
+        verbose_name="Orden de Compra Fuente",
+    )
+    total_debit = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Total Debe (C$)",
+    )
+    total_credit = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Total Haber (C$)",
+    )
+    is_balanced = models.BooleanField(
+        default=False,
+        verbose_name="Póliza Cuadrada",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Contador / Registrado Por",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Póliza Contable"
+        verbose_name_plural = "Pólizas Contables (Libro Diario)"
+        ordering = ['-date', '-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'number'],
+                name='unique_journal_entry_number_per_tenant',
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.number} · {self.concept} ({self.total_debit} C$)"
+
+    def verify_and_save_balance(self):
+        totals = self.lines.aggregate(
+            d=models.Sum('debit'),
+            c=models.Sum('credit'),
+        )
+        self.total_debit = totals['d'] or Decimal('0.00')
+        self.total_credit = totals['c'] or Decimal('0.00')
+        diff = abs(self.total_debit - self.total_credit)
+        self.is_balanced = (diff <= Decimal('0.01'))
+        JournalEntry.objects.filter(pk=self.pk).update(
+            total_debit=self.total_debit,
+            total_credit=self.total_credit,
+            is_balanced=self.is_balanced,
+            updated_at=timezone.now(),
+        )
+        return self.is_balanced
+
+    def save(self, *args, **kwargs):
+        if not self.number and self.organization_id:
+            year = self.date.year if self.date else timezone.now().year
+            prefix = f"POL-{year}-"
+            count = (
+                JournalEntry.objects.filter(
+                    organization_id=self.organization_id,
+                    number__startswith=prefix,
+                ).count()
+                + 1
+            )
+            candidate = f"{prefix}{count:04d}"
+            while JournalEntry.objects.filter(
+                organization_id=self.organization_id, number=candidate
+            ).exists():
+                count += 1
+                candidate = f"{prefix}{count:04d}"
+            self.number = candidate
+
+        super().save(*args, **kwargs)
+
+
+class JournalEntryLine(TenantScopedModel):
+    """
+    Partida Individual de Póliza Contable (Línea de Asiento).
+    """
+    entry = models.ForeignKey(
+        JournalEntry,
+        on_delete=models.CASCADE,
+        related_name='lines',
+        verbose_name="Póliza Contable",
+    )
+    account = models.ForeignKey(
+        AccountingAccount,
+        on_delete=models.PROTECT,
+        related_name='entry_lines',
+        verbose_name="Cuenta Contable",
+    )
+    concept = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Detalle de la Línea",
+    )
+    debit = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Debe (C$)",
+    )
+    credit = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Haber (C$)",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Línea de Póliza"
+        verbose_name_plural = "Líneas de Póliza"
+        ordering = ['created_at']
+
+    def __str__(self) -> str:
+        return f"{self.entry.number} · {self.account.code} | D:{self.debit} C:{self.credit}"
+

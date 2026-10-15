@@ -4,7 +4,8 @@ from django.db import models, transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 
-from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt
+from django.core.exceptions import ValidationError
+from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt, CashRegisterSession
 from apps.crm.models import Quote, Account
 from apps.inventory.models import InventoryItem, Warehouse, InventoryBatch
 from apps.operations.models import WorkOrder, WorkOrderTimelineLog
@@ -500,3 +501,158 @@ class PointOfSaleTerminalView(ModuleAccessRequiredMixin, View):
         except Exception as e:
             messages.error(request, f"Error al emitir factura en mostrador: {str(e)}")
             return redirect('billing:pos_terminal')
+
+
+class CashSessionListView(ModuleAccessRequiredMixin, View):
+    """
+    Monitor y Panel de Arqueo de Caja Z Bimonetario (C$ / $).
+    Accesible en lectura para Coordinador Operativo (80+).
+    Gestión de apertura y cierre reservada para Gerente Comercial (85+) y Administrador.
+    """
+    required_module = 'billing'
+    min_role_level = RoleLevel.OPERATIONS_COORD
+    template_name = 'billing/cash_sessions.html'
+
+    def get(self, request, *args, **kwargs):
+        org = request.organization
+        active_session = CashRegisterSession.objects.filter(
+            organization=org,
+            status=CashRegisterSession.Status.OPEN,
+        ).first()
+
+        if active_session:
+            active_session.recalculate_system_totals()
+
+        sessions_history = list(
+            CashRegisterSession.objects.filter(organization=org)
+            .select_related('cashier')
+            .order_by('-opened_at')
+        )
+
+        closed_sessions = [s for s in sessions_history if s.status == CashRegisterSession.Status.CLOSED]
+        total_sealed_nio = sum(s.declared_cash_nio for s in closed_sessions)
+        total_sealed_usd = sum(s.declared_cash_usd for s in closed_sessions)
+        total_diff_nio = sum(s.difference_nio for s in closed_sessions)
+        total_diff_usd = sum(s.difference_usd for s in closed_sessions)
+
+        can_manage_cash = (getattr(request, 'role_level', 0) >= RoleLevel.COMMERCIAL_MGR)
+
+        context = {
+            'active_session': active_session,
+            'sessions_history': sessions_history,
+            'total_sessions': len(sessions_history),
+            'total_closed_sessions': len(closed_sessions),
+            'total_sealed_nio': total_sealed_nio,
+            'total_sealed_usd': total_sealed_usd,
+            'total_diff_nio': total_diff_nio,
+            'total_diff_usd': total_diff_usd,
+            'can_manage_cash': can_manage_cash,
+        }
+        return render(request, self.template_name, context)
+
+
+class CashSessionOpenView(ModuleAccessRequiredMixin, View):
+    """
+    Apertura de Turno de Caja con Fondos Iniciales Bimonetarios (C$ / $).
+    Requiere nivel mínimo COMMERCIAL_MGR (85+).
+    """
+    required_module = 'billing'
+    min_role_level = RoleLevel.COMMERCIAL_MGR
+
+    def post(self, request, *args, **kwargs):
+        org = request.organization
+
+        if CashRegisterSession.objects.filter(organization=org, status=CashRegisterSession.Status.OPEN).exists():
+            messages.error(request, "Ya existe un turno de caja abierto en esta organización. Debe cerrar el turno activo antes de aperturar uno nuevo.")
+            return redirect('billing:cash_session_list')
+
+        try:
+            opening_nio = Decimal(request.POST.get('opening_cash_nio', '0.00').strip() or '0.00')
+            opening_usd = Decimal(request.POST.get('opening_cash_usd', '0.00').strip() or '0.00')
+            exchange_rate = Decimal(request.POST.get('exchange_rate', '36.6243').strip() or '36.6243')
+            notes = request.POST.get('notes', '').strip()
+
+            session = CashRegisterSession(
+                organization=org,
+                cashier=request.user,
+                status=CashRegisterSession.Status.OPEN,
+                opening_cash_nio=opening_nio,
+                opening_cash_usd=opening_usd,
+                exchange_rate=exchange_rate,
+                notes=notes,
+            )
+            session.save()
+            session.recalculate_system_totals()
+            session.save(update_fields=[
+                'system_cash_nio', 'system_cash_usd',
+                'system_transfer_nio', 'system_transfer_usd',
+                'expected_cash_nio', 'expected_cash_usd',
+            ])
+
+            messages.success(
+                request,
+                f"Turno de caja {session.number} aperturado con éxito. "
+                f"Fondo Inicial: C$ {opening_nio:,.2f} / $ {opening_usd:,.2f}."
+            )
+        except Exception as e:
+            messages.error(request, f"Error al aperturar turno de caja: {str(e)}")
+
+        return redirect('billing:cash_session_list')
+
+
+class CashSessionCloseView(ModuleAccessRequiredMixin, View):
+    """
+    Cierre y Sellado de Arqueo de Caja Z (Corte Z) con Firma Criptográfica SHA-256.
+    Requiere nivel mínimo COMMERCIAL_MGR (85+).
+    """
+    required_module = 'billing'
+    min_role_level = RoleLevel.COMMERCIAL_MGR
+
+    def post(self, request, pk, *args, **kwargs):
+        org = request.organization
+        session = get_object_or_404(CashRegisterSession, pk=pk, organization=org)
+
+        try:
+            declared_nio = Decimal(request.POST.get('declared_cash_nio', '0.00').strip() or '0.00')
+            declared_usd = Decimal(request.POST.get('declared_cash_usd', '0.00').strip() or '0.00')
+            notes = request.POST.get('notes', '').strip()
+
+            session.close_and_seal_session(
+                declared_nio=declared_nio,
+                declared_usd=declared_usd,
+                notes=notes,
+            )
+            messages.success(
+                request,
+                f"Arqueo de Caja Z {session.number} sellado exitosamente. "
+                f"Sello SHA-256: {session.audit_hash[:16]}... (Diferencia: C$ {session.difference_nio:,.2f} / $ {session.difference_usd:,.2f})"
+            )
+        except ValidationError as e:
+            messages.error(request, e.message if hasattr(e, 'message') else str(e))
+        except Exception as e:
+            messages.error(request, f"Error al cerrar arqueo de caja: {str(e)}")
+
+        return redirect('billing:cash_session_list')
+
+
+class CashSessionPrintView(ModuleAccessRequiredMixin, View):
+    """
+    Comprobante Físico de Arqueo de Caja Z (Corte Z) para Impresión Térmica / Auditoría.
+    Accesible en lectura para Coordinador Operativo (80+).
+    """
+    required_module = 'billing'
+    min_role_level = RoleLevel.OPERATIONS_COORD
+    template_name = 'billing/cash_session_print.html'
+
+    def get(self, request, pk, *args, **kwargs):
+        org = request.organization
+        session = get_object_or_404(CashRegisterSession, pk=pk, organization=org)
+
+        if session.status == CashRegisterSession.Status.OPEN:
+            session.recalculate_system_totals()
+
+        return render(request, self.template_name, {
+            'session': session,
+            'org': org,
+        })
+
