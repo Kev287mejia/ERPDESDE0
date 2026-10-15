@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-zinc-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colilla de Pago {{ payslip.number }} - {{ contract.full_name }} | ERP SAS</title>
+
+    <!-- Tipografía Suiza: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Inter"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #18181b;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background-color: #ffffff !important;
+                padding: 0 !important;
+            }
+            .print-card {
+                border: 1px solid #e4e4e7 !important;
+                box-shadow: none !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body class="py-8 px-4 font-sans antialiased text-zinc-900">
+
+    <!-- BARRA DE ACCIÓN NO IMPRIMIBLE -->
+    <div class="max-w-3xl mx-auto mb-4 flex items-center justify-between no-print">
+        <a href="javascript:history.back()" class="h-8 px-3 border border-zinc-300 bg-white hover:bg-zinc-50 rounded-[4px] text-xs font-medium text-zinc-700 inline-flex items-center gap-1.5 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            <span>Volver</span>
+        </a>
+        <button type="button" onclick="window.print()" class="h-8 px-4 bg-zinc-900 hover:bg-zinc-800 text-white rounded-[4px] text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            <span>Imprimir Colilla Oficial</span>
+        </button>
+    </div>
+
+    <!-- DOCUMENTO PRINCIPAL IMPRIMIBLE SWISS GRID -->
+    <div class="max-w-3xl mx-auto bg-white border border-zinc-200 rounded-[4px] p-8 shadow-sm print-card space-y-6">
+
+        <!-- CABECERA INSTITUCIONAL Y FISCAL -->
+        <div class="flex items-start justify-between border-b border-zinc-200 pb-5">
+            <div>
+                <span class="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold block">COMPROBANTE OFICIAL DE PAGO Y DEDUCCIONES</span>
+                <h1 class="text-base font-bold text-zinc-900 mt-1 uppercase">
+                    {{ organization.legal_name }}
+                </h1>
+                <div class="text-xs text-zinc-600 mt-1 space-y-0.5">
+                    <div>RUC Institucional: <span class="font-mono font-semibold tabular-nums text-zinc-900">{{ organization.tax_id }}</span></div>
+                    <div>República de Nicaragua &bull; Sistema Tributario DGI &bull; Afiliación INSS</div>
+                </div>
+            </div>
+
+            <div class="text-right">
+                <span class="text-[10px] font-mono text-zinc-400 uppercase block font-semibold">FOLIO DE COLILLA</span>
+                <div class="text-base font-mono font-bold text-zinc-900 tabular-nums">
+                    {{ payslip.number }}
+                </div>
+                <div class="text-[11px] font-mono text-zinc-500 mt-0.5">
+                    Planilla: <span class="text-zinc-800 font-semibold">{{ period.number }}</span>
+                </div>
+                <div class="text-[10px] font-mono text-zinc-400 mt-1">
+                    Pago: {{ period.payment_date|date:"Y-m-d" }}
+                </div>
+            </div>
+        </div>
+
+        <!-- DATOS DEL COLABORADOR Y DEL CONTRATO -->
+        <div class="bg-zinc-50 border border-zinc-200 rounded-[4px] p-4">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+                <div>
+                    <span class="text-[10px] text-zinc-400 block uppercase">COLABORADOR:</span>
+                    <span class="font-bold text-zinc-900 font-sans text-xs block">{{ contract.full_name }}</span>
+                    <span class="text-[10px] text-zinc-500">{{ contract.code }}</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-zinc-400 block uppercase">CÉDULA DE IDENTIDAD:</span>
+                    <span class="font-bold text-zinc-900 tabular-nums">{{ contract.national_id }}</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-zinc-400 block uppercase">N° ASEGURADO INSS:</span>
+                    <span class="font-bold text-zinc-900 tabular-nums">{{ contract.inss_number }}</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-zinc-400 block uppercase">CARGO & ÁREA:</span>
+                    <span class="font-medium text-zinc-800 font-sans text-xs truncate block">{{ contract.job_title }}</span>
+                    <span class="text-[10px] text-zinc-400">{{ contract.get_department_display }}</span>
+                </div>
+            </div>
+
+            <div class="mt-3 pt-3 border-t border-zinc-200/70 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono text-[11px]">
+                <div>
+                    <span class="text-[10px] text-zinc-400 block uppercase">FECHA DE INGRESO:</span>
+                    <span class="text-zinc-700 tabular-nums">{{ contract.hire_date|date:"Y-m-d" }}</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-zinc-400 block uppercase">DÍAS LABORADOS:</span>
+                    <span class="text-zinc-700 tabular-nums">{{ payslip.days_worked }} días</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-zinc-400 block uppercase">CUENTA DE DEPÓSITO:</span>
+                    <span class="text-zinc-700 tabular-nums">{{ contract.bank_name }} {{ contract.bank_account_number|default:"-" }}</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-zinc-400 block uppercase">SALARIO BASE MENSUAL:</span>
+                    <span class="font-bold text-zinc-900 tabular-nums">C$ {{ contract.monthly_base_salary }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CUADRO DE PERCEPCIONES Y DEDUCCIONES (2 COLUMNAS TÉCNICAS) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+            <!-- COLUMNA 1: INGRESOS DEVENGADOS -->
+            <div class="border border-zinc-200 rounded-[4px] p-4 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between pb-2 border-b border-zinc-200">
+                        <h3 class="text-xs font-mono uppercase font-bold text-zinc-900">1. Haberes Devengados</h3>
+                        <span class="text-[10px] font-mono text-zinc-400 uppercase">INGRESOS</span>
+                    </div>
+                    <div class="mt-3 space-y-2 text-xs font-mono">
+                        <div class="flex justify-between items-center">
+                            <span class="text-zinc-600 font-sans">Salario Base del Período:</span>
+                            <span class="font-semibold text-zinc-900 tabular-nums">C$ {{ payslip.base_salary_earned }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-zinc-600 font-sans">Horas Extras, Bonos e Incentivos:</span>
+                            <span class="font-semibold text-zinc-900 tabular-nums">C$ {{ payslip.overtime_and_bonuses }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-zinc-600 font-sans">Viáticos / Aguinaldo No Gravable:</span>
+                            <span class="font-semibold text-zinc-900 tabular-nums">C$ {{ payslip.non_taxable_allowances }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-zinc-200 flex justify-between items-center font-mono">
+                    <span class="text-xs font-bold text-zinc-900 uppercase">TOTAL INGRESOS BRUTOS:</span>
+                    <span class="text-sm font-bold text-zinc-900 tabular-nums">C$ {{ payslip.gross_salary }}</span>
+                </div>
+            </div>
+
+            <!-- COLUMNA 2: DEDUCCIONES DE LEY -->
+            <div class="border border-zinc-200 rounded-[4px] p-4 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between pb-2 border-b border-zinc-200">
+                        <h3 class="text-xs font-mono uppercase font-bold text-zinc-900">2. Deducciones de Ley</h3>
+                        <span class="text-[10px] font-mono text-zinc-400 uppercase">RETENCIONES</span>
+                    </div>
+                    <div class="mt-3 space-y-2 text-xs font-mono">
+                        <div class="flex justify-between items-center">
+                            <span class="text-zinc-600 font-sans">INSS Laboral (7.00%):</span>
+                            <span class="font-semibold text-red-700 tabular-nums">-C$ {{ payslip.inss_employee_amount }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-zinc-600 font-sans">Base Imponible Neta Gravable:</span>
+                            <span class="text-zinc-500 tabular-nums text-[11px]">C$ {{ payslip.net_taxable_base }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-zinc-600 font-sans">IR Salarial (Art. 23 Ley 822):</span>
+                            <span class="font-semibold text-red-700 tabular-nums">-C$ {{ payslip.ir_salary_tax_amount }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-zinc-600 font-sans">Otras Deducciones / Anticipos:</span>
+                            <span class="text-zinc-700 tabular-nums">
+                                {% if payslip.other_deductions > 0 %}-C$ {{ payslip.other_deductions }}{% else %}-{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-zinc-200 flex justify-between items-center font-mono">
+                    <span class="text-xs font-bold text-red-800 uppercase">TOTAL DEDUCCIONES:</span>
+                    <span class="text-sm font-bold text-red-700 tabular-nums">-C$ {{ payslip.total_deductions }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RECUADRO DESTACADO: NETO LÍQUIDO A RECIBIR -->
+        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-[4px] flex items-center justify-between font-mono">
+            <div>
+                <span class="text-xs font-bold text-emerald-900 uppercase tracking-wider block font-sans">NETO LÍQUIDO A RECIBIR POR EL TRABAJADOR:</span>
+                <span class="text-[11px] text-emerald-700">Depósito en cuenta o pago en efectivo a satisfacción de ley</span>
+            </div>
+            <div class="text-2xl font-bold text-emerald-900 tabular-nums">
+                C$ {{ payslip.net_payable }}
+            </div>
+        </div>
+
+        <!-- APORTES PATRONALES DE LEY (INFORMATIVO AL COLABORADOR) -->
+        <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-[4px] text-xs font-mono text-zinc-600">
+            <span class="text-[10px] text-zinc-400 uppercase font-semibold block mb-1">Cargas Patronales y Beneficios de Ley Pagados por la Empresa (Informativo):</span>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] tabular-nums">
+                <div>INSS Patronal ({{ period.employer_inss_rate }}%): <span class="font-semibold text-zinc-800">C$ {{ payslip.inss_employer_amount }}</span></div>
+                <div>INATEC ({{ period.inatec_rate }}%): <span class="font-semibold text-zinc-800">C$ {{ payslip.inatec_amount }}</span></div>
+                <div>Provisión Vacaciones: <span class="font-semibold text-zinc-800">C$ {{ payslip.vacation_provision }}</span></div>
+                <div>Provisión Aguinaldo: <span class="font-semibold text-zinc-800">C$ {{ payslip.thirteenth_month_provision }}</span></div>
+            </div>
+        </div>
+
+        <!-- BLOQUE DE FIRMAS TÉCNICAS -->
+        <div class="pt-10 grid grid-cols-2 gap-12 font-mono text-xs">
+            <div class="text-center">
+                <div class="border-t border-zinc-400 pt-2">
+                    <span class="font-bold text-zinc-900 block font-sans">POR LA EMPRESA</span>
+                    <span class="text-[10px] text-zinc-500">Recursos Humanos / Dirección General</span>
+                </div>
+            </div>
+            <div class="text-center">
+                <div class="border-t border-zinc-400 pt-2">
+                    <span class="font-bold text-zinc-900 block font-sans">{{ contract.full_name }}</span>
+                    <span class="text-[10px] text-zinc-500">Recibí Conforme (Cédula: {{ contract.national_id }})</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- PIE DE AUDITORÍA -->
+        <div class="pt-4 border-t border-zinc-100 flex items-center justify-between text-[10px] font-mono text-zinc-400">
+            <span>ERP SAS &bull; Colilla de Pago {{ payslip.number }}</span>
+            <span>Generado el {% now "Y-m-d H:i" %} &bull; Nicaragua DGI-822</span>
+        </div>
+
+    </div>
+
+</body>
+</html>

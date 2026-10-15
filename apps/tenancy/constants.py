@@ -112,6 +112,15 @@ ERP_MODULES_CATALOG = [
         'min_role_level': 80,
         'default_enabled': True,
     },
+    {
+        'code': 'payroll',
+        'tag': 'MOD-PAY',
+        'name': 'Planilla, Nómina INSS/IR & Prestaciones MITRAB',
+        'badge': 'LEY 822 / 185',
+        'description': 'Nómina Nicaragüense, INSS Laboral 7%, INSS Patronal, INATEC 2%, Tabla Progresiva IR Salarial Ley 822 y Provisiones MITRAB.',
+        'min_role_level': 20,
+        'default_enabled': True,
+    },
 ]
 
 # Diccionario indexado por código para consultas directas O(1)
@@ -153,7 +162,7 @@ VERTICAL_PRESETS_CONFIG = {
     BusinessVertical.ENGINEERING_SERVICES: {
         'name': 'Ingeniería, Construcción y Servicios de Campo',
         'short_name': 'INGENIERÍA',
-        'default_modules': ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
+        'default_modules': ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
         'enable_pos': False,
         'enable_batches_expiry': False,
         'enable_tiered_pricing': False,
@@ -162,7 +171,7 @@ VERTICAL_PRESETS_CONFIG = {
     BusinessVertical.HARDWARE_STORE: {
         'name': 'Ferretería, Materiales y Distribución Mayorista',
         'short_name': 'FERRETERÍA',
-        'default_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
+        'default_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
         'enable_pos': True,
         'enable_batches_expiry': False,
         'enable_tiered_pricing': True,
@@ -171,7 +180,7 @@ VERTICAL_PRESETS_CONFIG = {
     BusinessVertical.PHARMACY_HEALTH: {
         'name': 'Farmacia, Droguería e Insumos Médicos (MINSA)',
         'short_name': 'FARMACIA',
-        'default_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
+        'default_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
         'enable_pos': True,
         'enable_batches_expiry': True,
         'enable_tiered_pricing': False,
@@ -180,7 +189,7 @@ VERTICAL_PRESETS_CONFIG = {
     BusinessVertical.SME_RETAIL: {
         'name': 'PYME Comercial, Tienda y Servicios Generales',
         'short_name': 'PYME COMERCIAL',
-        'default_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
+        'default_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
         'enable_pos': True,
         'enable_batches_expiry': False,
         'enable_tiered_pricing': True,

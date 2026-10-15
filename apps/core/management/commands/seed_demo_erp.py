@@ -55,13 +55,13 @@ class Command(BaseCommand):
                 'tax_regime': Organization.TaxRegime.GENERAL,
                 'industry': Organization.Industry.ENERGY_TELCO,
                 'accounting_template': Organization.AccountingTemplate.NIIF_PYMES,
-                'enabled_modules': ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing'],
+                'enabled_modules': ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'payroll'],
                 'business_profile': Organization.BusinessProfile.ENGINEERING_SERVICES,
                 'onboarding_completed': True,
                 'is_active': True,
             }
         )
-        org.enabled_modules = ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing']
+        org.enabled_modules = ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'payroll']
         org.business_profile = Organization.BusinessProfile.ENGINEERING_SERVICES
         org.onboarding_completed = True
         org.save()

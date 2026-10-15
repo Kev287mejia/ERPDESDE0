@@ -1,0 +1,143 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Mis Colillas de Pago | ERP SAS{% endblock %}
+{% block breadcrumb_section %}AUTOSERVICIO DEL COLABORADOR{% endblock %}
+{% block breadcrumb_page %}MIS COLILLAS DE PAGO{% endblock %}
+{% block page_title %}Expediente Personal & Historial de Colillas de Nómina{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-5xl mx-auto font-sans">
+
+    <!-- ===================================================================== -->
+    <!-- 1. FICHA RESUMEN DEL COLABORADOR                                      -->
+    <!-- ===================================================================== -->
+    <div class="bg-white border border-zinc-200 rounded-[4px] p-4 space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-100">
+            <div>
+                <span class="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold">EXPEDIENTE LABORAL INDIVIDUAL</span>
+                <h2 class="text-sm font-semibold text-zinc-900 mt-0.5">
+                    {% if contract %}{{ contract.full_name }}{% else %}{{ request.user.get_full_name|default:request.user.email }}{% endif %}
+                </h2>
+                <p class="text-xs text-zinc-500">
+                    {{ organization.legal_name }} &bull; Afiliación a la Seguridad Social (INSS Nicaragua)
+                </p>
+            </div>
+            {% if contract %}
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-xs font-mono font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                CONTRATO ACTIVO &bull; {{ contract.code }}
+            </span>
+            {% endif %}
+        </div>
+
+        {% if contract %}
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block uppercase">CÉDULA DE IDENTIDAD:</span>
+                <span class="font-bold text-zinc-900 tabular-nums">{{ contract.national_id }}</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block uppercase">N° ASEGURADO INSS:</span>
+                <span class="font-bold text-zinc-900 tabular-nums">{{ contract.inss_number }}</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block uppercase">CARGO ASIGNADO:</span>
+                <span class="font-medium text-zinc-900 font-sans truncate block">{{ contract.job_title }}</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block uppercase">SALARIO BÁSICO:</span>
+                <span class="font-bold text-zinc-900 tabular-nums">C$ {{ contract.monthly_base_salary }}</span>
+            </div>
+        </div>
+        {% else %}
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-[4px] text-xs text-amber-800">
+            Aviso: Su usuario aún no tiene una ficha de contrato laboral vinculada directamente. Si considera que es un error, consulte con Recursos Humanos / Gerencia.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- 2. HISTORIAL AUDITABLE DE COLILLAS DE PAGO                            -->
+    <!-- ===================================================================== -->
+    <div class="bg-white border border-zinc-200 rounded-[4px] p-4">
+        <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+            <div>
+                <h3 class="text-xs font-mono uppercase font-bold text-zinc-900">Historial Oficial de Colillas de Pago</h3>
+                <p class="text-[11px] text-zinc-500 mt-0.5">
+                    Comprobantes individuales con deducciones de ley aplicadas (INSS 7% e IR Art. 23 Ley 822).
+                </p>
+            </div>
+            <span class="text-xs font-mono text-zinc-400 tabular-nums">{{ payslips|length }} Recibo(s)</span>
+        </div>
+
+        <div class="mt-3 overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="border-b border-zinc-200 text-[10px] font-mono text-zinc-400 uppercase">
+                        <th class="py-2.5 px-3 font-medium">Folio Colilla</th>
+                        <th class="py-2.5 px-3 font-medium">Período de Nómina</th>
+                        <th class="py-2.5 px-3 font-medium text-right">Devengado Bruto</th>
+                        <th class="py-2.5 px-3 font-medium text-right text-red-700">INSS Laboral (7%)</th>
+                        <th class="py-2.5 px-3 font-medium text-right text-red-700">IR Salarial (DGI)</th>
+                        <th class="py-2.5 px-3 font-medium text-right font-bold text-emerald-800 bg-emerald-50/50">NETO A RECIBIR</th>
+                        <th class="py-2.5 px-3 font-medium text-center">Estado Nómina</th>
+                        <th class="py-2.5 px-3 font-medium text-right">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 font-mono text-[11px] tabular-nums">
+                    {% for slip in payslips %}
+                    <tr class="hover:bg-zinc-50 transition-colors">
+                        <td class="py-2.5 px-3 font-bold text-zinc-900">
+                            {{ slip.number }}
+                        </td>
+                        <td class="py-2.5 px-3 font-sans">
+                            <div class="text-zinc-800 font-medium">{{ slip.period.period_name }}</div>
+                            <div class="text-[10px] font-mono text-zinc-400">
+                                Pago: {{ slip.period.payment_date|date:"Y-m-d" }}
+                            </div>
+                        </td>
+                        <td class="py-2.5 px-3 text-right text-zinc-800">
+                            C$ {{ slip.gross_salary }}
+                        </td>
+                        <td class="py-2.5 px-3 text-right text-red-700">
+                            -C$ {{ slip.inss_employee_amount }}
+                        </td>
+                        <td class="py-2.5 px-3 text-right text-red-700">
+                            -C$ {{ slip.ir_salary_tax_amount }}
+                        </td>
+                        <td class="py-2.5 px-3 text-right font-bold text-emerald-800 bg-emerald-50/50">
+                            C$ {{ slip.net_payable }}
+                        </td>
+                        <td class="py-2.5 px-3 text-center font-sans">
+                            {% if slip.period.status == 'CLOSED' %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-[3px] text-[10px] font-mono font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                PAGADA / SELLADA
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-[3px] text-[10px] font-mono font-medium bg-zinc-100 text-zinc-600 border border-zinc-200">
+                                EN PROCESO
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3 text-right">
+                            <a href="{% url 'payroll:payslip_print' pk=slip.pk %}" target="_blank" class="h-7 px-2.5 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-sans font-medium rounded-[4px] inline-flex items-center gap-1.5 transition-colors">
+                                <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24-3.078 1.905-5.734 4.887-5.975a5.753 5.753 0 016.143 5.975M6.72 13.829a5.748 5.748 0 00-4.97 5.671M6.72 13.829c.24 3.078-1.905 5.734-4.887 5.975m15.914-5.975a5.75 5.75 0 014.97 5.671m-4.97-5.671a5.748 5.748 0 00-4.887 5.975M12 9.75v10.5m0-10.5a3 3 0 110-6 3 3 0 010 6z"/>
+                                </svg>
+                                <span>Ver / Imprimir</span>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="py-8 text-center text-zinc-400 font-mono text-xs">
+                            No se registran colillas de pago emitidas para su usuario en esta organización.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

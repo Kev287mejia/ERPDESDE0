@@ -57,4 +57,7 @@ urlpatterns = [
 
     # Módulo de Servidor MCP, Agentes IA y Gobierno de Tokens
     path('mcp/', include('apps.ai_agent.urls')),
+
+    # Módulo de Planilla, Nómina INSS/IR y Prestaciones MITRAB (Payroll)
+    path('payroll/', include('apps.payroll.urls')),
 ]

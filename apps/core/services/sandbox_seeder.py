@@ -50,6 +50,8 @@ from apps.tenancy.models import (
     RoleLevel,
     SaasSubscriptionInvoice,
 )
+from apps.payroll.models import EmployeeContract, PayrollPeriod, Payslip
+from apps.payroll.services import close_and_account_payroll_period
 
 User = get_user_model()
 
@@ -135,6 +137,12 @@ class SandboxScenarioSeeder:
 
         # 7.6 Facturación de Suscripción SaaS HQ
         SaasSubscriptionInvoice.objects.filter(organization=organization).delete()
+
+        # 7.7 Nómina Laboral, Colillas y Provisiones (apps/payroll)
+        PayrollPeriod.objects.filter(organization=organization).update(status=PayrollPeriod.Status.DRAFT, audit_hash='')
+        Payslip.objects.filter(organization=organization).delete()
+        PayrollPeriod.objects.filter(organization=organization).delete()
+        EmployeeContract.objects.filter(organization=organization).delete()
 
         # 8. Miembros subordinados del equipo
         OrganizationMembership.objects.filter(
@@ -2007,6 +2015,98 @@ class SandboxScenarioSeeder:
             }
         )
 
+        # =========================================================================
+        # 12. PLANILLA Y NÓMINA LABORAL NICARAGUA LEY 822 / MITRAB (apps/payroll)
+        # =========================================================================
+        contracts_specs = [
+            {
+                'code': 'EMP-0001',
+                'user': owner_user,
+                'full_name': 'Ing. Alejandro Vega',
+                'national_id': '001-150882-0003K',
+                'inss_number': '2458901-4',
+                'job_title': 'Director General & Socio Fundador',
+                'department': EmployeeContract.Department.MANAGEMENT,
+                'monthly_base_salary': Decimal('65000.00'),
+                'bank_name': 'BAC Credomatic',
+                'bank_account_number': '360-128491-0',
+            },
+            {
+                'code': 'EMP-0002',
+                'user': ops_coord,
+                'full_name': 'Ing. Marcos Silva',
+                'national_id': '001-220785-0002A',
+                'inss_number': '3891456-8',
+                'job_title': 'Coordinador General de Operaciones',
+                'department': EmployeeContract.Department.OPERATIONS,
+                'monthly_base_salary': Decimal('35000.00'),
+                'bank_name': 'BAC Credomatic',
+                'bank_account_number': '360-845591-2',
+            },
+            {
+                'code': 'EMP-0003',
+                'user': resident_eng,
+                'full_name': 'Ing. Ricardo Blandón',
+                'national_id': '001-051189-0006L',
+                'inss_number': '4712039-2',
+                'job_title': 'Ingeniero Residente de Media Tensión',
+                'department': EmployeeContract.Department.OPERATIONS,
+                'monthly_base_salary': Decimal('25000.00'),
+                'bank_name': 'BAC Credomatic',
+                'bank_account_number': '360-471203-9',
+            },
+            {
+                'code': 'EMP-0004',
+                'user': field_tech,
+                'full_name': 'Téc. Carlos Ruiz',
+                'national_id': '001-300895-0008F',
+                'inss_number': '6294810-7',
+                'job_title': 'Técnico Electromecánico & Liniero',
+                'department': EmployeeContract.Department.OPERATIONS,
+                'monthly_base_salary': Decimal('9500.00'),
+                'bank_name': 'BAC Credomatic',
+                'bank_account_number': '360-629481-0',
+            },
+        ]
+
+        seeded_contracts = []
+        for cspec in contracts_specs:
+            contract, _ = EmployeeContract.objects.update_or_create(
+                organization=organization,
+                code=cspec['code'],
+                defaults={
+                    'user': cspec['user'],
+                    'full_name': cspec['full_name'],
+                    'national_id': cspec['national_id'],
+                    'inss_number': cspec['inss_number'],
+                    'job_title': cspec['job_title'],
+                    'department': cspec['department'],
+                    'hire_date': datetime.date(2024, 1, 15),
+                    'monthly_base_salary': cspec['monthly_base_salary'],
+                    'bank_name': cspec['bank_name'],
+                    'bank_account_number': cspec['bank_account_number'],
+                    'is_active': True,
+                }
+            )
+            seeded_contracts.append(contract)
+
+        period_oct, _ = PayrollPeriod.objects.get_or_create(
+            organization=organization,
+            number='NOM-2026-0001',
+            defaults={
+                'period_name': 'Planilla Mensual Octubre 2026',
+                'frequency': PayrollPeriod.Frequency.MONTHLY,
+                'start_date': datetime.date(2026, 10, 1),
+                'end_date': datetime.date(2026, 10, 31),
+                'payment_date': datetime.date(2026, 10, 31),
+                'employer_inss_rate': Decimal('22.50'),
+                'inatec_rate': Decimal('2.00'),
+                'status': PayrollPeriod.Status.DRAFT,
+            }
+        )
+        if period_oct.status == PayrollPeriod.Status.DRAFT:
+            close_and_account_payroll_period(period_oct, owner_user)
+
         return {
             'organization': organization,
             'members_count': 7,
@@ -2029,6 +2129,8 @@ class SandboxScenarioSeeder:
             'tickets_count': 2,
             'mcp_tokens_count': 2,
             'mcp_logs_count': 3,
+            'contracts_count': len(seeded_contracts),
+            'payroll_periods_count': 1,
         }
 
 

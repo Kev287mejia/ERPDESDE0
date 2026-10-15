@@ -1,0 +1,273 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Sábana de Nómina {{ period.number }} | ERP SAS{% endblock %}
+{% block breadcrumb_section %}PLANILLA & NÓMINA{% endblock %}
+{% block breadcrumb_page %}SÁBANA {{ period.number }}{% endblock %}
+{% block page_title %}{{ period.period_name }} &bull; {{ period.number }}{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2">
+    <a href="{% url 'payroll:dashboard' %}" class="h-8 px-3 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
+        </svg>
+        <span>Volver a Consola</span>
+    </a>
+
+    {% if period.status == 'DRAFT' %}
+    <form method="post" action="{% url 'payroll:period_recalculate' pk=period.pk %}" class="inline">
+        {% csrf_token %}
+        <button type="submit" class="h-8 px-3 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+            <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+            </svg>
+            <span>Recalcular Todo</span>
+        </button>
+    </form>
+    <form method="post" action="{% url 'payroll:period_close' pk=period.pk %}" class="inline" onsubmit="return confirm('¿Confirma el cierre y sellado definitivo de la planilla? Se generará el sello SHA-256 y la póliza contable en el Libro Diario.');">
+        {% csrf_token %}
+        <button type="submit" class="h-8 px-3.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+            <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/>
+            </svg>
+            <span>Aprobar, Sellar SHA-256 & Contabilizar</span>
+        </button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-full font-sans">
+
+    <!-- ===================================================================== -->
+    <!-- 1. FICHA TÉCNICA DEL PERÍODO Y ESTADO DE CIERRE                       -->
+    <!-- ===================================================================== -->
+    <div class="bg-white border border-zinc-200 rounded-[4px] p-4 space-y-4">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-zinc-100">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-mono font-bold text-zinc-900">{{ period.number }}</span>
+                    <span class="text-zinc-300">/</span>
+                    <span class="text-xs font-mono font-medium text-zinc-700">{{ period.get_frequency_display }}</span>
+                    <span class="text-zinc-300">/</span>
+                    <span class="text-xs text-zinc-500 font-mono">Pago: {{ period.payment_date|date:"Y-m-d" }}</span>
+                </div>
+                <p class="text-xs text-zinc-500 mt-0.5">
+                    Período Fiscal: <span class="font-mono text-zinc-700 tabular-nums">{{ period.start_date|date:"Y-m-d" }} al {{ period.end_date|date:"Y-m-d" }}</span> &bull; INSS Patronal: <strong class="font-mono">{{ period.employer_inss_rate }}%</strong> &bull; INATEC: <strong class="font-mono">{{ period.inatec_rate }}%</strong>
+                </p>
+            </div>
+
+            <div class="flex items-center gap-3">
+                {% if period.status == 'CLOSED' %}
+                <div class="text-right">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-xs font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                        PLANILLA SELLADA & CONTABILIZADA
+                    </span>
+                    <div class="text-[10px] font-mono text-zinc-400 mt-1 truncate max-w-xs" title="{{ period.audit_hash }}">
+                        HASH: {{ period.audit_hash|slice:":24" }}...
+                    </div>
+                </div>
+                {% if period.journal_entry %}
+                <div class="border-l border-zinc-200 pl-3 text-right">
+                    <span class="text-[10px] font-mono text-zinc-400 block uppercase">PÓLIZA CONTABLE</span>
+                    <span class="font-mono text-xs font-bold text-zinc-800">
+                        {{ period.journal_entry.number }}
+                    </span>
+                    <span class="inline-block text-[9px] font-mono text-emerald-700 font-semibold">(Partida Doble Cuadrada)</span>
+                </div>
+                {% endif %}
+                {% else %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-xs font-mono font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    BORRADOR EN REVISIÓN (MODIFICABLE)
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Métricas Rápidas del Período -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 text-xs font-mono">
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block uppercase">COLABORADORES:</span>
+                <span class="font-bold text-zinc-900 tabular-nums">{{ payslips|length }} Asientos</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block uppercase">DEVENGADO BRUTO:</span>
+                <span class="font-bold text-zinc-900 tabular-nums">C$ {{ period.total_gross_salary }}</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block uppercase">INSS LABORAL 7%:</span>
+                <span class="font-bold text-zinc-900 tabular-nums">C$ {{ period.total_inss_employee }}</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block uppercase">IR LEY 822 (DGI):</span>
+                <span class="font-bold text-zinc-900 tabular-nums">C$ {{ period.total_ir_tax }}</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block uppercase">NETO A PAGAR:</span>
+                <span class="font-bold text-emerald-700 tabular-nums">C$ {{ period.total_net_salary }}</span>
+            </div>
+            <div class="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <span class="text-[10px] text-zinc-400 block uppercase">COSTO EMPRESA:</span>
+                <span class="font-bold text-zinc-900 tabular-nums">C$ {{ period.total_company_cost }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- 2. SÁBANA MAESTRA DE NÓMINA (MATRIZ COMPLETA DE DETALLE)             -->
+    <!-- ===================================================================== -->
+    <div class="bg-white border border-zinc-200 rounded-[4px] p-4">
+        <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
+            <div>
+                <h3 class="text-xs font-mono uppercase font-bold text-zinc-900">Sábana Maestra de Nómina & Cargas Sociales</h3>
+                <p class="text-[11px] text-zinc-500 mt-0.5">
+                    Detalle individualizado por empleado conforme a normativa laboral INSS, DGI y MITRAB.
+                </p>
+            </div>
+            <span class="text-xs font-mono text-zinc-400 tabular-nums">{{ payslips|length }} Colillas</span>
+        </div>
+
+        <div class="mt-3 overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs font-mono">
+                <thead>
+                    <tr class="border-b border-zinc-200 text-[10px] text-zinc-400 uppercase bg-zinc-50">
+                        <th class="py-2.5 px-2 font-medium">Folio</th>
+                        <th class="py-2.5 px-2 font-medium">Colaborador / Identidad</th>
+                        <th class="py-2.5 px-1 font-medium text-center">Días</th>
+                        <th class="py-2.5 px-2 font-medium text-right">Salario Base</th>
+                        <th class="py-2.5 px-2 font-medium text-right">Extras/Bonos</th>
+                        <th class="py-2.5 px-2 font-medium text-right bg-zinc-100/50">Bruto Gravable</th>
+                        <th class="py-2.5 px-2 font-medium text-right text-red-700">INSS 7%</th>
+                        <th class="py-2.5 px-2 font-medium text-right">Base Neta IR</th>
+                        <th class="py-2.5 px-2 font-medium text-right text-red-700">IR Ley 822</th>
+                        <th class="py-2.5 px-2 font-medium text-right text-red-700">Otras Deduc.</th>
+                        <th class="py-2.5 px-2 font-medium text-right font-bold text-zinc-900 bg-emerald-50/60">NETO A PAGAR</th>
+                        <th class="py-2.5 px-2 font-medium text-right text-zinc-600">INSS Pat.</th>
+                        <th class="py-2.5 px-2 font-medium text-right text-zinc-600">INATEC</th>
+                        <th class="py-2.5 px-2 font-medium text-right text-zinc-600">Prov. MITRAB</th>
+                        <th class="py-2.5 px-2 font-medium text-right font-semibold">Costo Total</th>
+                        <th class="py-2.5 px-2 font-medium text-center">Colilla</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 text-[11px] tabular-nums">
+                    {% for slip in payslips %}
+                    <tr class="hover:bg-zinc-50 transition-colors">
+                        <td class="py-2 px-2 font-bold text-zinc-900">
+                            {{ slip.number }}
+                        </td>
+                        <td class="py-2 px-2 font-sans font-medium text-zinc-900 min-w-[180px]">
+                            <div class="truncate">{{ slip.contract.full_name }}</div>
+                            <div class="text-[10px] font-mono text-zinc-400">
+                                {{ slip.contract.code }} &bull; INSS: {{ slip.contract.inss_number }}
+                            </div>
+                        </td>
+                        <td class="py-2 px-1 text-center text-zinc-600">
+                            {{ slip.days_worked }}
+                        </td>
+                        <td class="py-2 px-2 text-right text-zinc-700">
+                            {{ slip.base_salary_earned }}
+                        </td>
+                        <td class="py-2 px-2 text-right text-zinc-600">
+                            {{ slip.overtime_and_bonuses }}
+                        </td>
+                        <td class="py-2 px-2 text-right font-semibold text-zinc-900 bg-zinc-50">
+                            {{ slip.gross_salary }}
+                        </td>
+                        <td class="py-2 px-2 text-right text-red-700">
+                            -{{ slip.inss_employee_amount }}
+                        </td>
+                        <td class="py-2 px-2 text-right text-zinc-600">
+                            {{ slip.net_taxable_base }}
+                        </td>
+                        <td class="py-2 px-2 text-right text-red-700">
+                            -{{ slip.ir_salary_tax_amount }}
+                        </td>
+                        <td class="py-2 px-2 text-right text-zinc-500">
+                            {% if slip.other_deductions > 0 %}-{{ slip.other_deductions }}{% else %}-{% endif %}
+                        </td>
+                        <td class="py-2 px-2 text-right font-bold text-emerald-800 bg-emerald-50/60">
+                            C$ {{ slip.net_payable }}
+                        </td>
+                        <td class="py-2 px-2 text-right text-zinc-600">
+                            {{ slip.inss_employer_amount }}
+                        </td>
+                        <td class="py-2 px-2 text-right text-zinc-600">
+                            {{ slip.inatec_amount }}
+                        </td>
+                        <td class="py-2 px-2 text-right text-zinc-600">
+                            {{ slip.vacation_provision|add:slip.thirteenth_month_provision|add:slip.severance_provision }}
+                        </td>
+                        <td class="py-2 px-2 text-right font-bold text-zinc-900">
+                            {{ slip.gross_salary|add:slip.inss_employer_amount|add:slip.inatec_amount|add:slip.vacation_provision|add:slip.thirteenth_month_provision|add:slip.severance_provision }}
+                        </td>
+                        <td class="py-2 px-2 text-center">
+                            <a href="{% url 'payroll:payslip_print' pk=slip.pk %}" target="_blank" class="p-1 text-zinc-500 hover:text-zinc-900 inline-flex items-center" title="Imprimir Colilla Individual">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24-3.078 1.905-5.734 4.887-5.975a5.753 5.753 0 016.143 5.975M6.72 13.829a5.748 5.748 0 00-4.97 5.671M6.72 13.829c.24 3.078-1.905 5.734-4.887 5.975m15.914-5.975a5.75 5.75 0 014.97 5.671m-4.97-5.671a5.748 5.748 0 00-4.887 5.975M12 9.75v10.5m0-10.5a3 3 0 110-6 3 3 0 010 6z"/>
+                                </svg>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="16" class="py-8 text-center text-zinc-400 font-mono text-xs">
+                            No se han generado colillas de pago para esta planilla.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <!-- FILA DE TOTALES CONSOLIDADOS -->
+                <tfoot>
+                    <tr class="border-t-2 border-zinc-900 bg-zinc-50 font-bold text-zinc-900 text-[11px] tabular-nums">
+                        <td colspan="3" class="py-3 px-2 font-sans uppercase text-[10px] tracking-wider text-zinc-500">
+                            TOTALES CONSOLIDADOS ({{ payslips|length }} EMPLEADOS)
+                        </td>
+                        <td class="py-3 px-2 text-right">
+                            C$ {{ period.total_gross_salary }}
+                        </td>
+                        <td class="py-3 px-2 text-right">
+                            -
+                        </td>
+                        <td class="py-3 px-2 text-right bg-zinc-100">
+                            C$ {{ period.total_gross_salary }}
+                        </td>
+                        <td class="py-3 px-2 text-right text-red-700">
+                            C$ {{ period.total_inss_employee }}
+                        </td>
+                        <td class="py-3 px-2 text-right">
+                            -
+                        </td>
+                        <td class="py-3 px-2 text-right text-red-700">
+                            C$ {{ period.total_ir_tax }}
+                        </td>
+                        <td class="py-3 px-2 text-right">
+                            -
+                        </td>
+                        <td class="py-3 px-2 text-right text-emerald-800 bg-emerald-100/60">
+                            C$ {{ period.total_net_salary }}
+                        </td>
+                        <td class="py-3 px-2 text-right text-zinc-700">
+                            C$ {{ period.total_inss_employer }}
+                        </td>
+                        <td class="py-3 px-2 text-right text-zinc-700">
+                            C$ {{ period.total_inatec }}
+                        </td>
+                        <td class="py-3 px-2 text-right text-zinc-700">
+                            C$ {{ period.total_provisions }}
+                        </td>
+                        <td class="py-3 px-2 text-right text-zinc-900">
+                            C$ {{ period.total_company_cost }}
+                        </td>
+                        <td class="py-3 px-2 text-center text-zinc-400">
+                            -
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

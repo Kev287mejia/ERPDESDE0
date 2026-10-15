@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'apps.repository',
     'apps.tickets',
     'apps.ai_agent',
+    'apps.payroll',
 ]
 
 MIDDLEWARE = [

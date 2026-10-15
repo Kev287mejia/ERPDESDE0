@@ -49,10 +49,10 @@ class Organization(TimeStampedModel):
         HYBRID_ENTERPRISE = 'HYBRID_ENTERPRISE', 'Operación Integral Multi-Giro'
 
     BUSINESS_PROFILE_PRESETS = {
-        'ENGINEERING_SERVICES': ['crm', 'operations', 'sst', 'inventory', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
-        'COMMERCIAL_RETAIL': ['crm', 'inventory', 'billing', 'purchasing', 'repository', 'tickets'],
-        'FIELD_CONTRACTOR': ['operations', 'sst', 'inventory', 'purchasing', 'repository', 'tickets'],
-        'HYBRID_ENTERPRISE': ['crm', 'operations', 'sst', 'inventory', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
+        'ENGINEERING_SERVICES': ['crm', 'operations', 'sst', 'inventory', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
+        'COMMERCIAL_RETAIL': ['crm', 'inventory', 'billing', 'purchasing', 'repository', 'tickets', 'payroll'],
+        'FIELD_CONTRACTOR': ['operations', 'sst', 'inventory', 'purchasing', 'repository', 'tickets', 'payroll'],
+        'HYBRID_ENTERPRISE': ['crm', 'operations', 'sst', 'inventory', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
     }
 
     BusinessVertical = BusinessVertical

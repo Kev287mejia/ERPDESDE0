@@ -173,5 +173,14 @@ def __getattr__(name):
     if name == 'SaasSubscriptionInvoice':
         from apps.tenancy.models import SaasSubscriptionInvoice
         return SaasSubscriptionInvoice
+    if name == 'EmployeeContract':
+        from apps.payroll.models import EmployeeContract
+        return EmployeeContract
+    if name == 'PayrollPeriod':
+        from apps.payroll.models import PayrollPeriod
+        return PayrollPeriod
+    if name == 'Payslip':
+        from apps.payroll.models import Payslip
+        return Payslip
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
