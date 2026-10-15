@@ -72,6 +72,11 @@ class Command(BaseCommand):
                 'business_profile': Organization.BusinessProfile.ENGINEERING_SERVICES,
                 'accounting_template': Organization.AccountingTemplate.NIIF_PYMES,
                 'enabled_modules': ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
+                'subscription_plan': Organization.SubscriptionPlan.ENTERPRISE,
+                'subscription_status': Organization.SubscriptionStatus.ACTIVE,
+                'monthly_fee_usd': Decimal('199.00'),
+                'max_users_quota': 50,
+                'max_users': 50,
                 'onboarding_completed': True,
                 'is_active': True,
             }
@@ -79,6 +84,12 @@ class Command(BaseCommand):
         org.business_vertical = BusinessVertical.ENGINEERING_SERVICES
         org.business_profile = Organization.BusinessProfile.ENGINEERING_SERVICES
         org.enabled_modules = ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll']
+        org.subscription_plan = Organization.SubscriptionPlan.ENTERPRISE
+        org.subscription_status = Organization.SubscriptionStatus.ACTIVE
+        org.monthly_fee_usd = Decimal('199.00')
+        org.max_users_quota = 50
+        org.max_users = 50
+        org.next_billing_date = datetime.date(2026, 11, 1)
         org.onboarding_completed = True
         org.save()
 

@@ -56,9 +56,15 @@ class TenantRequiredMixin(LoginRequiredMixin):
         # Candado de Suspensión Comercial SaaS (Modo Solo Lectura en Mutaciones POST)
         if request.method == 'POST' and getattr(request.organization, 'is_write_blocked_by_saas_suspension', lambda: False)():
             if not request.path.startswith('/saas-hq/'):
-                return render_403_rbac(
+                return render(
                     request,
-                    reason="SUSPENSIÓN COMERCIAL SAAS: La suscripción de la organización se encuentra suspendida (Modo Solo Lectura). Regularice su plan en SaaS HQ para habilitar operaciones de registro."
+                    'tenancy/subscription_suspended.html',
+                    {
+                        'organization': request.organization,
+                        'current_org': request.organization,
+                        'reason': "SUSPENSIÓN COMERCIAL SAAS: La suscripción de la organización se encuentra suspendida (Modo Solo Lectura). Regularice su plan en SaaS HQ para habilitar operaciones de registro.",
+                    },
+                    status=403
                 )
 
         return None

@@ -168,13 +168,15 @@ class SandboxScenarioSeeder:
         organization.onboarding_completed = True
         organization.subscription_plan = Organization.SubscriptionPlan.ENTERPRISE
         organization.subscription_status = Organization.SubscriptionStatus.ACTIVE
-        organization.monthly_fee_usd = Decimal('249.00')
-        organization.max_users = 999
+        organization.monthly_fee_usd = Decimal('199.00')
+        organization.max_users_quota = 50
+        organization.max_users = 50
+        organization.next_billing_date = datetime.date(2026, 11, 1)
         organization.subscription_renews_at = datetime.date(2026, 11, 1)
         organization.save(update_fields=[
             'enabled_modules', 'business_profile', 'onboarding_completed',
             'subscription_plan', 'subscription_status', 'monthly_fee_usd',
-            'max_users', 'subscription_renews_at',
+            'max_users_quota', 'max_users', 'next_billing_date', 'subscription_renews_at',
         ])
 
         # Limpiar datos previos manteniendo solo el Owner
@@ -2542,6 +2544,10 @@ def seed_multi_vertical_demo_organizations(country, users):
             'tax_id': 'J0310000771234',
             'business_vertical': BusinessVertical.HARDWARE_STORE,
             'business_profile': Organization.BusinessProfile.COMMERCIAL_RETAIL,
+            'subscription_plan': Organization.SubscriptionPlan.BUSINESS_PRO,
+            'subscription_status': Organization.SubscriptionStatus.ACTIVE,
+            'monthly_fee_usd': Decimal('89.00'),
+            'max_users_quota': 15,
             'enabled_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
             'industry': Organization.Industry.COMMERCE,
             'warehouse_name': 'Bodega Ferretera Central',
@@ -2556,6 +2562,10 @@ def seed_multi_vertical_demo_organizations(country, users):
             'tax_id': 'J0310000885678',
             'business_vertical': BusinessVertical.PHARMACY_HEALTH,
             'business_profile': Organization.BusinessProfile.COMMERCIAL_RETAIL,
+            'subscription_plan': Organization.SubscriptionPlan.BUSINESS_PRO,
+            'subscription_status': Organization.SubscriptionStatus.ACTIVE,
+            'monthly_fee_usd': Decimal('89.00'),
+            'max_users_quota': 15,
             'enabled_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
             'industry': Organization.Industry.COMMERCE,
             'warehouse_name': 'Bodega Farmacéutica Climatizada',
@@ -2570,6 +2580,10 @@ def seed_multi_vertical_demo_organizations(country, users):
             'tax_id': 'J0310000994321',
             'business_vertical': BusinessVertical.SME_RETAIL,
             'business_profile': Organization.BusinessProfile.COMMERCIAL_RETAIL,
+            'subscription_plan': Organization.SubscriptionPlan.PYME_STARTER,
+            'subscription_status': Organization.SubscriptionStatus.ACTIVE,
+            'monthly_fee_usd': Decimal('39.00'),
+            'max_users_quota': 5,
             'enabled_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'payroll'],
             'industry': Organization.Industry.COMMERCE,
             'warehouse_name': 'Tienda y Almacén General',
@@ -2594,6 +2608,11 @@ def seed_multi_vertical_demo_organizations(country, users):
                 'business_vertical': spec['business_vertical'],
                 'business_profile': spec['business_profile'],
                 'accounting_template': Organization.AccountingTemplate.NIIF_PYMES,
+                'subscription_plan': spec['subscription_plan'],
+                'subscription_status': spec['subscription_status'],
+                'monthly_fee_usd': spec['monthly_fee_usd'],
+                'max_users_quota': spec['max_users_quota'],
+                'max_users': spec['max_users_quota'],
                 'enabled_modules': spec['enabled_modules'],
                 'onboarding_completed': True,
                 'is_active': True,
@@ -2604,6 +2623,12 @@ def seed_multi_vertical_demo_organizations(country, users):
         org.tax_id = spec['tax_id']
         org.business_vertical = spec['business_vertical']
         org.business_profile = spec['business_profile']
+        org.subscription_plan = spec['subscription_plan']
+        org.subscription_status = spec['subscription_status']
+        org.monthly_fee_usd = spec['monthly_fee_usd']
+        org.max_users_quota = spec['max_users_quota']
+        org.max_users = spec['max_users_quota']
+        org.next_billing_date = datetime.date(2026, 11, 1)
         org.enabled_modules = spec['enabled_modules']
         org.onboarding_completed = True
         org.is_active = True

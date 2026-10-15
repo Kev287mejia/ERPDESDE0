@@ -39,8 +39,10 @@ urlpatterns = [
     path('settings/sandbox/reset/', views_onboarding.ResetSandboxDataView.as_view(), name='sandbox_reset'),
 
     # Consola Ejecutiva de Monetización SaaS HQ (Exclusivo Owner 100)
-    path('saas-hq/', views_saas_hq.SaasHQDashboardView.as_view(), name='saas_hq'),
+    path('saas-hq/', views_saas_hq.EternalLabsSaasHqView.as_view(), name='saas_hq'),
     path('saas-hq/switch-plan/', views_saas_hq.SaasSwitchPlanView.as_view(), name='saas_switch_plan'),
     path('saas-hq/update-status/', views_saas_hq.SaasUpdateStatusView.as_view(), name='saas_update_status'),
     path('saas-hq/generate-invoice/', views_saas_hq.SaasGenerateInvoiceView.as_view(), name='saas_generate_invoice'),
+    path('saas-hq/backup-json/<str:org_id>/', views_saas_hq.TenantVaultBackupExportView.as_view(), name='saas_backup_export'),
+    path('saas-hq/backup-json/', views_saas_hq.TenantVaultBackupExportView.as_view(), name='saas_backup_export_current'),
 ]

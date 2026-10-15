@@ -142,3 +142,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'accounts_auth:login'
 LOGIN_REDIRECT_URL = 'tenancy:dashboard'
 LOGOUT_REDIRECT_URL = 'accounts_auth:login'
+
+# Hardening de Seguridad HTTP para Producción
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+REFERRER_POLICY = 'strict-origin-when-cross-origin'
+

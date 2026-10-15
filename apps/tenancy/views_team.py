@@ -97,7 +97,12 @@ class TeamCreateMemberView(RoleLevelRequiredMixin, View):
     min_role_level = RoleLevel.OWNER_ADMIN
 
     def post(self, request, *args, **kwargs):
-        # Candado de Cuota de Asientos / Usuarios SaaS (Paso 15.1)
+        # Candado de Cuota de Asientos / Usuarios SaaS (Paso 19.1)
+        if request.organization.is_quota_exceeded:
+            can_add, reason = request.organization.can_add_more_users()
+            messages.error(request, reason)
+            return render_403_rbac(request, reason=reason)
+
         can_add, reason = request.organization.can_add_more_users()
         if not can_add:
             messages.error(request, reason)

@@ -1,3 +1,5 @@
+import hashlib
+import json
 from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import TestCase, Client
@@ -776,6 +778,320 @@ class BusinessVerticalArchitectureTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'FARMACIA MINSA')
         self.assertNotContains(response, 'Órdenes de Trabajo')
+
+
+class SaasHqGovernanceAndHardeningTestSuite(TestCase):
+    """
+    Suite oficial de Gobierno SaaS, Cuotas de Planes, Suspensión por Mora y Telemetría v1.0.0-GA.
+    Verifica:
+    1. Acceso 200 OK a /saas-hq/ para Nivel 100 y bloqueo 403 Forbidden para niveles inferiores (85, 80, 50, 20).
+    2. Bloqueo operativo cuando una organización pasa a subscription_status = 'SUSPENDED' y restauración inmediata al volver a 'ACTIVE'.
+    3. Bloqueo de alta de nuevos miembros cuando se alcanza max_users_quota.
+    4. Descarga del respaldo JSON con sello SHA-256 (/saas-hq/backup-json/<org_id>/).
+    5. Endpoint público de telemetría /healthz/ con version '1.0.0-GA'.
+    """
+
+    def setUp(self):
+        self.country_ni, _ = CountryConfig.objects.get_or_create(
+            code='NI',
+            defaults={
+                'name': 'Nicaragua',
+                'flag_emoji': '🇳🇮',
+                'primary_currency_code': 'NIO',
+                'primary_currency_symbol': 'C$',
+                'tax_id_label': 'RUC',
+                'tax_id_regex': r'^[A-Z]\d{13}$',
+                'is_active': True,
+                'default_tax_rate': Decimal('15.00'),
+                'default_tax_name': 'IVA',
+            }
+        )
+
+        self.org = Organization.objects.create(
+            name='SERMANSA Soluciones Industriales',
+            slug='sermansa-soluciones',
+            legal_name='SERMANSA Soluciones Industriales S.A.',
+            tax_id='J0310000458999',
+            country=self.country_ni,
+            currency=Organization.Currency.NIO,
+            subscription_plan=Organization.SubscriptionPlan.ENTERPRISE,
+            subscription_status=Organization.SubscriptionStatus.ACTIVE,
+            monthly_fee_usd=Decimal('199.00'),
+            max_users_quota=50,
+            max_users=50,
+            enabled_modules=['crm', 'operations', 'inventory', 'finance', 'billing', 'purchasing'],
+            onboarding_completed=True,
+            is_active=True,
+        )
+
+        # 1. Owner Admin (Nivel 100)
+        self.user_owner = User.objects.create_user(
+            email='owner@sermansa.ni',
+            password='Password123!',
+            full_name='Ing. Carlos Mendoza (Owner)',
+        )
+        self.mem_owner = OrganizationMembership.objects.create(
+            organization=self.org,
+            user=self.user_owner,
+            role_level=RoleLevel.OWNER_ADMIN,
+            is_active=True,
+        )
+        self.client_owner = Client()
+        self.client_owner.force_login(self.user_owner)
+        session_owner = self.client_owner.session
+        session_owner['active_org_id'] = str(self.org.id)
+        session_owner.save()
+
+        # 2. Gerente Comercial (Nivel 85)
+        self.user_mgr85 = User.objects.create_user(
+            email='mgr85@sermansa.ni',
+            password='Password123!',
+            full_name='Lic. Valentina Jarquín (85)',
+        )
+        self.mem_mgr85 = OrganizationMembership.objects.create(
+            organization=self.org,
+            user=self.user_mgr85,
+            role_level=RoleLevel.COMMERCIAL_MGR,
+            is_active=True,
+        )
+        self.client_mgr85 = Client()
+        self.client_mgr85.force_login(self.user_mgr85)
+        session_mgr85 = self.client_mgr85.session
+        session_mgr85['active_org_id'] = str(self.org.id)
+        session_mgr85.save()
+
+        # 3. Coordinador Operativo (Nivel 80)
+        self.user_coord80 = User.objects.create_user(
+            email='coord80@sermansa.ni',
+            password='Password123!',
+            full_name='Ing. Roberto Solís (80)',
+        )
+        self.mem_coord80 = OrganizationMembership.objects.create(
+            organization=self.org,
+            user=self.user_coord80,
+            role_level=RoleLevel.OPERATIONS_COORD,
+            is_active=True,
+        )
+        self.client_coord80 = Client()
+        self.client_coord80.force_login(self.user_coord80)
+        session_coord80 = self.client_coord80.session
+        session_coord80['active_org_id'] = str(self.org.id)
+        session_coord80.save()
+
+        # 4. Supervisor de Proyecto / Residente (Nivel 50)
+        self.user_sup50 = User.objects.create_user(
+            email='sup50@sermansa.ni',
+            password='Password123!',
+            full_name='Ing. Francisco Gómez (50)',
+        )
+        self.mem_sup50 = OrganizationMembership.objects.create(
+            organization=self.org,
+            user=self.user_sup50,
+            role_level=RoleLevel.ENGINEER,
+            is_active=True,
+        )
+        self.client_sup50 = Client()
+        self.client_sup50.force_login(self.user_sup50)
+        session_sup50 = self.client_sup50.session
+        session_sup50['active_org_id'] = str(self.org.id)
+        session_sup50.save()
+
+        # 5. Técnico de Campo (Nivel 20)
+        self.user_tech20 = User.objects.create_user(
+            email='tech20@sermansa.ni',
+            password='Password123!',
+            full_name='Téc. Pedro Martínez (20)',
+        )
+        self.mem_tech20 = OrganizationMembership.objects.create(
+            organization=self.org,
+            user=self.user_tech20,
+            role_level=RoleLevel.TECHNICIAN,
+            is_active=True,
+        )
+        self.client_tech20 = Client()
+        self.client_tech20.force_login(self.user_tech20)
+        session_tech20 = self.client_tech20.session
+        session_tech20['active_org_id'] = str(self.org.id)
+        session_tech20.save()
+
+    def test_saas_hq_access_control_level_100_vs_lower_levels(self):
+        """
+        Verifica acceso 200 OK a /saas-hq/ para Nivel 100 y bloqueo estricto 403
+        para todos los niveles jerárquicos inferiores (85, 80, 50, 20).
+        """
+        # Nivel 100: Acceso pleno permitido
+        res_owner = self.client_owner.get(reverse('tenancy:saas_hq'))
+        self.assertEqual(res_owner.status_code, 200)
+        self.assertContains(res_owner, 'Consola de Gobierno Multi-Tenant')
+
+        # Nivel 85: Bloqueo 403 Forbidden
+        res_85 = self.client_mgr85.get(reverse('tenancy:saas_hq'))
+        self.assertEqual(res_85.status_code, 403)
+
+        # Nivel 80: Bloqueo 403 Forbidden
+        res_80 = self.client_coord80.get(reverse('tenancy:saas_hq'))
+        self.assertEqual(res_80.status_code, 403)
+
+        # Nivel 50: Bloqueo 403 Forbidden
+        res_50 = self.client_sup50.get(reverse('tenancy:saas_hq'))
+        self.assertEqual(res_50.status_code, 403)
+
+        # Nivel 20: Bloqueo 403 Forbidden
+        res_20 = self.client_tech20.get(reverse('tenancy:saas_hq'))
+        self.assertEqual(res_20.status_code, 403)
+
+    def test_suspension_status_blocks_operations_and_restores_on_active(self):
+        """
+        Verifica bloqueo operativo cuando subscription_status = 'SUSPENDED'
+        y restauración inmediata al volver a 'ACTIVE'.
+        """
+        from apps.crm.models import Account
+
+        # 1. Poner en SUSPENDED
+        self.org.subscription_status = Organization.SubscriptionStatus.SUSPENDED
+        self.org.save(update_fields=['subscription_status'])
+
+        # Intento de mutación (POST) en CRM queda bloqueado con 403 y plantilla de suspensión
+        blocked_res = self.client_owner.post(
+            reverse('crm:account_create'),
+            data={
+                'commercial_name': 'Cliente Bloqueado por Mora Test',
+                'legal_name': 'Cliente Bloqueado Test S.A.',
+                'account_type': Account.AccountType.CORPORATE,
+                'lifecycle_stage': Account.LifecycleStage.PROSPECT,
+                'tax_id': 'J0310000778899',
+                'city': 'Managua',
+                'default_currency': 'NIO',
+                'payment_terms_days': 0,
+            }
+        )
+        self.assertEqual(blocked_res.status_code, 403)
+        self.assertContains(blocked_res, "SUSPENSIÓN COMERCIAL SAAS", status_code=403)
+        self.assertFalse(Account.objects.filter(tax_id='J0310000778899').exists())
+
+        # 2. Restauración a ACTIVE
+        self.org.subscription_status = Organization.SubscriptionStatus.ACTIVE
+        self.org.save(update_fields=['subscription_status'])
+
+        # Ahora el POST se ejecuta con éxito
+        allowed_res = self.client_owner.post(
+            reverse('crm:account_create'),
+            data={
+                'commercial_name': 'Cliente Activo Post Restauración',
+                'legal_name': 'Cliente Activo S.A.',
+                'account_type': Account.AccountType.CORPORATE,
+                'lifecycle_stage': Account.LifecycleStage.PROSPECT,
+                'tax_id': 'J0310000778899',
+                'city': 'Managua',
+                'default_currency': 'NIO',
+                'payment_terms_days': 0,
+            },
+            follow=True,
+        )
+        self.assertEqual(allowed_res.status_code, 200)
+        self.assertTrue(Account.objects.filter(tax_id='J0310000778899').exists())
+
+    def test_member_creation_blocked_when_max_users_quota_reached(self):
+        """
+        Verifica que el alta de colaboradores se bloquee cuando se alcance la cuota
+        máxima del plan (max_users_quota) y se permita al ampliarla.
+        """
+        # La organización tiene 5 miembros actualmente (owner, mgr, coord, sup, tech)
+        self.assertEqual(int(self.org.active_members_count), 5)
+
+        # Ajustamos cuota al límite actual (5)
+        self.org.max_users_quota = 5
+        self.org.max_users = 5
+        self.org.save(update_fields=['max_users_quota', 'max_users'])
+        self.assertTrue(self.org.is_quota_exceeded)
+
+        # Intento de crear un 6to miembro debe ser rechazado
+        fail_res = self.client_owner.post(
+            reverse('tenancy:team_create'),
+            data={
+                'email': 'extra_user@sermansa.ni',
+                'full_name': 'Colaborador Extra Fuera de Cuota',
+                'personal_id_number': '001-201095-0009P',
+                'phone': '+505 8899-7766',
+                'job_title': 'Especialista Adicional',
+                'role_level': RoleLevel.TECHNICIAN,
+                'department': 'OPERATIONS',
+                'contract_type': 'PERMANENT',
+            }
+        )
+        self.assertEqual(fail_res.status_code, 403)
+        self.assertFalse(User.objects.filter(email='extra_user@sermansa.ni').exists())
+
+        # Ampliar cuota a 10 asientos
+        self.org.max_users_quota = 10
+        self.org.max_users = 10
+        self.org.save(update_fields=['max_users_quota', 'max_users'])
+        self.assertFalse(self.org.is_quota_exceeded)
+
+        # Ahora el alta se realiza exitosamente
+        success_res = self.client_owner.post(
+            reverse('tenancy:team_create'),
+            data={
+                'email': 'extra_user@sermansa.ni',
+                'full_name': 'Colaborador Extra Con Cuota',
+                'personal_id_number': '001-201095-0009P',
+                'phone': '+505 8899-7766',
+                'job_title': 'Especialista Adicional',
+                'role_level': RoleLevel.TECHNICIAN,
+                'department': 'OPERATIONS',
+                'contract_type': 'PERMANENT',
+                'password': 'Password123!',
+            },
+            follow=True,
+        )
+        self.assertEqual(success_res.status_code, 200)
+        self.assertTrue(User.objects.filter(email='extra_user@sermansa.ni').exists())
+
+    def test_tenant_vault_backup_export_sha256_and_security(self):
+        """
+        Verifica la exportación del respaldo portable JSON con sello de integridad SHA-256
+        y que usuarios sin Nivel 100 no puedan descargarlo.
+        """
+        # Descarga Nivel 100
+        res = self.client_owner.get(reverse('tenancy:saas_backup_export', args=[str(self.org.id)]))
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res['Content-Type'], 'application/json')
+        self.assertIn('attachment;', res['Content-Disposition'])
+
+        backup_data = res.json()
+        self.assertIn('integrity_seal_sha256', backup_data)
+        self.assertIn('payload', backup_data)
+
+        payload = backup_data['payload']
+        self.assertEqual(payload['vault_version'], '1.0.0-GA')
+        self.assertEqual(payload['organization']['slug'], self.org.slug)
+
+        # Validar cálculo criptográfico SHA-256 sobre payload determinístico
+        raw_deterministic = json.dumps(payload, sort_keys=True, default=str)
+        expected_seal = hashlib.sha256(raw_deterministic.encode('utf-8')).hexdigest()
+        self.assertEqual(backup_data['integrity_seal_sha256'], expected_seal)
+
+        # Descarga Nivel 85 (Comercial) debe ser rechazada con 403
+        res_unauthorized = self.client_mgr85.get(reverse('tenancy:saas_backup_export', args=[str(self.org.id)]))
+        self.assertEqual(res_unauthorized.status_code, 403)
+
+    def test_healthz_telemetry_endpoint_v1_0_0_ga(self):
+        """
+        Verifica endpoint público /healthz/ con versión 1.0.0-GA, DB status y jurisdicciones activas.
+        """
+        anon_client = Client()
+        res = anon_client.get('/healthz/')
+        self.assertEqual(res.status_code, 200)
+
+        data = res.json()
+        self.assertEqual(data.get('status'), 'ok')
+        self.assertEqual(data.get('version'), '1.0.0-GA')
+        self.assertEqual(data.get('service'), 'VECTOR-ERP-SAS')
+        self.assertEqual(data.get('database'), 'connected')
+        self.assertGreaterEqual(data.get('active_jurisdictions', 0), 1)
+        self.assertIn('latency_ms', data)
+        self.assertIn('timestamp', data)
+
 
 
 

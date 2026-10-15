@@ -7,6 +7,12 @@ from apps.core.models import TimeStampedModel
 from apps.tenancy.constants import MODULE_THRESHOLD_MAP, BusinessVertical, VERTICAL_PRESETS_CONFIG
 
 
+class CallableInt(int):
+    """Permite evaluar una métrica tanto como valor entero como llamable sin romper retrocompatibilidad."""
+    def __call__(self):
+        return int(self)
+
+
 class Organization(TimeStampedModel):
     """
     Representa el Tenant u Organización aislada en la plataforma SaaS.
@@ -17,15 +23,18 @@ class Organization(TimeStampedModel):
         USD = 'USD', 'Dólar Estadounidense ($)'
 
     class SubscriptionPlan(models.TextChoices):
+        PYME_STARTER = 'PYME_STARTER', 'Plan PYME Starter ($39/mes · Hasta 5 Usuarios)'
+        BUSINESS_PRO = 'BUSINESS_PRO', 'Plan Comercial Pro ($89/mes · Hasta 15 Usuarios)'
+        ENTERPRISE = 'ENTERPRISE', 'Plan Industrial Enterprise ($199/mes · Usuarios Ilimitados / 50+)'
+        # Aliases retrocompatibles
         STARTER = 'STARTER', 'Starter Comercial ($49 USD/mes · 5 Usuarios)'
         PYME_PRO = 'PYME_PRO', 'Pyme Profesional ($119 USD/mes · 15 Usuarios)'
-        ENTERPRISE = 'ENTERPRISE', 'Enterprise Corporativo ($249 USD/mes · Usuarios Ilimitados)'
 
     class SubscriptionStatus(models.TextChoices):
-        TRIAL = 'TRIAL', 'Periodo de Prueba (Trial)'
+        TRIAL = 'TRIAL', 'Periodo de Evaluación'
         ACTIVE = 'ACTIVE', 'Suscripción Activa al Día'
-        PAST_DUE = 'PAST_DUE', 'Pago Vencido (Gracia)'
-        SUSPENDED = 'SUSPENDED', 'Servicio Suspendido (Solo Lectura)'
+        PAST_DUE = 'PAST_DUE', 'Pago Pendiente (Aviso de Cobro)'
+        SUSPENDED = 'SUSPENDED', 'Servicio Suspendido por Mora'
 
     class TaxRegime(models.TextChoices):
         GENERAL = 'GENERAL', 'Régimen General DGI (IR Anual + Retenciones)'
@@ -153,9 +162,9 @@ class Organization(TimeStampedModel):
         help_text="Lista de códigos de módulos contratados (ej: ['crm', 'operations', 'sst', 'inventory'])"
     )
 
-    # Gobierno Comercial SaaS y Cuotas de Licenciamiento (Paso 15.1)
+    # Gobierno Comercial SaaS y Cuotas de Licenciamiento (Paso 19.1)
     subscription_plan = models.CharField(
-        max_length=25,
+        max_length=30,
         choices=SubscriptionPlan.choices,
         default=SubscriptionPlan.ENTERPRISE,
         verbose_name="Plan de Suscripción SaaS",
@@ -172,7 +181,7 @@ class Organization(TimeStampedModel):
     monthly_fee_usd = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        default=Decimal('249.00'),
+        default=Decimal('199.00'),
         verbose_name="Tarifa Mensual (USD)",
         help_text="Canon mensual contratado en dólares"
     )
@@ -180,6 +189,17 @@ class Organization(TimeStampedModel):
         default=50,
         verbose_name="Límite Máximo de Usuarios",
         help_text="Límite máximo de membresías activas permitidas por el plan"
+    )
+    max_users_quota = models.PositiveIntegerField(
+        default=50,
+        verbose_name="Cuota Máxima de Usuarios",
+        help_text="Límite de usuarios asignados por la consola SaaS HQ"
+    )
+    next_billing_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Próxima Fecha de Facturación",
+        help_text="Fecha de vencimiento o próximo corte de suscripción"
     )
     subscription_renews_at = models.DateField(
         null=True,
@@ -249,42 +269,60 @@ class Organization(TimeStampedModel):
                 self.enabled_modules = list(preset['default_modules'])
             self.save(update_fields=['business_vertical', 'enabled_modules', 'updated_at'])
 
-    # Métodos Helper de Gobierno SaaS y Cuotas (Paso 15.1)
+    # Métodos Helper de Gobierno SaaS y Cuotas (Paso 19.1)
     def apply_subscription_plan(self, plan_code: str):
         """
-        Ajusta cuotas y tarifas del plan SaaS:
-        - STARTER: $49.00 USD, 5 usuarios.
-        - PYME_PRO: $119.00 USD, 15 usuarios.
-        - ENTERPRISE: $249.00 USD, 999 usuarios.
+        Ajusta cuotas y tarifas del plan SaaS.
         """
         code = str(plan_code).upper().strip()
-        if code == self.SubscriptionPlan.STARTER:
+        if code == 'STARTER':
             self.subscription_plan = self.SubscriptionPlan.STARTER
             self.monthly_fee_usd = Decimal('49.00')
             self.max_users = 5
-        elif code == self.SubscriptionPlan.PYME_PRO:
+            self.max_users_quota = 5
+        elif code == self.SubscriptionPlan.PYME_STARTER:
+            self.subscription_plan = self.SubscriptionPlan.PYME_STARTER
+            self.monthly_fee_usd = Decimal('39.00')
+            self.max_users = 5
+            self.max_users_quota = 5
+        elif code == 'PYME_PRO':
             self.subscription_plan = self.SubscriptionPlan.PYME_PRO
             self.monthly_fee_usd = Decimal('119.00')
             self.max_users = 15
+            self.max_users_quota = 15
+        elif code == self.SubscriptionPlan.BUSINESS_PRO:
+            self.subscription_plan = self.SubscriptionPlan.BUSINESS_PRO
+            self.monthly_fee_usd = Decimal('89.00')
+            self.max_users = 15
+            self.max_users_quota = 15
         elif code == self.SubscriptionPlan.ENTERPRISE:
             self.subscription_plan = self.SubscriptionPlan.ENTERPRISE
             self.monthly_fee_usd = Decimal('249.00')
             self.max_users = 999
+            self.max_users_quota = 999
         else:
             return
-        self.save(update_fields=['subscription_plan', 'monthly_fee_usd', 'max_users', 'updated_at'])
+        self.save(update_fields=['subscription_plan', 'monthly_fee_usd', 'max_users', 'max_users_quota', 'updated_at'])
 
-    def active_members_count(self) -> int:
+    @property
+    def active_members_count(self) -> CallableInt:
         """Retorna la cantidad de colaboradores activos en la organización."""
-        return self.memberships.filter(is_active=True).count()
+        return CallableInt(self.memberships.filter(is_active=True).count())
+
+    @property
+    def is_quota_exceeded(self) -> bool:
+        """Indica si se ha alcanzado o superado la cuota de usuarios permitidos."""
+        limit = self.max_users_quota or self.max_users or 50
+        return int(self.active_members_count) >= limit
 
     def can_add_more_users(self) -> tuple[bool, str]:
         """Verifica si la organización dispone de cupos para incorporar nuevos colaboradores."""
-        active = self.active_members_count()
-        if active >= self.max_users:
+        limit = self.max_users_quota or self.max_users or 50
+        active = int(self.active_members_count)
+        if active >= limit:
             return (
                 False,
-                f"Límite de asientos alcanzado ({active}/{self.max_users}) en su plan {self.get_subscription_plan_display()}. Actualice su plan SaaS."
+                f"Límite de asientos alcanzado / cuota ({active}/{limit} usuarios). El plan {self.get_subscription_plan_display()} no permite agregar más colaboradores. Actualice su suscripción en Eternal Labs HQ."
             )
         return (True, "OK")
 
@@ -448,6 +486,10 @@ class OrganizationMembership(TimeStampedModel):
             )
         ]
         ordering = ['-role_level', 'created_at']
+
+    @property
+    def role_display(self) -> str:
+        return self.get_role_level_display()
 
     def __str__(self) -> str:
         return f"{self.user} @ {self.organization.name} [{self.get_role_level_display()}]"
