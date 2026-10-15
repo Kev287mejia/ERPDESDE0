@@ -21,16 +21,25 @@
         </div>
 
         <div class="flex items-center gap-3">
-            <!-- Moneda y Hora Técnica -->
-            <div class="hidden md:flex items-center gap-2 font-mono text-[11px] text-zinc-600 bg-zinc-50 border border-zinc-200 px-2.5 py-1 rounded-[4px]">
-                <span>CAJA: <strong>PRINCIPAL</strong></span>
-                <span class="text-zinc-300">|</span>
-                <span>MONEDA: <strong>{{ current_org.currency }}</strong> ({{ current_org.currency_symbol }})</span>
+            <!-- Indicador de Turno POS en Vivo -->
+            {% if active_shift %}
+            <div class="flex items-center gap-2 font-mono text-[11px] bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1 rounded-[4px]">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span><strong>{{ active_shift.shift_number }}</strong> &bull; {{ active_shift.register_name }}</span>
             </div>
-            <a href="{% url 'billing:cash_session_list' %}" class="px-2.5 py-1 text-xs font-mono text-zinc-700 bg-white border border-zinc-200 rounded-[4px] hover:bg-zinc-50 transition-colors">
-                Arqueo de Caja (Corte Z)
+            <a href="{% url 'billing:pos_shifts' %}" class="px-2.5 py-1 text-xs font-mono font-medium text-zinc-900 bg-white border border-zinc-300 rounded-[4px] hover:bg-zinc-50 transition-colors">
+                Corte X / Cierre Z de Caja
             </a>
-            <a href="{% url 'billing:invoice_list' %}" class="px-2.5 py-1 text-xs font-mono text-zinc-700 bg-white border border-zinc-200 rounded-[4px] hover:bg-zinc-50 transition-colors">
+            {% else %}
+            <div class="flex items-center gap-2 font-mono text-[11px] bg-amber-50 border border-amber-200 text-amber-800 px-2.5 py-1 rounded-[4px]">
+                <span>SIN TURNO ACTIVO</span>
+            </div>
+            <a href="{% url 'billing:pos_shifts' %}" class="px-2.5 py-1 text-xs font-mono font-semibold text-white bg-zinc-900 rounded-[4px] hover:bg-zinc-800 transition-colors">
+                Abrir Turno de Caja
+            </a>
+            {% endif %}
+
+            <a href="{% url 'billing:invoice_list' %}" class="px-2.5 py-1 text-xs font-mono text-zinc-600 bg-white border border-zinc-200 rounded-[4px] hover:bg-zinc-50 transition-colors">
                 &larr; Facturas &amp; Cartera
             </a>
         </div>

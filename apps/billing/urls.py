@@ -7,6 +7,8 @@ app_name = 'billing'
 urlpatterns = [
     # Terminal de Punto de Venta Rápido de Mostrador (POS)
     path('pos/', views.PointOfSaleTerminalView.as_view(), name='pos_terminal'),
+    path('pos/shifts/', views.PosShiftConsoleView.as_view(), name='pos_shifts'),
+    path('pos/shifts/<str:pk>/print-z/', views.PosShiftZReportPrintView.as_view(), name='pos_shift_print_z'),
 
     # Directorio de Facturas y Cartera
     path('', views.InvoiceListView.as_view(), name='invoice_list'),

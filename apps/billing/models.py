@@ -55,6 +55,15 @@ class Invoice(TenantScopedModel):
         related_name='invoices',
         verbose_name="Orden de Trabajo de Origen"
     )
+    pos_shift = models.ForeignKey(
+        'billing.PosRegisterShift',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='shift_invoices',
+        verbose_name="Turno POS",
+        help_text="Turno operativo de caja en el que se emitió esta factura POS",
+    )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -842,4 +851,154 @@ class CashRegisterSession(TenantScopedModel):
         if self.status == self.Status.CLOSED and self.audit_hash:
             raise ValidationError("No se puede eliminar un Arqueo de Caja (Corte Z) sellado con hash de auditoría.")
         super().delete(*args, **kwargs)
+
+
+class PosRegisterShift(TenantScopedModel):
+    """
+    Control de Turno de Caja POS, Corte X Parcial y Arqueo Ciego Corte Z.
+    Gestiona la apertura con fondo fijo en gaveta, acumulación de ventas en vivo,
+    arqueo ciego de efectivo declarado y sellado inmutable SHA-256.
+    """
+    class Status(models.TextChoices):
+        OPEN = 'OPEN', 'Turno Abierto'
+        CLOSED_Z = 'CLOSED_Z', 'Cerrado (Corte Z Sellado)'
+
+    shift_number = models.CharField(
+        max_length=25,
+        db_index=True,
+        verbose_name="Número de Turno",
+        help_text="Folio secuencial por organización ej: TURNO-2026-0001",
+    )
+    cashier = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='pos_shifts',
+        verbose_name="Cajero Responsable",
+    )
+    register_name = models.CharField(
+        max_length=100,
+        default='CAJA-PRINCIPAL-01',
+        verbose_name="Identificador de Caja / Terminal",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OPEN,
+        db_index=True,
+        verbose_name="Estado del Turno",
+    )
+    opened_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha y Hora de Apertura",
+    )
+    closed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha y Hora de Cierre (Corte Z)",
+    )
+
+    # Importes Monetarios (C$ NIO)
+    opening_cash_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Fondo Fijo Inicial Córdobas (C$)",
+    )
+    system_cash_sales_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Ventas en Efectivo del Turno (C$)",
+    )
+    system_card_transfer_sales_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Ventas Tarjeta / Transferencia / Crédito (C$)",
+    )
+    expected_cash_in_drawer_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Efectivo Esperado en Gaveta (C$)",
+    )
+    declared_cash_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Efectivo Real Declarado en Arqueo (C$)",
+    )
+    cash_difference_nio = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Diferencia de Caja (C$)",
+    )
+    transactions_count = models.IntegerField(
+        default=0,
+        verbose_name="Cantidad de Transacciones / Facturas",
+    )
+    closing_notes = models.TextField(
+        blank=True,
+        verbose_name="Notas de Cierre y Arqueo",
+    )
+    audit_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        editable=False,
+        verbose_name="Sello Criptográfico SHA-256 (Corte Z)",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Turno de Caja POS"
+        verbose_name_plural = "Turnos de Caja POS"
+        ordering = ['-opened_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'shift_number'],
+                name='unique_pos_shift_number_per_tenant',
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.shift_number} · {self.register_name} [{self.get_status_display()}]"
+
+    def clean(self):
+        super().clean()
+        if self.pk:
+            original = PosRegisterShift.objects.filter(pk=self.pk).values('status', 'audit_hash').first()
+            if original and original['status'] == self.Status.CLOSED_Z:
+                raise ValidationError("Un turno con Corte Z sellado es inmutable.")
+
+    def save(self, *args, **kwargs):
+        if self.pk and not self._state.adding:
+            original = PosRegisterShift.objects.filter(pk=self.pk).values('status', 'audit_hash').first()
+            if original and original['status'] == self.Status.CLOSED_Z:
+                raise ValidationError("Un turno con Corte Z sellado es inmutable.")
+
+        if not self.shift_number and self.organization_id:
+            year = timezone.now().year
+            prefix = f"TURNO-{year}-"
+            count = (
+                PosRegisterShift.objects.filter(
+                    organization_id=self.organization_id,
+                    shift_number__startswith=prefix,
+                ).count()
+                + 1
+            )
+            candidate = f"{prefix}{count:04d}"
+            while PosRegisterShift.objects.filter(
+                organization_id=self.organization_id, shift_number=candidate
+            ).exists():
+                count += 1
+                candidate = f"{prefix}{count:04d}"
+            self.shift_number = candidate
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.status == self.Status.CLOSED_Z:
+            raise ValidationError("Un turno con Corte Z sellado es inmutable.")
+        super().delete(*args, **kwargs)
+
 

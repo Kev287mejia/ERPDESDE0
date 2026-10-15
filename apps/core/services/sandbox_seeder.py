@@ -10,7 +10,7 @@ from django.db import transaction
 from django.utils import timezone
 
 import hashlib
-from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt, CashRegisterSession
+from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt, CashRegisterSession, PosRegisterShift
 from apps.core.models import CountryConfig
 from apps.crm.models import Account, AccountContact, Opportunity, Quote, QuoteItem
 from apps.purchasing.models import PurchaseOrder, PurchaseOrderItem, Supplier, SupplierPayment
@@ -96,6 +96,8 @@ class SandboxScenarioSeeder:
         AccountingAccount.objects.filter(organization=organization).delete()
 
         # 2. Facturación Fiscal, Retenciones DGI, Recibos Oficiales de Caja (ROC) y Arqueos Z
+        PosRegisterShift.objects.filter(organization=organization).update(status=PosRegisterShift.Status.OPEN, audit_hash='')
+        PosRegisterShift.objects.filter(organization=organization).delete()
         CashRegisterSession.objects.filter(organization=organization).update(status=CashRegisterSession.Status.OPEN, audit_hash='')
         CashRegisterSession.objects.filter(organization=organization).delete()
         PaymentReceipt.objects.filter(organization=organization).delete()
@@ -1537,6 +1539,54 @@ class SandboxScenarioSeeder:
             notes='Turno activo de operaciones en mostrador y ventas rápidas POS.',
         )
 
+        # -------------------------------------------------------------------------
+        # TURNOS DE CAJA POS RETAIL (apps/billing - PosRegisterShift)
+        # -------------------------------------------------------------------------
+        # 1. Turno Histórico Cerrado con Corte Z Cuadrado y Sello SHA-256
+        shift_open_t = timezone.now() - datetime.timedelta(days=1, hours=8)
+        shift_close_t = timezone.now() - datetime.timedelta(days=1)
+        raw_hash_main = f"{organization.id}:TURNO-2026-0001:2000.00:3450.00:5450.00:5450.00:0.00:CLOSED_Z"
+        sha_seal_main = hashlib.sha256(raw_hash_main.encode('utf-8')).hexdigest()
+
+        shift_z_main = PosRegisterShift.objects.create(
+            organization=organization,
+            shift_number='TURNO-2026-0001',
+            cashier=commercial_mgr,
+            register_name='CAJA-PRINCIPAL-01',
+            status=PosRegisterShift.Status.OPEN,
+            opened_at=shift_open_t,
+            opening_cash_nio=Decimal('2000.00'),
+            system_cash_sales_nio=Decimal('3450.00'),
+            system_card_transfer_sales_nio=Decimal('1200.00'),
+            expected_cash_in_drawer_nio=Decimal('5450.00'),
+            declared_cash_nio=Decimal('5450.00'),
+            cash_difference_nio=Decimal('0.00'),
+            transactions_count=8,
+            closing_notes='Cierre de turno jornada anterior. Gaveta cuadrada al 100% sin discrepancias.',
+        )
+        shift_z_main.status = PosRegisterShift.Status.CLOSED_Z
+        shift_z_main.closed_at = shift_close_t
+        shift_z_main.audit_hash = sha_seal_main
+        shift_z_main.save()
+
+        # 2. Turno Actualmente Abierto para Terminal POS
+        PosRegisterShift.objects.create(
+            organization=organization,
+            shift_number='TURNO-2026-0002',
+            cashier=commercial_mgr,
+            register_name='CAJA-PRINCIPAL-01',
+            status=PosRegisterShift.Status.OPEN,
+            opened_at=timezone.now() - datetime.timedelta(hours=2),
+            opening_cash_nio=Decimal('2000.00'),
+            system_cash_sales_nio=Decimal('0.00'),
+            system_card_transfer_sales_nio=Decimal('0.00'),
+            expected_cash_in_drawer_nio=Decimal('2000.00'),
+            declared_cash_nio=Decimal('0.00'),
+            cash_difference_nio=Decimal('0.00'),
+            transactions_count=0,
+            closing_notes='',
+        )
+
         # =========================================================================
         # 8. COMPRAS, PROVEEDORES Y CUENTAS POR PAGAR (apps/purchasing)
         # =========================================================================
@@ -2607,6 +2657,52 @@ def seed_multi_vertical_demo_organizations(country, users):
         )
 
         ensure_vertical_demo_catalog(org, spec['business_vertical'])
+
+        # Turnos de Caja POS demostrativos para organizaciones de comercio y mostrador
+        PosRegisterShift.objects.filter(organization=org).update(status=PosRegisterShift.Status.OPEN, audit_hash='')
+        PosRegisterShift.objects.filter(organization=org).delete()
+
+        raw_hash_sat = f"{org.id}:TURNO-2026-0001:2000.00:3450.00:5450.00:5450.00:0.00:CLOSED_Z"
+        sha_sat = hashlib.sha256(raw_hash_sat.encode('utf-8')).hexdigest()
+
+        sat_shift_z = PosRegisterShift.objects.create(
+            organization=org,
+            shift_number='TURNO-2026-0001',
+            cashier=users[0],
+            register_name='CAJA-PRINCIPAL-01',
+            status=PosRegisterShift.Status.OPEN,
+            opened_at=timezone.now() - datetime.timedelta(days=1, hours=8),
+            opening_cash_nio=Decimal('2000.00'),
+            system_cash_sales_nio=Decimal('3450.00'),
+            system_card_transfer_sales_nio=Decimal('1200.00'),
+            expected_cash_in_drawer_nio=Decimal('5450.00'),
+            declared_cash_nio=Decimal('5450.00'),
+            cash_difference_nio=Decimal('0.00'),
+            transactions_count=8,
+            closing_notes='Arqueo de cierre de jornada regular. Gaveta cuadrada al 100% conforme a comprobantes.',
+        )
+        sat_shift_z.status = PosRegisterShift.Status.CLOSED_Z
+        sat_shift_z.closed_at = timezone.now() - datetime.timedelta(days=1)
+        sat_shift_z.audit_hash = sha_sat
+        sat_shift_z.save()
+
+        PosRegisterShift.objects.create(
+            organization=org,
+            shift_number='TURNO-2026-0002',
+            cashier=users[0],
+            register_name='CAJA-PRINCIPAL-01',
+            status=PosRegisterShift.Status.OPEN,
+            opened_at=timezone.now() - datetime.timedelta(hours=2),
+            opening_cash_nio=Decimal('2000.00'),
+            system_cash_sales_nio=Decimal('0.00'),
+            system_card_transfer_sales_nio=Decimal('0.00'),
+            expected_cash_in_drawer_nio=Decimal('2000.00'),
+            declared_cash_nio=Decimal('0.00'),
+            cash_difference_nio=Decimal('0.00'),
+            transactions_count=0,
+            closing_notes='',
+        )
+
         created_orgs.append(org)
 
     return created_orgs

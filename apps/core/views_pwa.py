@@ -1,9 +1,10 @@
 """
 Vistas de Infraestructura PWA Instalable (Progressive Web App).
-Eternal Labs - ERP SAS Operaciones & Gestión de Campo.
+Eternal Labs - ERP SAS Operaciones, Retail POS & Gestión de Campo.
 """
 import json
 from django.http import HttpResponse
+from django.shortcuts import render
 from django.views import View
 
 
@@ -16,22 +17,22 @@ class PWAManifestView(View):
         icon_svg = (
             "data:image/svg+xml;utf8,"
             "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='512' height='512'>"
-            "<rect width='512' height='512' rx='64' fill='%230f172a'/>"
-            "<path d='M120 160h272v48H120zm0 96h200v48H120zm0 96h272v48H120z' fill='%2338bdf8'/>"
-            "<circle cx='380' cy='280' r='24' fill='%2310b981'/>"
+            "<rect width='512' height='512' rx='64' fill='%2318181B'/>"
+            "<path d='M120 160h272v40H120zm0 88h200v40H120zm0 88h272v40H120z' fill='%23FFFFFF'/>"
+            "<circle cx='380' cy='268' r='20' fill='%2310B981'/>"
             "</svg>"
         )
 
         manifest = {
-            "name": "ERP SAS · Operaciones & Gestión",
+            "name": "ERP SAS · Eternal Labs",
             "short_name": "ERP SAS",
-            "description": "Sistema de Gestión Empresarial B2B e Ingeniería de Campo",
-            "start_url": "/operations/orders/",
+            "description": "Sistema de Planificación de Recursos Empresariales, Punto de Venta e Ingeniería de Campo",
+            "start_url": "/",
             "scope": "/",
             "display": "standalone",
-            "background_color": "#0F172A",
-            "theme_color": "#0F172A",
-            "orientation": "portrait-primary",
+            "background_color": "#FFFFFF",
+            "theme_color": "#18181B",
+            "orientation": "any",
             "icons": [
                 {
                     "src": icon_svg,
@@ -42,14 +43,19 @@ class PWAManifestView(View):
             ],
             "shortcuts": [
                 {
-                    "name": "Mis Órdenes de Trabajo",
-                    "url": "/operations/orders/",
-                    "description": "Acceso directo a OTs activas"
+                    "name": "Terminal POS",
+                    "url": "/billing/pos/",
+                    "description": "Caja y cobro rápido en mostrador"
                 },
                 {
-                    "name": "Almacén & Kardex",
-                    "url": "/inventory/dashboard/",
-                    "description": "Existencias y despachos"
+                    "name": "Órdenes de Trabajo",
+                    "url": "/operations/orders/",
+                    "description": "Frentes de obra e ingeniería de campo"
+                },
+                {
+                    "name": "Checklists SST",
+                    "url": "/sst/",
+                    "description": "Seguridad laboral y prevención Ley 618"
                 }
             ]
         }
@@ -61,15 +67,17 @@ class PWAManifestView(View):
 
 class PWAServiceWorkerView(View):
     """
-    Service Worker con estrategia Network First with Cache Fallback.
-    Permite operar en zonas industriales sin conectividad (subestaciones, minas, plantas).
+    Service Worker con estrategia Network First with Cache Fallback y contingencia Offline.
+    Permite operar en zonas industriales sin conectividad (subestaciones, minas, carreteras).
     """
     def get(self, request, *args, **kwargs):
         sw_script = """
 const CACHE_NAME = 'erp-sas-v1';
+const OFFLINE_URL = '/offline/';
 const PRECACHE_URLS = [
-  '/operations/orders/',
-  '/manifest.json'
+  '/',
+  '/manifest.json',
+  OFFLINE_URL
 ];
 
 self.addEventListener('install', event => {
@@ -77,7 +85,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       return cache.addAll(PRECACHE_URLS).catch(err => {
-        console.warn('[PWA-SW] Pre-caching warning:', err);
+        console.warn('[PWA-SW] Fallo precaching inicial:', err);
       });
     })
   );
@@ -96,34 +104,49 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const request = event.request;
 
-  // No interceptar peticiones no GET ni peticiones API externas
   if (request.method !== 'GET') {
     return;
   }
 
-  // Estrategia Network First con Cache Fallback
-  event.respondWith(
-    fetch(request)
-      .then(networkResponse => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(request, responseToCache);
+  // Estrategia Network-First con Fallback para navegación de campo
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(request).then(cached => {
+            return cached || caches.match(OFFLINE_URL);
           });
+        })
+    );
+    return;
+  }
+
+  // Recursos estáticos: Cache First con Network Refresh
+  event.respondWith(
+    caches.match(request).then(cachedResponse => {
+      if (cachedResponse) {
+        fetch(request).then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            caches.open(CACHE_NAME).then(cache => cache.put(request, networkResponse));
+          }
+        }).catch(() => {});
+        return cachedResponse;
+      }
+      return fetch(request).then(networkResponse => {
+        if (networkResponse && networkResponse.status === 200) {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
         }
         return networkResponse;
-      })
-      .catch(() => {
-        return caches.match(request).then(cachedResponse => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          // Si es navegación HTML y no hay red ni cache, devolver página offline o raíz de OTs
-          if (request.headers.get('accept') && request.headers.get('accept').includes('text/html')) {
-            return caches.match('/operations/orders/');
-          }
-        });
-      })
+      });
+    })
   );
 });
 """
@@ -131,3 +154,19 @@ self.addEventListener('fetch', event => {
         response['Service-Worker-Allowed'] = '/'
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return response
+
+
+class PwaOfflineFallbackView(View):
+    """
+    Vista de contingencia de campo cuando el dispositivo pierde la señal celular o conexión WiFi.
+    Muestra la bitácora técnica de seguridad Ley 618 y monitor de reconexión.
+    """
+    template_name = 'core/offline.html'
+
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name)
+
+
+# Aliases para compatibilidad de nomenclatura
+PwaManifestView = PWAManifestView
+PwaServiceWorkerView = PWAServiceWorkerView

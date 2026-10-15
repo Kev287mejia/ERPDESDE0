@@ -6,7 +6,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 from apps.core.views_health import SystemHealthcheckView
-from apps.core.views_pwa import PWAManifestView, PWAServiceWorkerView
+from apps.core.views_pwa import PWAManifestView, PWAServiceWorkerView, PwaOfflineFallbackView
 
 urlpatterns = [
     # Healthcheck para Docker, Kubernetes y balanceadores de carga
@@ -15,6 +15,7 @@ urlpatterns = [
     # Infraestructura PWA Instalable de Campo
     path('manifest.json', PWAManifestView.as_view(), name='pwa_manifest'),
     path('service-worker.js', PWAServiceWorkerView.as_view(), name='pwa_service_worker'),
+    path('offline/', PwaOfflineFallbackView.as_view(), name='pwa_offline'),
 
     # Interfaz administrativa exclusiva del SuperAdmin de la Plataforma
     path('platform-superadmin/', admin.site.urls),

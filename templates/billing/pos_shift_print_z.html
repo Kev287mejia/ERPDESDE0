@@ -1,0 +1,193 @@
+{% extends "print/base_print.html" %}
+
+{% block title %}Acta de Arqueo y Corte Z · {{ shift.shift_number }} · {{ current_org.name }}{% endblock %}
+
+{% block document_folio %}ACTA DE CORTE Z POS · {{ shift.shift_number }}{% endblock %}
+
+{% block back_link %}
+<a href="{% url 'billing:pos_shifts' %}" class="px-3 py-1.5 border border-zinc-300 text-zinc-700 hover:bg-zinc-50 text-xs font-medium rounded-[4px] transition-colors">
+    &larr; Volver a Consola de Turnos
+</a>
+{% endblock %}
+
+{% block document_meta %}
+<div class="text-zinc-500 uppercase text-[10px] tracking-wider font-semibold">ACTA DE CIERRE Z</div>
+<div class="text-sm font-bold text-zinc-900 font-mono">{{ shift.shift_number }}</div>
+<div class="text-zinc-600 text-[11px] font-mono">ESTADO: <span class="font-bold {% if shift.status == 'CLOSED_Z' %}text-emerald-700{% else %}text-amber-700{% endif %}">{{ shift.get_status_display|upper }}</span></div>
+<div class="text-zinc-500 text-[10px] font-mono">EMISIÓN: {{ now|date:"d/m/Y H:i:s" }}</div>
+{% endblock %}
+
+{% block document_body %}
+<div class="space-y-6">
+    <!-- Encabezado del Acta -->
+    <div class="border-b border-zinc-200 pb-4">
+        <h2 class="text-base font-bold uppercase tracking-tight text-zinc-900">Acta Oficial de Arqueo y Corte Fiscal Z</h2>
+        <p class="text-xs text-zinc-500 mt-0.5">Control de Auditoría de Gaveta de Caja POS · Normativa Contable y Fiscal DGI</p>
+    </div>
+
+    <!-- Metadatos de Operación de Turno -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-zinc-50 border border-zinc-200 p-3.5 rounded-[4px] text-xs">
+        <div>
+            <span class="block text-[10px] font-mono uppercase text-zinc-500">Terminal / Caja</span>
+            <span class="font-semibold text-zinc-900 font-mono">{{ shift.register_name }}</span>
+        </div>
+        <div>
+            <span class="block text-[10px] font-mono uppercase text-zinc-500">Cajero Responsable</span>
+            <span class="font-semibold text-zinc-900">{{ shift.cashier.get_full_name|default:shift.cashier.username }}</span>
+        </div>
+        <div>
+            <span class="block text-[10px] font-mono uppercase text-zinc-500">Apertura</span>
+            <span class="font-mono text-zinc-800">{{ shift.opened_at|date:"d/m/Y H:i" }}</span>
+        </div>
+        <div>
+            <span class="block text-[10px] font-mono uppercase text-zinc-500">Cierre Corte Z</span>
+            <span class="font-mono text-zinc-800">
+                {% if shift.closed_at %}{{ shift.closed_at|date:"d/m/Y H:i" }}{% else %}EN OPERACIÓN{% endif %}
+            </span>
+        </div>
+    </div>
+
+    <!-- Conciliación Financiera y Arqueo Ciego -->
+    <div class="border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="bg-zinc-100 px-3.5 py-2 border-b border-zinc-200">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-800">Desglose de Efectivo y Conciliación de Gaveta (C$)</h3>
+        </div>
+        <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Columna Izquierda: Cálculos del Sistema -->
+            <div class="space-y-2 text-xs">
+                <div class="flex justify-between py-1 border-b border-zinc-100">
+                    <span class="text-zinc-600 font-mono">Fondo Inicial de Apertura:</span>
+                    <span class="font-mono font-semibold text-zinc-900 tabular-nums">C$ {{ shift.opening_cash_nio|floatformat:2 }}</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-zinc-100">
+                    <span class="text-zinc-600 font-mono">(+) Ventas Cobradas en Efectivo:</span>
+                    <span class="font-mono font-semibold text-emerald-700 tabular-nums">C$ {{ shift.system_cash_sales_nio|floatformat:2 }}</span>
+                </div>
+                <div class="flex justify-between py-1.5 border-b-2 border-zinc-300 bg-zinc-50 px-2 rounded-[2px]">
+                    <span class="font-bold text-zinc-900 font-mono">(=) Efectivo Esperado en Gaveta:</span>
+                    <span class="font-bold font-mono text-zinc-900 tabular-nums">C$ {{ shift.expected_cash_in_drawer_nio|floatformat:2 }}</span>
+                </div>
+                <div class="flex justify-between py-1 text-zinc-500 text-[11px]">
+                    <span class="font-mono">(+) Ventas Tarjeta / Transferencia:</span>
+                    <span class="font-mono tabular-nums">C$ {{ shift.system_card_transfer_sales_nio|floatformat:2 }}</span>
+                </div>
+                <div class="flex justify-between py-1 text-zinc-500 text-[11px]">
+                    <span class="font-mono">Total Comprobantes / Transacciones:</span>
+                    <span class="font-mono tabular-nums font-semibold text-zinc-700">{{ shift.transactions_count }}</span>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Arqueo Declarado y Diferencia Final -->
+            <div class="bg-zinc-50 border border-zinc-200 p-3.5 rounded-[4px] flex flex-col justify-between">
+                <div>
+                    <div class="text-[10px] font-mono uppercase text-zinc-500 tracking-wider mb-1">Efectivo Físico Declarado por Cajero</div>
+                    <div class="text-xl font-bold font-mono text-zinc-900 tabular-nums">
+                        C$ {{ shift.declared_cash_nio|floatformat:2 }}
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-zinc-200">
+                    <div class="text-[10px] font-mono uppercase text-zinc-500 tracking-wider mb-1">Resultado de Conciliación (Diferencia)</div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-base font-bold font-mono tabular-nums {% if shift.cash_difference_nio == 0 %}text-emerald-700{% elif shift.cash_difference_nio > 0 %}text-blue-700{% else %}text-rose-700{% endif %}">
+                            C$ {{ shift.cash_difference_nio|floatformat:2 }}
+                        </span>
+                        <span>
+                            {% if shift.cash_difference_nio == 0 %}
+                                <span class="px-2 py-0.5 text-[10px] font-mono uppercase font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-[2px]">CUADRADO</span>
+                            {% elif shift.cash_difference_nio > 0 %}
+                                <span class="px-2 py-0.5 text-[10px] font-mono uppercase font-bold bg-blue-50 text-blue-800 border border-blue-300 rounded-[2px]">SOBRANTE (+{{ shift.cash_difference_nio|floatformat:2 }})</span>
+                            {% else %}
+                                <span class="px-2 py-0.5 text-[10px] font-mono uppercase font-bold bg-rose-50 text-rose-800 border border-rose-300 rounded-[2px]">FALTANTE ({{ shift.cash_difference_nio|floatformat:2 }})</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla Detallada de Facturas del Turno -->
+    <div class="border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="bg-zinc-100 px-3.5 py-2 border-b border-zinc-200 flex justify-between items-center">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-800">Comprobantes Fiscales Emitidos en Turno</h3>
+            <span class="text-[11px] font-mono text-zinc-500">{{ invoices|length }} comprobantes</span>
+        </div>
+        <table class="w-full text-left text-xs">
+            <thead class="bg-zinc-50 border-b border-zinc-200 font-mono text-[11px] text-zinc-600">
+                <tr>
+                    <th class="py-1.5 px-3">Folio</th>
+                    <th class="py-1.5 px-3">Hora</th>
+                    <th class="py-1.5 px-3">Cliente</th>
+                    <th class="py-1.5 px-3">Condición</th>
+                    <th class="py-1.5 px-3 text-right">Moneda</th>
+                    <th class="py-1.5 px-3 text-right">Total Factura</th>
+                    <th class="py-1.5 px-3 text-right">Cobrado C$</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-100 font-mono text-[11px]">
+                {% for inv in invoices %}
+                <tr class="hover:bg-zinc-50">
+                    <td class="py-1.5 px-3 font-semibold text-zinc-900">{{ inv.number }}</td>
+                    <td class="py-1.5 px-3 text-zinc-500">{{ inv.issue_date|date:"H:i:s" }}</td>
+                    <td class="py-1.5 px-3 text-zinc-700 font-sans truncate max-w-[160px]">{{ inv.account.name|default:"Consumidor Final" }}</td>
+                    <td class="py-1.5 px-3 text-zinc-600 uppercase text-[10px]">{{ inv.get_payment_terms_display|default:"Contado" }}</td>
+                    <td class="py-1.5 px-3 text-right text-zinc-500">{{ inv.currency }}</td>
+                    <td class="py-1.5 px-3 text-right text-zinc-800 tabular-nums">{{ inv.total_amount|floatformat:2 }}</td>
+                    <td class="py-1.5 px-3 text-right font-semibold text-zinc-900 tabular-nums">
+                        {% if inv.currency == 'USD' %}
+                            C$ {{ inv.total_amount|floatformat:2 }}*
+                        {% else %}
+                            C$ {{ inv.total_amount|floatformat:2 }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="py-4 text-center text-zinc-400 italic">
+                        No se registraron transacciones durante este turno.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if shift.closing_notes %}
+    <!-- Notas de Cierre -->
+    <div class="border border-zinc-200 rounded-[4px] p-3 text-xs bg-zinc-50">
+        <span class="block text-[10px] font-mono uppercase text-zinc-500 font-semibold mb-1">Observaciones Registradas en Cierre:</span>
+        <p class="text-zinc-700">{{ shift.closing_notes }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Sello Criptográfico Digital SHA-256 -->
+    <div class="border border-zinc-300 bg-white p-3.5 rounded-[4px] space-y-1.5">
+        <div class="flex items-center justify-between text-[10px] font-mono uppercase text-zinc-500 font-bold">
+            <span>Sello Criptográfico Inmutable de Arqueo (SHA-256)</span>
+            <span class="text-zinc-400">Algoritmo FIPS PUB 180-4</span>
+        </div>
+        <div class="p-2 bg-zinc-900 text-zinc-100 font-mono text-[10px] break-all rounded-[2px] leading-relaxed select-all">
+            {{ shift.audit_hash|default:"HASH-NO-GENERADO-TURNO-ABIERTO" }}
+        </div>
+        <div class="text-[9px] text-zinc-500 font-mono">
+            Este sello certifica la inmutabilidad de los importes y registros de caja asociados al corte. Cualquier modificación posterior anula la validez del acta.
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block signature_block %}
+<div class="pt-10 border-t border-zinc-200 grid grid-cols-2 gap-12 text-center text-xs">
+    <div class="border-t border-zinc-400 pt-3">
+        <div class="font-bold text-zinc-900">{{ shift.cashier.get_full_name|default:shift.cashier.username }}</div>
+        <div class="text-[11px] text-zinc-500 uppercase tracking-wide">Cajero Responsable de Gaveta</div>
+        <div class="text-[10px] font-mono text-zinc-400 mt-1">Declaro conforme el efectivo entregado</div>
+    </div>
+    <div class="border-t border-zinc-400 pt-3">
+        <div class="font-bold text-zinc-900">Auditoría / Supervisor de Caja</div>
+        <div class="text-[11px] text-zinc-500 uppercase tracking-wide">Revisión y Aprobación de Corte Z</div>
+        <div class="text-[10px] font-mono text-zinc-400 mt-1">Conforme arqueo físico vs. sistema</div>
+    </div>
+</div>
+{% endblock %}

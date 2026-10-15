@@ -1,9 +1,9 @@
 from decimal import Decimal
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import transaction, models
 from django.utils import timezone
 
-from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt
+from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt, PosRegisterShift
 from apps.crm.models import Account
 from apps.inventory.models import InventoryItem, Warehouse, StockBalance, StockMovement, InventoryBatch
 
@@ -214,7 +214,19 @@ def execute_pos_sale(
     invoice.amount_paid = invoice.net_receivable
     invoice.balance_due = Decimal('0.00')
     invoice.status = Invoice.Status.PAID
-    invoice.save(update_fields=['amount_paid', 'balance_due', 'status', 'updated_at'])
+
+    # 7. Vinculación automática a Turno POS activo de la organización
+    active_shift = PosRegisterShift.objects.filter(
+        organization=organization,
+        status=PosRegisterShift.Status.OPEN,
+    ).filter(
+        models.Q(cashier=user) | models.Q(cashier__isnull=False)
+    ).order_by('-opened_at').first()
+
+    if active_shift:
+        invoice.pos_shift = active_shift
+
+    invoice.save(update_fields=['amount_paid', 'balance_due', 'status', 'pos_shift', 'updated_at'])
     invoice.receipt = receipt
 
     return invoice

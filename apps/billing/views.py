@@ -3,9 +3,11 @@ from django.contrib import messages
 from django.db import models, transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
+from django.utils import timezone
 
 from django.core.exceptions import ValidationError
-from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt, CashRegisterSession
+from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt, CashRegisterSession, PosRegisterShift
+from apps.billing.services_pos_shift import open_pos_shift, compute_shift_x_cut_metrics, close_pos_shift_z_cut
 from apps.crm.models import Quote, Account
 from apps.inventory.models import InventoryItem, Warehouse, InventoryBatch
 from apps.operations.models import WorkOrder, WorkOrderTimelineLog
@@ -419,6 +421,13 @@ class PointOfSaleTerminalView(ModuleAccessRequiredMixin, View):
                 'batches': batches_list,
             })
 
+        active_shift = PosRegisterShift.objects.filter(
+            organization=org,
+            status=PosRegisterShift.Status.OPEN,
+        ).filter(
+            models.Q(cashier=request.user) | models.Q(cashier__isnull=False)
+        ).order_by('-opened_at').first()
+
         return render(request, self.template_name, {
             'items': items,
             'catalog_json': json.dumps(catalog_data),
@@ -426,6 +435,7 @@ class PointOfSaleTerminalView(ModuleAccessRequiredMixin, View):
             'accounts': accounts,
             'default_account': default_account,
             'payment_methods': PaymentReceipt.PaymentMethod.choices,
+            'active_shift': active_shift,
         })
 
     def post(self, request, *args, **kwargs):
@@ -655,4 +665,144 @@ class CashSessionPrintView(ModuleAccessRequiredMixin, View):
             'session': session,
             'org': org,
         })
+
+
+class PosShiftConsoleView(ModuleAccessRequiredMixin, View):
+    """
+    Consola de Control de Turnos de Caja POS:
+    - Apertura de Gaveta con Fondo Inicial.
+    - Monitor en vivo de Corte X Parcial (recaudación en efectivo, tarjetas y total esperado).
+    - Arqueo Ciego y Cierre de Corte Z Definitivo con Sello SHA-256.
+    - Historial auditable de turnos cerrados con semáforo de cuadre.
+    """
+    required_module = 'billing'
+    min_role_level = RoleLevel.TECHNICIAN
+    template_name = 'billing/pos_shifts.html'
+
+    def get(self, request, *args, **kwargs):
+        org = request.organization
+        active_shift = PosRegisterShift.objects.filter(
+            organization=org,
+            status=PosRegisterShift.Status.OPEN,
+        ).filter(
+            models.Q(cashier=request.user) | models.Q(cashier__isnull=False)
+        ).order_by('-opened_at').first()
+
+        x_metrics = None
+        if active_shift:
+            x_metrics = compute_shift_x_cut_metrics(active_shift)
+
+        closed_shifts = PosRegisterShift.objects.filter(
+            organization=org,
+            status=PosRegisterShift.Status.CLOSED_Z,
+        ).select_related('cashier').order_by('-closed_at')[:40]
+
+        return render(request, self.template_name, {
+            'active_shift': active_shift,
+            'x_metrics': x_metrics,
+            'closed_shifts': closed_shifts,
+            'now': timezone.now(),
+        })
+
+    def post(self, request, *args, **kwargs):
+        org = request.organization
+        action = request.POST.get('action')
+
+        if action == 'open_shift':
+            opening_cash = request.POST.get('opening_cash_nio', '0.00')
+            register_name = request.POST.get('register_name', 'CAJA-PRINCIPAL-01')
+            try:
+                shift = open_pos_shift(
+                    organization=org,
+                    cashier=request.user,
+                    opening_cash_nio=opening_cash,
+                    register_name=register_name,
+                )
+                messages.success(
+                    request,
+                    f"Turno {shift.shift_number} abierto exitosamente en {shift.register_name} con fondo inicial de C$ {shift.opening_cash_nio:,.2f}."
+                )
+            except ValidationError as e:
+                messages.error(request, e.message if hasattr(e, 'message') else str(e))
+            except Exception as e:
+                messages.error(request, f"Error al abrir turno: {str(e)}")
+
+            return redirect('billing:pos_shifts')
+
+        elif action == 'close_z':
+            shift_id = request.POST.get('shift_id')
+            declared_cash = request.POST.get('declared_cash_nio', '0.00')
+            notes = request.POST.get('notes', '')
+
+            active_shift = None
+            if shift_id:
+                active_shift = PosRegisterShift.objects.filter(organization=org, pk=shift_id).first()
+            if not active_shift:
+                active_shift = PosRegisterShift.objects.filter(
+                    organization=org,
+                    status=PosRegisterShift.Status.OPEN,
+                ).filter(
+                    models.Q(cashier=request.user) | models.Q(cashier__isnull=False)
+                ).first()
+
+            if not active_shift:
+                messages.error(request, "No se encontró ningún turno activo para cerrar.")
+                return redirect('billing:pos_shifts')
+
+            try:
+                closed_shift = close_pos_shift_z_cut(
+                    shift=active_shift,
+                    declared_cash_nio=declared_cash,
+                    user=request.user,
+                    notes=notes,
+                )
+                diff = closed_shift.cash_difference_nio
+                if diff == Decimal('0.00'):
+                    status_text = "CUADRADO PERFECTO (C$ 0.00)"
+                elif diff > Decimal('0.00'):
+                    status_text = f"SOBRANTE DE C$ {diff:,.2f}"
+                else:
+                    status_text = f"FALTANTE DE C$ {abs(diff):,.2f}"
+
+                messages.success(
+                    request,
+                    f"Corte Z {closed_shift.shift_number} sellado con éxito [{status_text}]. Sello SHA-256 generado."
+                )
+                return redirect('billing:pos_shift_print_z', pk=str(closed_shift.pk))
+            except ValidationError as e:
+                messages.error(request, e.message if hasattr(e, 'message') else str(e))
+            except Exception as e:
+                messages.error(request, f"Error al ejecutar Corte Z: {str(e)}")
+
+            return redirect('billing:pos_shifts')
+
+        return redirect('billing:pos_shifts')
+
+
+class PosShiftZReportPrintView(ModuleAccessRequiredMixin, View):
+    """
+    Vista oficial de impresión de Acta de Arqueo y Corte Z de Caja POS.
+    Diseño All-Light Swiss Grid de alta densidad conforme a normativa fiscal DGI.
+    """
+    required_module = 'billing'
+    min_role_level = RoleLevel.TECHNICIAN
+    template_name = 'billing/pos_shift_print_z.html'
+
+    def get(self, request, pk, *args, **kwargs):
+        org = request.organization
+        shift = get_object_or_404(
+            PosRegisterShift.objects.filter(organization=org),
+            pk=pk
+        )
+        invoices = list(
+            shift.shift_invoices.all().select_related('account').prefetch_related('payments').order_by('issue_date', 'number')
+        )
+
+        return render(request, self.template_name, {
+            'shift': shift,
+            'invoices': invoices,
+            'current_org': org,
+            'now': timezone.now(),
+        })
+
 

@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 import datetime
 from django.contrib.auth import get_user_model
@@ -6,7 +7,10 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt
+from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt, PosRegisterShift
+from apps.billing.services_pos_shift import open_pos_shift, compute_shift_x_cut_metrics, close_pos_shift_z_cut
+from apps.billing.services import execute_pos_sale
+from apps.inventory.models import InventoryItem, Warehouse, StockBalance
 from apps.core.models import CountryConfig
 from apps.crm.models import Account, Quote, QuoteItem
 from apps.operations.models import WorkOrder, WorkOrderItem, WorkOrderTimelineLog
@@ -565,3 +569,288 @@ class BillingModuleTestSuite(TestCase):
         response = self.client.get(detail_url)
         # Debe dar 404 porque el queryset está aislado con .for_org(request.organization)
         self.assertEqual(response.status_code, 404)
+
+
+class PosRegisterShiftAndPwaTestCase(TestCase):
+    """
+    Suite de Pruebas Unitarias y de Integración para el Control de Turnos de Caja POS
+    y la Infraestructura PWA de Contingencia en Campo (Paso 18.1).
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.country_ni, _ = CountryConfig.objects.get_or_create(
+            code='NI',
+            defaults={
+                'name': 'Nicaragua',
+                'flag_emoji': '🇳🇮',
+                'primary_currency_code': 'NIO',
+                'primary_currency_symbol': 'C$',
+                'tax_id_label': 'RUC',
+                'default_tax_name': 'IVA',
+                'default_tax_rate': Decimal('15.00'),
+                'is_active': True,
+            }
+        )
+
+        self.org = Organization.objects.create(
+            name="Comercial El Ahorro S.A.",
+            legal_name="Comercializadora El Ahorro Sociedad Anónima",
+            slug="comercial-ahorro-pos",
+            tax_id="J0310000789012",
+            country=self.country_ni,
+            currency=Organization.Currency.NIO,
+            enabled_modules=['crm', 'inventory', 'billing'],
+            business_profile=Organization.BusinessProfile.COMMERCIAL_RETAIL,
+            is_active=True,
+        )
+
+        self.cashier = User.objects.create_user(
+            email='cajero1@elahorro.ni',
+            password='Password123*',
+            full_name='Martha Lorena Gómez'
+        )
+        self.membership = OrganizationMembership.objects.create(
+            user=self.cashier,
+            organization=self.org,
+            role_level=RoleLevel.COMMERCIAL_MGR,
+            is_active=True,
+            is_default_org=True,
+        )
+
+        self.warehouse = Warehouse.objects.create(
+            organization=self.org,
+            code='BOD-POS-01',
+            name='Bodega Tienda Mostrador',
+            warehouse_type=Warehouse.WarehouseType.CENTRAL,
+            is_active=True,
+        )
+
+        self.client_account = Account.objects.create(
+            organization=self.org,
+            commercial_name='Consumidor Final',
+            legal_name='Cliente de Mostrador',
+            tax_id='',
+            account_type=Account.AccountType.INDIVIDUAL,
+        )
+
+        self.item = InventoryItem.objects.create(
+            organization=self.org,
+            sku='PROD-POS-01',
+            name='Taladro Percutor 1/2 Pulgada',
+            price_retail=Decimal('100.00'),
+            price_contractor=Decimal('90.00'),
+            price_wholesale=Decimal('80.00'),
+            unit_cost=Decimal('60.00'),
+            is_active=True,
+        )
+
+        StockBalance.objects.create(
+            organization=self.org,
+            warehouse=self.warehouse,
+            item=self.item,
+            quantity=Decimal('50.00'),
+        )
+
+    def test_01_open_pos_shift_and_duplicate_prevention(self):
+        """
+        Verifica la apertura limpia de un turno POS y el bloqueo estricto
+        a la existencia de turnos duplicados en estado OPEN para el mismo cajero.
+        """
+        shift = open_pos_shift(
+            organization=self.org,
+            cashier=self.cashier,
+            opening_cash_nio=Decimal('1500.00'),
+            register_name='CAJA-MOSTRADOR-01'
+        )
+
+        self.assertIsNotNone(shift.pk)
+        self.assertTrue(shift.shift_number.startswith('TURNO-'))
+        self.assertEqual(shift.status, PosRegisterShift.Status.OPEN)
+        self.assertEqual(shift.opening_cash_nio, Decimal('1500.00'))
+        self.assertEqual(shift.expected_cash_in_drawer_nio, Decimal('1500.00'))
+        self.assertIsNone(shift.closed_at)
+        self.assertEqual(shift.audit_hash, '')
+
+        # Intento de abrir un segundo turno para el mismo cajero -> Bloqueo ValidationError
+        with self.assertRaises(ValidationError):
+            open_pos_shift(
+                organization=self.org,
+                cashier=self.cashier,
+                opening_cash_nio=Decimal('2000.00'),
+                register_name='CAJA-MOSTRADOR-02'
+            )
+
+    def test_02_sale_auto_linking_and_live_corte_x(self):
+        """
+        Verifica que al emitir una venta POS, la factura se vincule automáticamente
+        al turno abierto de la organización y se recalculen las métricas de Corte X en vivo.
+        """
+        shift = open_pos_shift(
+            organization=self.org,
+            cashier=self.cashier,
+            opening_cash_nio=Decimal('1000.00'),
+            register_name='CAJA-MOSTRADOR-01'
+        )
+
+        # Ejecutar venta en efectivo de 2 unidades a C$ 100.00 + IVA = C$ 230.00
+        invoice = execute_pos_sale(
+            organization=self.org,
+            user=self.cashier,
+            warehouse=self.warehouse,
+            cart_items=[{
+                'item_id': str(self.item.id),
+                'quantity': Decimal('2.00'),
+                'price_tier': 'RETAIL',
+                'batch_id': None,
+            }],
+            account=self.client_account,
+            payment_method=PaymentReceipt.PaymentMethod.CASH,
+            cash_received=Decimal('230.00'),
+            notes='Venta mostrador vinculada a turno'
+        )
+
+        # Verificar vinculación automática al turno abierto
+        self.assertEqual(invoice.pos_shift_id, shift.id)
+
+        # Recalcular métricas de Corte X
+        metrics = compute_shift_x_cut_metrics(shift)
+        self.assertEqual(metrics['transactions_count'], 1)
+        self.assertGreater(metrics['system_cash_sales_nio'], Decimal('0.00'))
+        self.assertEqual(
+            metrics['expected_cash_in_drawer_nio'],
+            shift.opening_cash_nio + metrics['system_cash_sales_nio']
+        )
+
+    def test_03_close_pos_shift_z_cut_and_strict_immutability(self):
+        """
+        Verifica el Arqueo Ciego y Corte Z definitivo:
+        1. Cuadre exacto (cash_difference_nio == 0.00).
+        2. Generación del sello criptográfico SHA-256 de 64 caracteres.
+        3. Bloqueo estricto de edición (save) y eliminación (delete) una vez cerrado.
+        """
+        shift = open_pos_shift(
+            organization=self.org,
+            cashier=self.cashier,
+            opening_cash_nio=Decimal('1000.00'),
+            register_name='CAJA-MOSTRADOR-01'
+        )
+
+        # Venta POS
+        execute_pos_sale(
+            organization=self.org,
+            user=self.cashier,
+            warehouse=self.warehouse,
+            cart_items=[{
+                'item_id': str(self.item.id),
+                'quantity': Decimal('1.00'),
+                'price_tier': 'RETAIL',
+                'batch_id': None,
+            }],
+            account=self.client_account,
+            payment_method=PaymentReceipt.PaymentMethod.CASH,
+            cash_received=Decimal('115.00'),
+        )
+
+        metrics = compute_shift_x_cut_metrics(shift)
+        expected_total = metrics['expected_cash_in_drawer_nio']
+
+        # Cajero declara el monto esperado (arqueo cuadrado)
+        closed_shift = close_pos_shift_z_cut(
+            shift=shift,
+            declared_cash_nio=expected_total,
+            user=self.cashier,
+            notes='Arqueo cuadrado al 100%'
+        )
+
+        self.assertEqual(closed_shift.status, PosRegisterShift.Status.CLOSED_Z)
+        self.assertIsNotNone(closed_shift.closed_at)
+        self.assertEqual(closed_shift.cash_difference_nio, Decimal('0.00'))
+        self.assertEqual(len(closed_shift.audit_hash), 64)
+
+        # REGLA DE INMUTABILIDAD: Modificar o borrar el turno cerrado debe lanzar ValidationError
+        closed_shift.closing_notes = 'Intento de modificar notas en turno sellado'
+        with self.assertRaises(ValidationError):
+            closed_shift.save()
+
+        with self.assertRaises(ValidationError):
+            closed_shift.delete()
+
+    def test_04_corte_z_discrepancy_calculation(self):
+        """
+        Verifica el cálculo de faltante y sobrante en el arqueo de gaveta.
+        """
+        shift = open_pos_shift(
+            organization=self.org,
+            cashier=self.cashier,
+            opening_cash_nio=Decimal('2000.00'),
+            register_name='CAJA-01'
+        )
+
+        # Faltante: Se esperaban 2,000 pero cajero declara 1,850 (-150)
+        closed = close_pos_shift_z_cut(
+            shift=shift,
+            declared_cash_nio=Decimal('1850.00'),
+            user=self.cashier,
+            notes='Faltante detectado'
+        )
+        self.assertEqual(closed.cash_difference_nio, Decimal('-150.00'))
+
+    def test_05_views_and_printable_z_report(self):
+        """
+        Verifica la navegación a la consola de turnos POS y el renderizado
+        del reporte imprimible oficial de Corte Z con firmas y sello SHA-256.
+        """
+        self.client.force_login(self.cashier)
+
+        # 1. Consola de turnos (GET)
+        console_url = reverse('billing:pos_shifts')
+        resp_console = self.client.get(console_url)
+        self.assertEqual(resp_console.status_code, 200)
+
+        # 2. Abrir turno vía POST
+        resp_open = self.client.post(console_url, {
+            'action': 'open_shift',
+            'opening_cash_nio': '1200.00',
+            'register_name': 'CAJA MOSTRADOR 01'
+        })
+        self.assertEqual(resp_open.status_code, 302)
+
+        active_shift = PosRegisterShift.objects.filter(
+            organization=self.org,
+            status=PosRegisterShift.Status.OPEN
+        ).first()
+        self.assertIsNotNone(active_shift)
+
+        # 3. Vista de impresión oficial de Corte Z (GET)
+        print_url = reverse('billing:pos_shift_print_z', kwargs={'pk': str(active_shift.pk)})
+        resp_print = self.client.get(print_url)
+        self.assertEqual(resp_print.status_code, 200)
+        self.assertIn('Acta Oficial de Arqueo y Corte Fiscal Z', resp_print.content.decode('utf-8'))
+
+    def test_06_pwa_infrastructure_endpoints(self):
+        """
+        Verifica que los endpoints PWA para técnicos y cajeros respondan adecuadamente:
+        - GET /manifest.json (application/json o manifest+json, status 200)
+        - GET /service-worker.js (application/javascript, cabecera Service-Worker-Allowed: /)
+        - GET /offline/ (Contingencia de campo Ley 618)
+        """
+        # 1. Manifest
+        resp_manifest = self.client.get(reverse('pwa_manifest'))
+        self.assertEqual(resp_manifest.status_code, 200)
+        self.assertIn('application/manifest+json', resp_manifest['Content-Type'])
+        manifest_data = json.loads(resp_manifest.content.decode('utf-8'))
+        self.assertEqual(manifest_data.get('short_name'), 'ERP SAS')
+        self.assertEqual(manifest_data.get('display'), 'standalone')
+
+        # 2. Service Worker
+        resp_sw = self.client.get(reverse('pwa_service_worker'))
+        self.assertEqual(resp_sw.status_code, 200)
+        self.assertIn('application/javascript', resp_sw['Content-Type'])
+        self.assertEqual(resp_sw['Service-Worker-Allowed'], '/')
+
+        # 3. Fallback Offline
+        resp_offline = self.client.get(reverse('pwa_offline'))
+        self.assertEqual(resp_offline.status_code, 200)
+        self.assertIn('Modo Contingencia Offline', resp_offline.content.decode('utf-8'))
+        self.assertIn('Ley 618', resp_offline.content.decode('utf-8'))
