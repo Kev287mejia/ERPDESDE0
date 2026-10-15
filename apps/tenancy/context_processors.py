@@ -90,6 +90,19 @@ def tenancy_context(request):
         'is_field_tech_only': role_level == RoleLevel.TECHNICIAN,
     }
 
+    # Radar de Alertas Activas en Tiempo Real
+    active_alerts_count = 0
+    critical_alerts_count = 0
+    if user and user.is_authenticated and organization and membership:
+        try:
+            from apps.core.services.alerts_engine import get_active_alerts_for_user
+            alerts_data = get_active_alerts_for_user(organization, user, role_level)
+            active_alerts_count = alerts_data['counts']['total']
+            critical_alerts_count = alerts_data['counts']['critical']
+        except Exception:
+            active_alerts_count = 0
+            critical_alerts_count = 0
+
     return {
         'current_org': organization,
         'current_country': current_country,
@@ -108,4 +121,6 @@ def tenancy_context(request):
         'current_vertical_short': current_vertical_short,
         'vertical_features': vertical_features,
         'available_verticals': available_verticals,
+        'active_alerts_count': active_alerts_count,
+        'critical_alerts_count': critical_alerts_count,
     }

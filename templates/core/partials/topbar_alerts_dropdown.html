@@ -1,0 +1,75 @@
+<div class="w-full text-zinc-900 text-xs">
+    <!-- Encabezado técnico del radar -->
+    <div class="px-3.5 py-2.5 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full {% if counts.critical > 0 %}bg-rose-600 animate-pulse{% elif counts.high > 0 %}bg-amber-500{% else %}bg-emerald-600{% endif %}"></span>
+            <span class="font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-900">Radar Proactivo</span>
+        </div>
+        <div class="flex items-center gap-1.5 font-mono text-[10px] tabular-nums">
+            {% if counts.critical > 0 %}
+            <span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200 font-semibold">{{ counts.critical }} CRÍTICAS</span>
+            {% endif %}
+            {% if counts.high > 0 %}
+            <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 font-semibold">{{ counts.high }} ALTAS</span>
+            {% endif %}
+            {% if counts.total == 0 %}
+            <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold">0 HALLAZGOS</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Lista de hallazgos prioritarios (máximo 8) -->
+    <div class="max-h-80 overflow-y-auto divide-y divide-zinc-100">
+        {% if alerts %}
+            {% for alert in alerts %}
+            <a href="{{ alert.target_url }}" 
+               class="p-3 block hover:bg-zinc-50 transition-colors group">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-mono text-[10px] text-zinc-400 font-medium">[{{ alert.code }}]</span>
+                        <span class="font-semibold text-zinc-900 group-hover:text-zinc-700 leading-tight">{{ alert.title }}</span>
+                    </div>
+                    {% if alert.severity == 'CRITICAL' %}
+                    <span class="px-1.5 py-0.2 rounded font-mono text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase flex-shrink-0">CRÍTICA</span>
+                    {% elif alert.severity == 'HIGH' %}
+                    <span class="px-1.5 py-0.2 rounded font-mono text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 uppercase flex-shrink-0">ALTA</span>
+                    {% else %}
+                    <span class="px-1.5 py-0.2 rounded font-mono text-[9px] font-bold bg-zinc-100 text-zinc-700 border border-zinc-200 uppercase flex-shrink-0">NORMAL</span>
+                    {% endif %}
+                </div>
+                <p class="text-[11px] text-zinc-600 line-clamp-2 leading-relaxed mb-1.5">
+                    {{ alert.detail }}
+                </p>
+                <div class="flex items-center justify-between text-[10px] font-mono">
+                    <span class="text-zinc-500 tabular-nums font-medium bg-zinc-100 px-1.5 py-0.5 rounded">{{ alert.metric_mono }}</span>
+                    <span class="text-zinc-400 group-hover:text-zinc-900 group-hover:underline flex items-center gap-0.5">
+                        Resolver
+                        <svg class="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                    </span>
+                </div>
+            </a>
+            {% endfor %}
+        {% else %}
+            <div class="p-6 text-center">
+                <svg class="w-6 h-6 text-emerald-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div class="font-mono text-xs font-semibold text-zinc-800">CERO ALERTAS CRÍTICAS</div>
+                <div class="text-[11px] text-zinc-500 mt-0.5">Operación, almacenes y frentes dentro de los umbrales seguros.</div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Pie de pie técnico con enlace al centro de radar completo -->
+    <div class="p-2 bg-zinc-50 border-t border-zinc-200 text-center">
+        <a href="{% url 'alerts_radar' %}" 
+           class="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-zinc-700 hover:text-zinc-900 py-1 px-2 rounded hover:bg-zinc-200 transition-colors">
+            <span>Ver todas las alertas en el Radar Completo</span>
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+        </a>
+    </div>
+</div>

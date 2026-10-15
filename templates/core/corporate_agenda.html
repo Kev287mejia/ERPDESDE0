@@ -1,0 +1,387 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Agenda Corporativa Unificada & Calendario Fiscal{% endblock %}
+{% block breadcrumb_section %}GOBERNANZA{% endblock %}
+{% block breadcrumb_page %}AGENDA CORPORATIVA{% endblock %}
+{% block page_title %}Agenda Corporativa Unificada & Calendario Fiscal DGI/INSS{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2">
+    {% if can_generate_fiscal %}
+    <form method="POST" action="{% url 'generate_fiscal_calendar' %}" class="inline">
+        {% csrf_token %}
+        <button type="submit" 
+                class="h-8 px-3 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 text-xs font-mono font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Genera de forma idempotente los hitos DGI (IVA/Retenciones día 05), Alcaldía IMI (día 15) e INSS (día 20)">
+            <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+            </svg>
+            <span>Generar Calendario Fiscal DGI/INSS del Mes</span>
+        </button>
+    </form>
+    {% endif %}
+
+    {% if can_create_event %}
+    <button type="button" 
+            @click="openModal = true"
+            class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-mono font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        <span>+ Programar Evento</span>
+    </button>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-5 max-w-7xl mx-auto p-6" x-data="{
+    openModal: false,
+    filterType: 'ALL',
+    filterStatus: 'ALL'
+}">
+
+    <!-- Mensajes Django Flash -->
+    {% if messages %}
+    <div class="space-y-2">
+        {% for message in messages %}
+        <div class="p-3 bg-zinc-50 border border-zinc-200 text-xs font-mono text-zinc-800 rounded-[4px] flex items-center justify-between">
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ===================================================================== -->
+    <!-- BARRA DE FILTROS SWISS GRID                                           -->
+    <!-- ===================================================================== -->
+    <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-[4px] flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex flex-wrap items-center gap-1.5">
+            <span class="text-[10px] font-mono font-semibold uppercase text-zinc-400 tracking-wider mr-1">TIPO:</span>
+            <button type="button" 
+                    @click="filterType = 'ALL'"
+                    :class="filterType === 'ALL' ? 'bg-zinc-900 text-white font-medium' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'"
+                    class="h-7 px-2.5 rounded-[3px] font-mono text-[11px] transition-colors cursor-pointer">
+                TODOS
+            </button>
+            <button type="button" 
+                    @click="filterType = 'TAX_DEADLINE'"
+                    :class="filterType === 'TAX_DEADLINE' ? 'bg-zinc-900 text-white font-medium' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'"
+                    class="h-7 px-2.5 rounded-[3px] font-mono text-[11px] transition-colors cursor-pointer">
+                FISCAL DGI / INSS
+            </button>
+            <button type="button" 
+                    @click="filterType = 'TECHNICAL_MAINTENANCE'"
+                    :class="filterType === 'TECHNICAL_MAINTENANCE' ? 'bg-zinc-900 text-white font-medium' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'"
+                    class="h-7 px-2.5 rounded-[3px] font-mono text-[11px] transition-colors cursor-pointer">
+                MANTENIMIENTO TÉCNICO
+            </button>
+            <button type="button" 
+                    @click="filterType = 'SST_INSPECTION'"
+                    :class="filterType === 'SST_INSPECTION' ? 'bg-zinc-900 text-white font-medium' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'"
+                    class="h-7 px-2.5 rounded-[3px] font-mono text-[11px] transition-colors cursor-pointer">
+                INSPECCIÓN SST
+            </button>
+            <button type="button" 
+                    @click="filterType = 'INVENTORY_AUDIT'"
+                    :class="filterType === 'INVENTORY_AUDIT' ? 'bg-zinc-900 text-white font-medium' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'"
+                    class="h-7 px-2.5 rounded-[3px] font-mono text-[11px] transition-colors cursor-pointer">
+                AUDITORÍA FEFO
+            </button>
+            <button type="button" 
+                    @click="filterType = 'COMMERCIAL_VISIT'"
+                    :class="filterType === 'COMMERCIAL_VISIT' ? 'bg-zinc-900 text-white font-medium' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'"
+                    class="h-7 px-2.5 rounded-[3px] font-mono text-[11px] transition-colors cursor-pointer">
+                VISITA COMERCIAL
+            </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] font-mono font-semibold uppercase text-zinc-400 tracking-wider mr-1">ESTADO:</span>
+            <select x-model="filterStatus" 
+                    class="h-7 px-2 bg-white border border-zinc-200 rounded-[3px] font-mono text-[11px] text-zinc-800 focus:outline-none cursor-pointer">
+                <option value="ALL">Todos los Estados</option>
+                <option value="SCHEDULED">Programados</option>
+                <option value="COMPLETED">Completados</option>
+                <option value="CANCELLED">Cancelados</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- LISTA / TIMELINE DE EVENTOS CORPORATIVOS                              -->
+    <!-- ===================================================================== -->
+    <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="px-4 py-3 border-b border-zinc-200 bg-zinc-50 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="font-mono text-xs font-semibold text-zinc-900 uppercase tracking-tight">Hitos Programados & Vencimientos Regulatorios</span>
+            </div>
+            <span class="font-mono text-[11px] text-zinc-500 tabular-nums">Visibilidad Acorde a Nivel Jerárquico: LVL-{{ current_role_level }}</span>
+        </div>
+
+        <div class="divide-y divide-zinc-200">
+            {% if events %}
+                {% for event in events %}
+                <div x-show="(filterType === 'ALL' || filterType === '{{ event.event_type }}') && (filterStatus === 'ALL' || filterStatus === '{{ event.status }}')"
+                     class="p-4 hover:bg-zinc-50/70 transition-colors flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    
+                    <div class="space-y-2 flex-1">
+                        <!-- Badges de Encabezado -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-mono text-xs font-bold text-zinc-900 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-[3px] tabular-nums">
+                                {{ event.code }}
+                            </span>
+
+                            <!-- Tipo de Evento -->
+                            <span class="font-mono text-[10px] font-semibold px-2 py-0.5 rounded-[3px] uppercase border
+                                {% if event.event_type == 'TAX_DEADLINE' %}bg-rose-50 text-rose-700 border-rose-200
+                                {% elif event.event_type == 'TECHNICAL_MAINTENANCE' %}bg-blue-50 text-blue-700 border-blue-200
+                                {% elif event.event_type == 'SST_INSPECTION' %}bg-amber-50 text-amber-800 border-amber-200
+                                {% elif event.event_type == 'INVENTORY_AUDIT' %}bg-purple-50 text-purple-700 border-purple-200
+                                {% else %}bg-zinc-100 text-zinc-700 border-zinc-200{% endif %}">
+                                {{ event.get_event_type_display }}
+                            </span>
+
+                            <!-- Prioridad -->
+                            <span class="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded uppercase border
+                                {% if event.priority == 'CRITICAL' %}bg-rose-100 text-rose-800 border-rose-300
+                                {% elif event.priority == 'HIGH' %}bg-amber-100 text-amber-800 border-amber-300
+                                {% elif event.priority == 'NORMAL' %}bg-zinc-100 text-zinc-700 border-zinc-200
+                                {% else %}bg-zinc-50 text-zinc-500 border-zinc-200{% endif %}">
+                                {{ event.get_priority_display }}
+                            </span>
+
+                            <!-- Estado -->
+                            <span class="font-mono text-[10px] font-semibold px-1.5 py-0.2 rounded uppercase
+                                {% if event.status == 'COMPLETED' %}bg-emerald-100 text-emerald-800 border border-emerald-200
+                                {% elif event.status == 'CANCELLED' %}bg-zinc-200 text-zinc-600 line-through
+                                {% else %}bg-zinc-100 text-zinc-800 border border-zinc-200{% endif %}">
+                                {{ event.get_status_display }}
+                            </span>
+
+                            <!-- Nivel Mínimo de Acceso -->
+                            <span class="font-mono text-[10px] text-zinc-400 bg-zinc-50 px-1.5 py-0.2 rounded border border-zinc-200 tabular-nums">
+                                MIN LVL-{{ event.min_role_level }}
+                            </span>
+                        </div>
+
+                        <!-- Título y Descripción -->
+                        <div>
+                            <h3 class="text-sm font-semibold text-zinc-900 leading-tight">
+                                {{ event.title }}
+                            </h3>
+                            {% if event.description %}
+                            <p class="text-xs text-zinc-600 leading-relaxed mt-1">
+                                {{ event.description }}
+                            </p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Vínculos de Trazabilidad -->
+                        <div class="flex flex-wrap items-center gap-3 text-[11px] font-mono text-zinc-500 pt-1">
+                            {% if event.location %}
+                            <span class="flex items-center gap-1 text-zinc-600">
+                                <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                                </svg>
+                                {{ event.location }}
+                            </span>
+                            {% endif %}
+
+                            {% if event.related_work_order %}
+                            <a href="{% url 'operations:workorder_detail' event.related_work_order.id %}" 
+                               class="text-zinc-700 hover:text-zinc-900 underline font-semibold flex items-center gap-1">
+                                <span>OT: {{ event.related_work_order.code }}</span>
+                            </a>
+                            {% endif %}
+
+                            {% if event.related_account %}
+                            <span class="text-zinc-600">
+                                Cliente: {{ event.related_account.commercial_name|default:event.related_account.legal_name }}
+                            </span>
+                            {% endif %}
+
+                            {% if event.assigned_to %}
+                            <span class="text-zinc-600">
+                                Asignado: {{ event.assigned_to.full_name|default:event.assigned_to.email }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Lado derecho: Horario & Cambio Rápido de Estado -->
+                    <div class="flex flex-col items-end gap-2 flex-shrink-0 self-start md:self-center">
+                        <div class="text-right font-mono">
+                            <span class="text-[10px] text-zinc-400 uppercase block">FECHA & HORA</span>
+                            <span class="text-xs font-bold text-zinc-900 tabular-nums block">
+                                {{ event.start_datetime|date:"d/m/Y H:i" }}
+                            </span>
+                            {% if event.end_datetime %}
+                            <span class="text-[10px] text-zinc-500 tabular-nums block">
+                                fin: {{ event.end_datetime|date:"d/m/Y H:i" }}
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        {% if can_create_event and event.status == 'SCHEDULED' %}
+                        <form method="POST" action="{% url 'corporate_event_status_update' event.id %}" class="flex items-center gap-1">
+                            {% csrf_token %}
+                            <input type="hidden" name="status" value="COMPLETED">
+                            <button type="submit" 
+                                    class="h-7 px-2 bg-white hover:bg-zinc-100 text-emerald-700 border border-zinc-200 hover:border-emerald-300 font-mono text-[10px] font-semibold rounded-[3px] transition-colors cursor-pointer"
+                                    title="Marcar como cumplido">
+                                Marcar Cumplido
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="p-12 text-center bg-white">
+                    <svg class="w-8 h-8 text-zinc-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+                    </svg>
+                    <h4 class="font-mono text-sm font-semibold text-zinc-900 uppercase">Cero eventos corporativos registrados</h4>
+                    <p class="text-xs text-zinc-500 mt-1 max-w-md mx-auto">
+                        No hay hitos técnicos ni compromisos fiscales agendados para este nivel jerárquico.
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL DE PROGRAMACIÓN DE EVENTO (ALPINES.JS)                          -->
+    <!-- ===================================================================== -->
+    <div x-show="openModal" 
+         x-cloak
+         class="fixed inset-0 z-50 overflow-y-auto bg-zinc-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white border border-zinc-200 rounded-[4px] max-w-lg w-full shadow-md overflow-hidden" 
+             @click.away="openModal = false">
+            <div class="px-4 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
+                <span class="font-mono text-xs font-bold uppercase text-zinc-900">Programar Nuevo Evento Corporativo</span>
+                <button type="button" @click="openModal = false" class="text-zinc-400 hover:text-zinc-700 text-sm font-mono">&times;</button>
+            </div>
+
+            <form method="POST" action="{% url 'corporate_event_create' %}" class="p-4 space-y-3.5 text-xs">
+                {% csrf_token %}
+
+                <div>
+                    <label class="block font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Título del Evento *</label>
+                    <input type="text" name="title" required 
+                           placeholder="ej: Mantenimiento Preventivo Subestación 15kV"
+                           class="w-full h-8 px-2.5 bg-white border border-zinc-200 rounded-[3px] text-xs text-zinc-900 focus:outline-none focus:border-zinc-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Tipo de Evento *</label>
+                        <select name="event_type" required 
+                                class="w-full h-8 px-2 bg-white border border-zinc-200 rounded-[3px] text-xs text-zinc-900 focus:outline-none">
+                            {% for code, label in event_types %}
+                            <option value="{{ code }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Prioridad *</label>
+                        <select name="priority" required 
+                                class="w-full h-8 px-2 bg-white border border-zinc-200 rounded-[3px] text-xs text-zinc-900 focus:outline-none">
+                            {% for code, label in priorities %}
+                            <option value="{{ code }}" {% if code == 'NORMAL' %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Fecha & Hora Inicio *</label>
+                        <input type="datetime-local" name="start_datetime" required 
+                               class="w-full h-8 px-2 bg-white border border-zinc-200 rounded-[3px] font-mono text-xs text-zinc-900 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Fecha & Hora Fin (Opcional)</label>
+                        <input type="datetime-local" name="end_datetime" 
+                               class="w-full h-8 px-2 bg-white border border-zinc-200 rounded-[3px] font-mono text-xs text-zinc-900 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Ubicación / Frente</label>
+                        <input type="text" name="location" placeholder="ej: Planta Industrial Tipitapa"
+                               class="w-full h-8 px-2.5 bg-white border border-zinc-200 rounded-[3px] text-xs text-zinc-900 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Nivel Mínimo Visibilidad</label>
+                        <select name="min_role_level" 
+                                class="w-full h-8 px-2 bg-white border border-zinc-200 rounded-[3px] font-mono text-xs text-zinc-900 focus:outline-none">
+                            {% for code, label in role_choices %}
+                            <option value="{{ code }}" {% if code == 50 %}selected{% endif %}>LVL-{{ code }} &bull; {{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-1">OT Vinculada</label>
+                        <select name="related_work_order" 
+                                class="w-full h-8 px-2 bg-white border border-zinc-200 rounded-[3px] text-xs text-zinc-900 focus:outline-none">
+                            <option value="">-- Ninguna --</option>
+                            {% for wo in work_orders %}
+                            <option value="{{ wo.id }}">{{ wo.code }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Cliente Vinculado</label>
+                        <select name="related_account" 
+                                class="w-full h-8 px-2 bg-white border border-zinc-200 rounded-[3px] text-xs text-zinc-900 focus:outline-none">
+                            <option value="">-- Ninguno --</option>
+                            {% for acc in accounts %}
+                            <option value="{{ acc.id }}">{{ acc.commercial_name|default:acc.legal_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Responsable</label>
+                        <select name="assigned_to" 
+                                class="w-full h-8 px-2 bg-white border border-zinc-200 rounded-[3px] text-xs text-zinc-900 focus:outline-none">
+                            <option value="">-- Sin Asignar --</option>
+                            {% for u in users %}
+                            <option value="{{ u.id }}">{{ u.full_name|default:u.email }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-mono text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Descripción / Instrucciones Técnicas</label>
+                    <textarea name="description" rows="2" placeholder="Detalles de la operación o hito regulatorio..."
+                              class="w-full p-2 bg-white border border-zinc-200 rounded-[3px] text-xs text-zinc-900 focus:outline-none"></textarea>
+                </div>
+
+                <div class="pt-2 border-t border-zinc-200 flex items-center justify-end gap-2">
+                    <button type="button" @click="openModal = false" 
+                            class="h-8 px-3 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 font-mono text-xs rounded-[3px] cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="submit" 
+                            class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white font-mono text-xs font-medium rounded-[3px] cursor-pointer">
+                        Guardar Evento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

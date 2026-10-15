@@ -164,3 +164,11 @@ class CountryConfig(TimeStampedModel):
         if not self.personal_id_regex:
             return True
         return bool(re.match(self.personal_id_regex, personal_id.strip()))
+
+
+def __getattr__(name):
+    if name == 'CorporateEvent':
+        from apps.tenancy.models import CorporateEvent
+        return CorporateEvent
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+

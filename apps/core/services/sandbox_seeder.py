@@ -43,6 +43,7 @@ from apps.sst.models import EPPDelivery, LeaveRequest, SafetyChecklist
 from apps.tenancy.models import (
     BloodType,
     ContractType,
+    CorporateEvent,
     Department,
     Organization,
     OrganizationMembership,
@@ -127,6 +128,9 @@ class SandboxScenarioSeeder:
         Opportunity.objects.filter(organization=organization).delete()
         AccountContact.objects.filter(organization=organization).delete()
         Account.objects.filter(organization=organization).delete()
+
+        # 7.5 Agenda Corporativa y Calendario Fiscal (apps/tenancy / apps/core)
+        CorporateEvent.objects.filter(organization=organization).delete()
 
         # 8. Miembros subordinados del equipo
         OrganizationMembership.objects.filter(
@@ -1441,6 +1445,40 @@ class SandboxScenarioSeeder:
             notes='Pago de contado en efectivo en mostrador.',
         )
 
+        # Factura 3: En Mora (Overdue CxC) para Radar de Alertas
+        inv3 = Invoice.objects.create(
+            organization=organization,
+            number='FAC-2026-0003',
+            account=cli_claro,
+            status=Invoice.Status.ISSUED,
+            payment_condition=Invoice.PaymentCondition.CREDIT_30,
+            issue_date=timezone.now().date() - datetime.timedelta(days=40),
+            due_date=timezone.now().date() - datetime.timedelta(days=10),
+            currency_code='NIO',
+            currency_symbol='C$',
+            exchange_rate=Decimal('36.6243'),
+            apply_tax=True,
+            tax_name='IVA',
+            tax_rate=Decimal('15.00'),
+            ir_retention_rate=Decimal('2.00'),
+            imi_retention_rate=Decimal('1.00'),
+            created_by=commercial_mgr,
+            notes='Factura en mora por servicios técnicos de mantenimiento.',
+        )
+        InvoiceItem.objects.create(
+            organization=organization,
+            invoice=inv3,
+            item_type='SERVICE',
+            code='SRV-ING-003',
+            description='Servicio especializado de mantenimiento preventivo correctivo',
+            unit='SRV',
+            quantity=Decimal('1.00'),
+            unit_price=Decimal('45000.00'),
+            discount_percent=Decimal('0.00'),
+        )
+        inv3.recalculate_totals()
+        inv3.save()
+
         # -------------------------------------------------------------------------
         # ARQUEO DE CAJA Z BIMONETARIO (apps/billing)
         # -------------------------------------------------------------------------
@@ -1817,6 +1855,113 @@ class SandboxScenarioSeeder:
             error_message='Violación RBAC: scoped_role_level 70 insuficiente para invocar query_financial_summary (mínimo 80)',
         )
 
+        # -------------------------------------------------------------------------
+        # 10. AGENDA CORPORATIVA UNIFICADA & HITOS REGULATORIOS (Paso 14.1)
+        # -------------------------------------------------------------------------
+        now_dt = timezone.now()
+        current_year = now_dt.year
+        current_month = now_dt.month
+        tz = timezone.get_current_timezone()
+
+        # Hito 1: DGI IVA y Retenciones Ley 822 (Día 05)
+        dgi_date = timezone.make_aware(datetime.datetime(current_year, current_month, 5, 8, 0), tz)
+        CorporateEvent.objects.get_or_create(
+            organization=organization,
+            code='EVT-2026-0001',
+            defaults={
+                'title': 'Declaración Mensual IVA y Retenciones en la Fuente VET-DGI Ley 822',
+                'event_type': CorporateEvent.EventType.TAX_DEADLINE,
+                'priority': CorporateEvent.Priority.CRITICAL,
+                'status': CorporateEvent.Status.SCHEDULED,
+                'start_datetime': dgi_date,
+                'end_datetime': dgi_date + datetime.timedelta(hours=4),
+                'location': 'Ventanilla Electrónica Tributaria (VET-DGI)',
+                'description': 'Presentación y liquidación obligatoria de IVA mensual y retenciones del 2% IR / 1% IMI.',
+                'min_role_level': RoleLevel.OPERATIONS_COORD,
+                'created_by': owner_user,
+            }
+        )
+
+        # Hito 2: Alcaldía IMI (Día 15)
+        imi_date = timezone.make_aware(datetime.datetime(current_year, current_month, 15, 8, 0), tz)
+        CorporateEvent.objects.get_or_create(
+            organization=organization,
+            code='EVT-2026-0002',
+            defaults={
+                'title': 'Declaración y Pago de Impuesto Municipal sobre Ingresos (IMI Alcaldía)',
+                'event_type': CorporateEvent.EventType.TAX_DEADLINE,
+                'priority': CorporateEvent.Priority.HIGH,
+                'status': CorporateEvent.Status.SCHEDULED,
+                'start_datetime': imi_date,
+                'end_datetime': imi_date + datetime.timedelta(hours=4),
+                'location': 'Alcaldía de Managua (ALMA) / Ventanilla Virtual',
+                'description': 'Liquidación y pago mensual del 1% de Impuesto Municipal sobre Ingresos.',
+                'min_role_level': RoleLevel.OPERATIONS_COORD,
+                'created_by': owner_user,
+            }
+        )
+
+        # Hito 3: INSS / INATEC (Día 20)
+        inss_date = timezone.make_aware(datetime.datetime(current_year, current_month, 20, 8, 0), tz)
+        CorporateEvent.objects.get_or_create(
+            organization=organization,
+            code='EVT-2026-0003',
+            defaults={
+                'title': 'Pago de Facturación y Planilla Mensual INSS / INATEC',
+                'event_type': CorporateEvent.EventType.TAX_DEADLINE,
+                'priority': CorporateEvent.Priority.HIGH,
+                'status': CorporateEvent.Status.SCHEDULED,
+                'start_datetime': inss_date,
+                'end_datetime': inss_date + datetime.timedelta(hours=4),
+                'location': 'Portal Patronal INSS / Bancos del Sistema Financiero',
+                'description': 'Pago patronal y retención laboral conforme a factura mensual emitida por el INSS.',
+                'min_role_level': RoleLevel.OPERATIONS_COORD,
+                'created_by': owner_user,
+            }
+        )
+
+        # Hito 4: Mantenimiento Técnico Preventivo en OT-2026-0001
+        maint_date = now_dt + datetime.timedelta(days=2)
+        CorporateEvent.objects.get_or_create(
+            organization=organization,
+            code='EVT-2026-0004',
+            defaults={
+                'title': 'Mantenimiento Preventivo Subestación 15kV y Banco de Baterías AGM',
+                'event_type': CorporateEvent.EventType.TECHNICAL_MAINTENANCE,
+                'priority': CorporateEvent.Priority.CRITICAL,
+                'status': CorporateEvent.Status.SCHEDULED,
+                'start_datetime': maint_date,
+                'end_datetime': maint_date + datetime.timedelta(hours=6),
+                'location': 'Hospital Vivian Pellas, Módulo Quirúrgico Torre B',
+                'description': 'Montaje mecánico de banco de baterías y pruebas de aislamiento dieléctrico.',
+                'min_role_level': RoleLevel.TECHNICIAN,
+                'related_work_order': wo1,
+                'related_account': accounts.get('CLI-004') if 'accounts' in locals() else None,
+                'assigned_to': resident_eng,
+                'created_by': ops_coord,
+            }
+        )
+
+        # Hito 5: Auditoría FEFO en Bodega Central
+        audit_date = now_dt + datetime.timedelta(days=7)
+        CorporateEvent.objects.get_or_create(
+            organization=organization,
+            code='EVT-2026-0005',
+            defaults={
+                'title': 'Conteo Físico y Auditoría Sanitaria FEFO de Lotes Farmacéuticos',
+                'event_type': CorporateEvent.EventType.INVENTORY_AUDIT,
+                'priority': CorporateEvent.Priority.HIGH,
+                'status': CorporateEvent.Status.SCHEDULED,
+                'start_datetime': audit_date,
+                'end_datetime': audit_date + datetime.timedelta(hours=5),
+                'location': 'Bodega Central Tipitapa (BOD-01)',
+                'description': 'Inspección de lotes de antibióticos y sueros conforme a normativa MINSA.',
+                'min_role_level': RoleLevel.ENGINEER,
+                'assigned_to': resident_eng,
+                'created_by': ops_coord,
+            }
+        )
+
         return {
             'organization': organization,
             'members_count': 7,
@@ -2025,6 +2170,12 @@ def ensure_vertical_demo_catalog(organization: Organization, vertical_code: str)
                     'quantity_available': Decimal('15.00'),
                 }
             )
+
+        # Alerta de Stock Bajo (LOW_STOCK): Ajustar Solución Salina a 5 unidades (min_stock_level=25)
+        sal_item = InventoryItem.objects.filter(organization=organization, sku='MED-SAL-01').first()
+        if sal_item:
+            StockBalance.objects.filter(organization=organization, warehouse=bod1, item=sal_item).update(quantity=Decimal('5.00'))
+
 
 
 

@@ -1,0 +1,233 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Radar de Alertas Proactivas Multi-Giro{% endblock %}
+{% block breadcrumb_section %}GOBERNANZA{% endblock %}
+{% block breadcrumb_page %}RADAR DE ALERTAS{% endblock %}
+{% block page_title %}Radar de Alertas Proactivas Multi-Giro{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2">
+    <a href="{% url 'corporate_agenda' %}" class="h-8 px-3 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-mono font-medium rounded-[4px] transition-colors flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+        </svg>
+        <span>Agenda Corporativa</span>
+    </a>
+    <a href="{% url 'alerts_radar' %}" class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-mono font-medium rounded-[4px] transition-colors flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+        </svg>
+        <span>Re-escanear Radar</span>
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-5 max-w-7xl mx-auto p-6" x-data="{
+    categoryFilter: '{{ selected_category|default:'ALL' }}',
+    severityFilter: '{{ selected_severity|default:'ALL' }}'
+}">
+
+    <!-- ===================================================================== -->
+    <!-- KPI METRICS INDUSTRIAL SWISS GRID                                      -->
+    <!-- ===================================================================== -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <!-- Total Alertas Activas -->
+        <div class="p-3.5 bg-white border border-zinc-200 rounded-[4px] flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] font-mono text-zinc-400 uppercase tracking-wider font-medium">TOTAL ACTIVAS</span>
+                <span class="w-2 h-2 rounded-full bg-zinc-900"></span>
+            </div>
+            <div class="mt-2 flex items-baseline justify-between">
+                <span class="text-2xl font-mono font-bold tracking-tight text-zinc-900 tabular-nums">{{ counts.total }}</span>
+                <span class="text-[11px] font-mono text-zinc-500">Hallazgos radar</span>
+            </div>
+        </div>
+
+        <!-- Alertas Críticas -->
+        <div class="p-3.5 bg-white border border-zinc-200 rounded-[4px] flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] font-mono text-rose-600 uppercase tracking-wider font-semibold">CRÍTICAS (ACCIÓN INMEDIATA)</span>
+                <span class="w-2 h-2 rounded-full {% if counts.critical > 0 %}bg-rose-600 animate-pulse{% else %}bg-zinc-200{% endif %}"></span>
+            </div>
+            <div class="mt-2 flex items-baseline justify-between">
+                <span class="text-2xl font-mono font-bold tracking-tight text-rose-600 tabular-nums">{{ counts.critical }}</span>
+                <span class="text-[11px] font-mono text-rose-600/80">Riesgo Alto</span>
+            </div>
+        </div>
+
+        <!-- Alertas Altas -->
+        <div class="p-3.5 bg-white border border-zinc-200 rounded-[4px] flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] font-mono text-amber-700 uppercase tracking-wider font-semibold">ALTA PRIORIDAD</span>
+                <span class="w-2 h-2 rounded-full {% if counts.high > 0 %}bg-amber-500{% else %}bg-zinc-200{% endif %}"></span>
+            </div>
+            <div class="mt-2 flex items-baseline justify-between">
+                <span class="text-2xl font-mono font-bold tracking-tight text-amber-700 tabular-nums">{{ counts.high }}</span>
+                <span class="text-[11px] font-mono text-amber-700/80">Atención 24-48h</span>
+            </div>
+        </div>
+
+        <!-- Distribución por Categoría -->
+        <div class="p-3.5 bg-white border border-zinc-200 rounded-[4px] flex flex-col justify-between text-xs font-mono">
+            <div class="flex items-center justify-between border-b border-zinc-100 pb-1 mb-1">
+                <span class="text-[10px] text-zinc-400 uppercase tracking-wider font-medium">POR MÓDULO</span>
+                <span class="text-[10px] text-zinc-500 tabular-nums">LVL-{{ current_role_level }}</span>
+            </div>
+            <div class="space-y-1 text-[11px] text-zinc-600">
+                <div class="flex justify-between items-center">
+                    <span>Almacén / FEFO:</span>
+                    <span class="font-bold tabular-nums text-zinc-900">{{ counts.by_category.INVENTORY_FEFO|default:0 }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span>Operaciones / SST:</span>
+                    <span class="font-bold tabular-nums text-zinc-900">{{ counts.by_category.OPERATIONS_SST|default:0 }}</span>
+                </div>
+                {% if current_role_level >= 80 %}
+                <div class="flex justify-between items-center text-zinc-900">
+                    <span class="font-medium">Cartera & DGI:</span>
+                    <span class="font-bold tabular-nums">{{ counts.by_category.FINANCE_DGI|default:0 }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- BARRA DE FILTROS TÉCNICA                                              -->
+    <!-- ===================================================================== -->
+    <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-[4px] flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-[10px] font-mono font-semibold uppercase text-zinc-400 tracking-wider mr-1">MÓDULO:</span>
+            <button type="button" 
+                    @click="categoryFilter = 'ALL'"
+                    :class="categoryFilter === 'ALL' ? 'bg-zinc-900 text-white font-medium' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'"
+                    class="h-7 px-2.5 rounded-[3px] font-mono text-[11px] transition-colors cursor-pointer">
+                TODOS ({{ counts.total }})
+            </button>
+            <button type="button" 
+                    @click="categoryFilter = 'INVENTORY_FEFO'"
+                    :class="categoryFilter === 'INVENTORY_FEFO' ? 'bg-zinc-900 text-white font-medium' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'"
+                    class="h-7 px-2.5 rounded-[3px] font-mono text-[11px] transition-colors cursor-pointer">
+                ALMACÉN & FEFO ({{ counts.by_category.INVENTORY_FEFO|default:0 }})
+            </button>
+            <button type="button" 
+                    @click="categoryFilter = 'OPERATIONS_SST'"
+                    :class="categoryFilter === 'OPERATIONS_SST' ? 'bg-zinc-900 text-white font-medium' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'"
+                    class="h-7 px-2.5 rounded-[3px] font-mono text-[11px] transition-colors cursor-pointer">
+                OPERACIONES & SST ({{ counts.by_category.OPERATIONS_SST|default:0 }})
+            </button>
+            {% if current_role_level >= 80 %}
+            <button type="button" 
+                    @click="categoryFilter = 'FINANCE_DGI'"
+                    :class="categoryFilter === 'FINANCE_DGI' ? 'bg-zinc-900 text-white font-medium' : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'"
+                    class="h-7 px-2.5 rounded-[3px] font-mono text-[11px] transition-colors cursor-pointer">
+                FINANZAS & DGI ({{ counts.by_category.FINANCE_DGI|default:0 }})
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="text-[10px] font-mono font-semibold uppercase text-zinc-400 tracking-wider mr-1">SEVERIDAD:</span>
+            <select x-model="severityFilter" 
+                    class="h-7 px-2 bg-white border border-zinc-200 rounded-[3px] font-mono text-[11px] text-zinc-800 focus:outline-none cursor-pointer">
+                <option value="ALL">Todas las Severidades</option>
+                <option value="CRITICAL">Solo Críticas</option>
+                <option value="HIGH">Solo Altas</option>
+                <option value="NORMAL">Solo Normales</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TABLA DE ALINEACIÓN TÉCNICA DE HALLAZGOS                               -->
+    <!-- ===================================================================== -->
+    <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="px-4 py-3 border-b border-zinc-200 bg-zinc-50 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="font-mono text-xs font-semibold text-zinc-900 uppercase tracking-tight">Registro Activo de Discrepancias & Cuellos de Botella</span>
+            </div>
+            <span class="font-mono text-[11px] text-zinc-500 tabular-nums">Filtrado en Cliente &bull; Escaneo en Tiempo Real</span>
+        </div>
+
+        <div class="divide-y divide-zinc-200">
+            {% if alerts %}
+                {% for alert in alerts %}
+                <div x-show="(categoryFilter === 'ALL' || categoryFilter === '{{ alert.category }}') && (severityFilter === 'ALL' || severityFilter === '{{ alert.severity }}')"
+                     class="p-4 hover:bg-zinc-50/70 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    
+                    <!-- Lado izquierdo: Metadatos, Severidad y Detalle -->
+                    <div class="space-y-1.5 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-mono text-xs font-bold text-zinc-900 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-[3px]">
+                                {{ alert.code }}
+                            </span>
+                            
+                            {% if alert.severity == 'CRITICAL' %}
+                            <span class="font-mono text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-[3px] uppercase">
+                                CRÍTICA
+                            </span>
+                            {% elif alert.severity == 'HIGH' %}
+                            <span class="font-mono text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-[3px] uppercase">
+                                ALTA
+                            </span>
+                            {% else %}
+                            <span class="font-mono text-[10px] font-bold bg-zinc-100 text-zinc-700 border border-zinc-200 px-2 py-0.5 rounded-[3px] uppercase">
+                                NORMAL
+                            </span>
+                            {% endif %}
+
+                            <span class="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">
+                                {% if alert.category == 'INVENTORY_FEFO' %}
+                                &bull; ALMACÉN / FEFO
+                                {% elif alert.category == 'OPERATIONS_SST' %}
+                                &bull; OPERACIONES / SST
+                                {% elif alert.category == 'FINANCE_DGI' %}
+                                &bull; FINANZAS / CARTERA
+                                {% endif %}
+                            </span>
+                        </div>
+
+                        <h3 class="text-sm font-semibold text-zinc-900 leading-tight">
+                            {{ alert.title }}
+                        </h3>
+
+                        <p class="text-xs text-zinc-600 leading-relaxed max-w-4xl">
+                            {{ alert.detail }}
+                        </p>
+                    </div>
+
+                    <!-- Lado derecho: Métrica Técnica Mono + Botón de Resolución -->
+                    <div class="flex items-center gap-3 flex-shrink-0 self-end md:self-center">
+                        <div class="text-right">
+                            <span class="block text-[10px] font-mono text-zinc-400 uppercase">MÉTRICA / IMPACTO</span>
+                            <span class="font-mono text-xs font-bold text-zinc-800 tabular-nums bg-zinc-100 px-2 py-1 rounded-[3px] border border-zinc-200">
+                                {{ alert.metric_mono }}
+                            </span>
+                        </div>
+
+                        <a href="{{ alert.target_url }}" 
+                           class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-mono font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
+                            <span>Resolver</span>
+                            <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="p-12 text-center bg-white">
+                    <svg class="w-8 h-8 text-emerald-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h4 class="font-mono text-sm font-semibold text-zinc-900 uppercase">Cero alertas activas en la organización</h4>
+                    <p class="text-xs text-zinc-500 mt-1 max-w-md mx-auto">
+                        Todos los parámetros operativos, vencimientos sanitarios FEFO, protocolos SST y compromisos de facturación se encuentran al día.
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

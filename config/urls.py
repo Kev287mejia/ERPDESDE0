@@ -21,6 +21,9 @@ urlpatterns = [
     # Espacio Operativo Multi-Tenant & Onboarding
     path('', include('apps.tenancy.urls')),
 
+    # Radar de Alertas Proactivas y Agenda Corporativa
+    path('', include('apps.core.urls')),
+
     # Módulo Comercial Unificado (CRM, Pipeline, Cotizador Bimonetario)
     path('crm/', include('apps.crm.urls')),
 

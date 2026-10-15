@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 from apps.core.models import TimeStampedModel
 from apps.tenancy.constants import MODULE_THRESHOLD_MAP, BusinessVertical, VERTICAL_PRESETS_CONFIG
 
@@ -461,3 +462,158 @@ class TenantScopedModel(TimeStampedModel):
         if not self.organization_id:
             raise ValidationError("Todo modelo derivado de TenantScopedModel requiere una organización asignada.")
         super().save(*args, **kwargs)
+
+
+class CorporateEvent(TenantScopedModel):
+    """
+    Agenda Corporativa Unificada y Calendario de Hitos Fiscales/Operativos.
+    Consolida vencimientos DGI/Alcaldía/INSS, mantenimientos técnicos en campo,
+    inspecciones SST, visitas comerciales y auditorías de inventario FEFO.
+    """
+    class EventType(models.TextChoices):
+        TECHNICAL_MAINTENANCE = 'TECHNICAL_MAINTENANCE', 'Mantenimiento / Ejecución Técnica'
+        COMMERCIAL_VISIT = 'COMMERCIAL_VISIT', 'Visita Comercial / Licitación'
+        SST_INSPECTION = 'SST_INSPECTION', 'Inspección / Capacitación SST'
+        TAX_DEADLINE = 'TAX_DEADLINE', 'Vencimiento Fiscal DGI / Alcaldía / INSS'
+        INVENTORY_AUDIT = 'INVENTORY_AUDIT', 'Conteo Físico / Auditoría FEFO'
+
+    class Priority(models.TextChoices):
+        LOW = 'LOW', 'Baja'
+        NORMAL = 'NORMAL', 'Normal'
+        HIGH = 'HIGH', 'Alta'
+        CRITICAL = 'CRITICAL', 'Crítica'
+
+    class Status(models.TextChoices):
+        SCHEDULED = 'SCHEDULED', 'Programado'
+        COMPLETED = 'COMPLETED', 'Completado'
+        CANCELLED = 'CANCELLED', 'Cancelado'
+
+    code = models.CharField(
+        max_length=25,
+        db_index=True,
+        verbose_name="Código de Evento",
+        help_text="Identificador único ej: EVT-2026-0001",
+    )
+    title = models.CharField(
+        max_length=200,
+        verbose_name="Título del Evento / Hito",
+    )
+    event_type = models.CharField(
+        max_length=30,
+        choices=EventType.choices,
+        default=EventType.TECHNICAL_MAINTENANCE,
+        db_index=True,
+        verbose_name="Tipo de Evento",
+    )
+    priority = models.CharField(
+        max_length=20,
+        choices=Priority.choices,
+        default=Priority.NORMAL,
+        verbose_name="Prioridad",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.SCHEDULED,
+        db_index=True,
+        verbose_name="Estado",
+    )
+    start_datetime = models.DateTimeField(
+        verbose_name="Fecha y Hora de Inicio",
+    )
+    end_datetime = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha y Hora de Fin",
+    )
+    location = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Ubicación / Frente de Trabajo",
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name="Descripción / Instrucciones Técnicas",
+    )
+    min_role_level = models.IntegerField(
+        choices=RoleLevel.choices,
+        default=RoleLevel.ENGINEER,
+        verbose_name="Nivel Jerárquico Mínimo de Visualización",
+        help_text="Nivel jerárquico mínimo para visualizar este evento",
+    )
+
+    # Trazabilidad Operativa Multi-Módulo
+    related_account = models.ForeignKey(
+        'crm.Account',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='events',
+        verbose_name="Cliente Vinculado",
+    )
+    related_work_order = models.ForeignKey(
+        'operations.WorkOrder',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='events',
+        verbose_name="Orden de Trabajo Vinculada",
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_events',
+        verbose_name="Responsable Asignado",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_events',
+        verbose_name="Creado Por",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Evento Corporativo"
+        verbose_name_plural = "Agenda Corporativa & Hitos"
+        ordering = ['start_datetime']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'code'],
+                name='unique_corporate_event_code_per_tenant',
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.code} · {self.title} [{self.get_event_type_display()}]"
+
+    def save(self, *args, **kwargs):
+        # Regla de confidencialidad estricta comercial y fiscal:
+        if self.event_type in (self.EventType.TAX_DEADLINE, self.EventType.COMMERCIAL_VISIT):
+            if self.min_role_level < RoleLevel.OPERATIONS_COORD:
+                self.min_role_level = RoleLevel.OPERATIONS_COORD
+
+        # Autogenerador de código consecutivo por organización
+        if not self.code and self.organization_id:
+            year = self.start_datetime.year if self.start_datetime else timezone.now().year
+            prefix = f"EVT-{year}-"
+            count = (
+                CorporateEvent.objects.filter(
+                    organization_id=self.organization_id,
+                    code__startswith=prefix,
+                ).count()
+                + 1
+            )
+            candidate = f"{prefix}{count:04d}"
+            while CorporateEvent.objects.filter(
+                organization_id=self.organization_id, code=candidate
+            ).exists():
+                count += 1
+                candidate = f"{prefix}{count:04d}"
+            self.code = candidate
+
+        super().save(*args, **kwargs)
+
