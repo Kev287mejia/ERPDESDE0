@@ -2,6 +2,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -31,6 +32,8 @@ from apps.finance.services import (
     submit_petty_cash_replenishment,
     disburse_petty_cash_replenishment,
 )
+from apps.finance.services_statements import FinancialStatementsService
+from apps.finance.services_dgi_tax import NicaraguaDgiTaxService
 
 
 class FinanceDashboardView(ModuleAccessRequiredMixin, TemplateView):
@@ -361,3 +364,177 @@ class PettyCashFundDetailView(ModuleAccessRequiredMixin, DetailView):
             'disburse_form': PettyCashDisburseForm(organization=org),
         })
         return context
+
+
+class FinancialStatementsDashboardView(ModuleAccessRequiredMixin, TemplateView):
+    """
+    Consola Ejecutiva de Estados Financieros en Tiempo Real.
+    Visualización tabular de alta densidad (P&L, Balance General y Balanza de Comprobación).
+    Acceso restringido a RoleLevel.COMMERCIAL_MGR (85) y OWNER_ADMIN (100).
+    """
+    template_name = 'finance/statements_dashboard.html'
+    required_module = 'finance'
+    min_role_level = RoleLevel.COMMERCIAL_MGR
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        org = self.request.organization
+        tab = self.request.GET.get('tab', 'pnl')
+        date_from_raw = self.request.GET.get('date_from', '')
+        date_to_raw = self.request.GET.get('date_to', '')
+        as_of_raw = self.request.GET.get('as_of_date', '')
+
+        import datetime
+        date_from = None
+        date_to = None
+        as_of_date = None
+
+        if date_from_raw:
+            try:
+                date_from = datetime.datetime.strptime(date_from_raw, '%Y-%m-%d').date()
+            except ValueError:
+                date_from = None
+        if date_to_raw:
+            try:
+                date_to = datetime.datetime.strptime(date_to_raw, '%Y-%m-%d').date()
+            except ValueError:
+                date_to = None
+        if as_of_raw:
+            try:
+                as_of_date = datetime.datetime.strptime(as_of_raw, '%Y-%m-%d').date()
+            except ValueError:
+                as_of_date = None
+
+        pnl = FinancialStatementsService.get_income_statement(org, date_from=date_from, date_to=date_to)
+        balance = FinancialStatementsService.get_balance_sheet(org, as_of_date=as_of_date or date_to)
+        trial = FinancialStatementsService.get_trial_balance(org, date_from=date_from, date_to=date_to)
+
+        context.update({
+            'active_tab': tab,
+            'pnl': pnl,
+            'balance': balance,
+            'trial': trial,
+            'date_from': date_from_raw,
+            'date_to': date_to_raw,
+            'as_of_date': as_of_raw,
+        })
+        return context
+
+
+class FinancialStatementsPrintView(ModuleAccessRequiredMixin, TemplateView):
+    """
+    Vista Oficial de Impresión para Estados Financieros (P&L y Balance General).
+    Formato membretado de alta densidad con bloques de firma legal para CPA y Representante Legal.
+    Acceso restringido a RoleLevel.COMMERCIAL_MGR (85) y OWNER_ADMIN (100).
+    """
+    template_name = 'finance/statements_print.html'
+    required_module = 'finance'
+    min_role_level = RoleLevel.COMMERCIAL_MGR
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        org = self.request.organization
+        date_from_raw = self.request.GET.get('date_from', '')
+        date_to_raw = self.request.GET.get('date_to', '')
+        as_of_raw = self.request.GET.get('as_of_date', '')
+
+        import datetime
+        date_from = None
+        date_to = None
+        as_of_date = None
+
+        if date_from_raw:
+            try:
+                date_from = datetime.datetime.strptime(date_from_raw, '%Y-%m-%d').date()
+            except ValueError:
+                date_from = None
+        if date_to_raw:
+            try:
+                date_to = datetime.datetime.strptime(date_to_raw, '%Y-%m-%d').date()
+            except ValueError:
+                date_to = None
+        if as_of_raw:
+            try:
+                as_of_date = datetime.datetime.strptime(as_of_raw, '%Y-%m-%d').date()
+            except ValueError:
+                as_of_date = None
+
+        pnl = FinancialStatementsService.get_income_statement(org, date_from=date_from, date_to=date_to)
+        balance = FinancialStatementsService.get_balance_sheet(org, as_of_date=as_of_date or date_to)
+
+        context.update({
+            'pnl': pnl,
+            'balance': balance,
+            'date_from': date_from_raw,
+            'date_to': date_to_raw,
+            'as_of_date': as_of_date or timezone.now().date(),
+            'generated_at': timezone.now(),
+        })
+        return context
+
+
+class DgiTaxConsoleView(ModuleAccessRequiredMixin, TemplateView):
+    """
+    Consola Tributaria DGI Nicaragua y Alcaldía Municipal.
+    Monitoreo de liquidación de IVA 15%, Retenciones en la Fuente e Impuestos Laborales.
+    Acceso restringido a RoleLevel.COMMERCIAL_MGR (85) y OWNER_ADMIN (100).
+    """
+    template_name = 'finance/dgi_tax_console.html'
+    required_module = 'finance'
+    min_role_level = RoleLevel.COMMERCIAL_MGR
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        org = self.request.organization
+        year_raw = self.request.GET.get('year', '')
+        month_raw = self.request.GET.get('month', '')
+
+        year = int(year_raw) if year_raw.isdigit() else None
+        month = int(month_raw) if month_raw.isdigit() else None
+
+        tax_summary = NicaraguaDgiTaxService.get_tax_summary(org, year=year, month=month)
+
+        current_year = timezone.now().year
+        available_years = list(range(current_year - 2, current_year + 1))
+        months = [
+            (1, 'Enero'), (2, 'Febrero'), (3, 'Marzo'), (4, 'Abril'),
+            (5, 'Mayo'), (6, 'Junio'), (7, 'Julio'), (8, 'Agosto'),
+            (9, 'Septiembre'), (10, 'Octubre'), (11, 'Noviembre'), (12, 'Diciembre')
+        ]
+
+        context.update({
+            'tax_summary': tax_summary,
+            'selected_year': year,
+            'selected_month': month,
+            'available_years': available_years,
+            'months': months,
+        })
+        return context
+
+
+class DgiVetCsvExportView(ModuleAccessRequiredMixin, View):
+    """
+    Descarga del Archivo CSV en Formato Ventanilla Electrónica Tributaria (VET) DGI.
+    Acceso restringido a RoleLevel.COMMERCIAL_MGR (85) y OWNER_ADMIN (100).
+    """
+    required_module = 'finance'
+    min_role_level = RoleLevel.COMMERCIAL_MGR
+
+    def get(self, request, *args, **kwargs):
+        org = request.organization
+        year_raw = request.GET.get('year', '')
+        month_raw = request.GET.get('month', '')
+
+        year = int(year_raw) if year_raw.isdigit() else None
+        month = int(month_raw) if month_raw.isdigit() else None
+
+        csv_payload = NicaraguaDgiTaxService.generate_vet_csv_payload(org, year=year, month=month)
+        tax_id = org.tax_id or 'ORG'
+        suffix = f"_{year}" if year else ""
+        if month:
+            suffix += f"_{month:02d}"
+
+        filename = f"SABANA_VET_DGI_{tax_id}{suffix}.csv"
+        response = HttpResponse(csv_payload, content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response

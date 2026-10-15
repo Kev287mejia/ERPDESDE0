@@ -262,8 +262,11 @@ def ensure_default_chart_of_accounts(organization):
         ('2102-01', 'IVA Débito Fiscal por Pagar (15%)', AccountingAccount.AccountType.LIABILITY),
         ('2103-01', 'Retenciones IR en la Fuente por Enterar DGI', AccountingAccount.AccountType.LIABILITY),
         ('2103-02', 'Retenciones IMI Alcaldía por Enterar', AccountingAccount.AccountType.LIABILITY),
+        ('3101-01', 'Capital Social Pagado / Aporte Inicial', AccountingAccount.AccountType.EQUITY),
+        ('3201-01', 'Resultados Acumulados de Ejercicios Anteriores', AccountingAccount.AccountType.EQUITY),
         ('4101-01', 'Ingresos por Ventas de Bienes y Servicios', AccountingAccount.AccountType.INCOME),
         ('5101-01', 'Costo de Ventas, Compras e Insumos', AccountingAccount.AccountType.EXPENSE),
+        ('6101-01', 'Gastos Generales y de Administración', AccountingAccount.AccountType.EXPENSE),
     ]
     accounts_map = {}
     for code, name, acct_type in default_accounts:

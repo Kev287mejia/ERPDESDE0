@@ -29,7 +29,10 @@ from apps.finance.models import (
     JournalEntry,
     JournalEntryLine,
 )
-from apps.finance.services import sync_commercial_and_purchasing_to_ledger
+from apps.finance.services import (
+    sync_commercial_and_purchasing_to_ledger,
+    ensure_default_chart_of_accounts,
+)
 from apps.inventory.models import InventoryItem, StockBalance, StockMovement, Warehouse, InventoryBatch
 from apps.inventory.services import record_stock_entry
 from apps.operations.models import (
@@ -1659,6 +1662,94 @@ class SandboxScenarioSeeder:
 
         # Sincronización Contable Automática con apps/finance (Partida Doble NIIF/DGI)
         sync_commercial_and_purchasing_to_ledger(organization, owner_user)
+
+        # Asiento 1: Aporte de Capital Social Inicial (100% Cuadrado: Debe == Haber)
+        accounts_map = ensure_default_chart_of_accounts(organization)
+        if not JournalEntry.objects.filter(organization=organization, concept__icontains='Capital Social').exists():
+            entry_capital = JournalEntry.objects.create(
+                organization=organization,
+                date=timezone.now().date() - datetime.timedelta(days=60),
+                entry_type=JournalEntry.EntryType.ADJUSTMENT,
+                concept="Aporte Inicial de Capital Social de Socios Fundadores",
+                reference="ACT-CONST-2026",
+                created_by=owner_user,
+            )
+            # DEBE: Bancos Institucionales (BAC)
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry_capital,
+                account=accounts_map['1102-01'],
+                concept="Depósito BAC Aporte Capital Fundadores",
+                debit=Decimal('500000.00'),
+                credit=Decimal('0.00'),
+            )
+            # HABER: Capital Social Pagado
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry_capital,
+                account=accounts_map['3101-01'],
+                concept="Capital Social Autorizado y Pagado",
+                debit=Decimal('0.00'),
+                credit=Decimal('500000.00'),
+            )
+            entry_capital.verify_and_save_balance()
+
+        # Asiento 2: Reconocimiento de Ingresos por Servicios Mayores de Ingeniería
+        if not JournalEntry.objects.filter(organization=organization, concept__icontains='Hito Mayor Subestación').exists():
+            entry_income = JournalEntry.objects.create(
+                organization=organization,
+                date=timezone.now().date() - datetime.timedelta(days=15),
+                entry_type=JournalEntry.EntryType.SALES,
+                concept="Facturación Hito Mayor Subestación Geotérmica San Jacinto",
+                reference="FAC-2026-0004",
+                created_by=owner_user,
+            )
+            # DEBE: Clientes por Cobrar CxC (Neto)
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry_income,
+                account=accounts_map['1103-01'],
+                concept="CxC Polaris Energy Nicaragua - Hito Mayor",
+                debit=Decimal('224000.00'),
+                credit=Decimal('0.00'),
+            )
+            # DEBE: Anticipo Retención IR 2% Sufrida
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry_income,
+                account=accounts_map['1105-01'],
+                concept="Retención IR 2% Polaris Energy",
+                debit=Decimal('4000.00'),
+                credit=Decimal('0.00'),
+            )
+            # DEBE: Anticipo Retención IMI 1% Sufrida
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry_income,
+                account=accounts_map['1105-02'],
+                concept="Retención IMI 1% Alcaldía de Telica",
+                debit=Decimal('2000.00'),
+                credit=Decimal('0.00'),
+            )
+            # HABER: Ingresos por Servicios Electromecánicos
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry_income,
+                account=accounts_map['4101-01'],
+                concept="Ingresos por Pruebas de Alta Tensión y Montaje",
+                debit=Decimal('0.00'),
+                credit=Decimal('200000.00'),
+            )
+            # HABER: IVA Débito Fiscal 15%
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry_income,
+                account=accounts_map['2102-01'],
+                concept="IVA 15% Débito Fiscal Hito Mayor",
+                debit=Decimal('0.00'),
+                credit=Decimal('30000.00'),
+            )
+            entry_income.verify_and_save_balance()
 
         # =========================================================================
         # 8. REPOSITORIO DOCUMENTAL INSTITUCIONAL (apps/repository)

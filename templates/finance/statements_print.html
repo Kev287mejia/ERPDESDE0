@@ -1,0 +1,238 @@
+{% extends "print/base_print.html" %}
+
+{% block title %}Estados Financieros Auditados | {{ current_org.name }}{% endblock %}
+{% block document_folio %}ESTADOS FINANCIEROS NIIF · DGI NICARAGUA{% endblock %}
+
+{% block document_meta %}
+<div class="text-slate-400 uppercase text-[10px] tracking-wider font-mono">EJERCICIO / CORTE CONTABLE</div>
+<div class="text-sm font-bold text-slate-900 font-mono">
+    {% if date_from and date_to %}
+    {{ date_from }} AL {{ date_to }}
+    {% elif date_to %}
+    AL CORTE {{ date_to }}
+    {% else %}
+    AL CORTE {{ as_of_date|date:"d/m/Y" }}
+    {% endif %}
+</div>
+<div class="text-slate-500 text-[11px] font-mono">EMITIDO: {{ generated_at|date:"d/m/Y H:i" }}</div>
+<div class="text-slate-500 text-[11px] font-mono">MONEDA: C$ NIO (CÓRDOBAS)</div>
+{% endblock %}
+
+{% block document_body %}
+<div class="space-y-6 text-xs font-sans">
+
+    <!-- Indicador de Cuadre de Partida Doble -->
+    <div class="p-2.5 bg-slate-50 border border-slate-200 rounded flex items-center justify-between font-mono text-[11px]">
+        <span>DICTAMEN TÉCNICO DE BALANCE:</span>
+        {% if balance.is_balanced %}
+        <span class="font-bold text-slate-900">PARTIDA DOBLE CUADRADA · DIFERENCIA C$ 0.00</span>
+        {% else %}
+        <span class="font-bold text-rose-700">DIFERENCIA: C$ {{ balance.accounting_equation_diff|floatformat:2 }}</span>
+        {% endif %}
+    </div>
+
+    <!-- 1. ESTADO DE RESULTADOS (P&L) -->
+    <div class="space-y-2">
+        <div class="border-b-2 border-slate-900 pb-1 flex justify-between items-baseline font-mono">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-900">1. Estado de Resultados Integral (P&L)</h2>
+            <span class="text-[10px] text-slate-500">INGRESOS Y GASTOS DEL PERÍODO</span>
+        </div>
+
+        <table class="w-full text-left border-collapse text-xs font-mono">
+            <tbody>
+                <!-- INGRESOS -->
+                <tr class="bg-slate-100 font-bold text-slate-900">
+                    <td class="py-1 px-2">INGRESOS OPERATIVOS</td>
+                    <td class="py-1 px-2 text-right tabular-nums">C$ {{ pnl.total_revenue|floatformat:2 }}</td>
+                </tr>
+                {% for rev in pnl.revenue_items %}
+                <tr class="border-b border-slate-200 text-slate-700">
+                    <td class="py-1 px-4 font-sans">{{ rev.code }} · {{ rev.name }}</td>
+                    <td class="py-1 px-2 text-right tabular-nums">C$ {{ rev.amount|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+
+                <!-- COSTOS -->
+                <tr class="bg-slate-100 font-bold text-slate-900">
+                    <td class="py-1 px-2">(-) COSTOS DIRECTOS DE OPERACIÓN Y VENTAS</td>
+                    <td class="py-1 px-2 text-right tabular-nums">(C$ {{ pnl.total_operational_costs|floatformat:2 }})</td>
+                </tr>
+                {% for cost in pnl.cost_items %}
+                <tr class="border-b border-slate-200 text-slate-700">
+                    <td class="py-1 px-4 font-sans">{{ cost.code }} · {{ cost.name }}</td>
+                    <td class="py-1 px-2 text-right tabular-nums">C$ {{ cost.amount|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+
+                <!-- UTILIDAD BRUTA -->
+                <tr class="font-bold text-slate-900 border-t border-b border-slate-400">
+                    <td class="py-1.5 px-2 font-mono">(=) UTILIDAD BRUTA</td>
+                    <td class="py-1.5 px-2 text-right tabular-nums font-mono">C$ {{ pnl.gross_profit|floatformat:2 }}</td>
+                </tr>
+
+                <!-- GASTOS NÓMINA -->
+                <tr class="bg-slate-100 font-bold text-slate-900">
+                    <td class="py-1 px-2">(-) GASTOS DE PERSONAL, NÓMINA Y CARGAS SOCIALES (LEY 185)</td>
+                    <td class="py-1 px-2 text-right tabular-nums">(C$ {{ pnl.total_payroll_expenses|floatformat:2 }})</td>
+                </tr>
+                {% for pay in pnl.payroll_items %}
+                <tr class="border-b border-slate-200 text-slate-700">
+                    <td class="py-1 px-4 font-sans">{{ pay.code }} · {{ pay.name }}</td>
+                    <td class="py-1 px-2 text-right tabular-nums">C$ {{ pay.amount|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+
+                <!-- GASTOS GENERALES -->
+                {% if pnl.general_expense_items %}
+                <tr class="bg-slate-100 font-bold text-slate-900">
+                    <td class="py-1 px-2">(-) GASTOS GENERALES Y ADMINISTRATIVOS</td>
+                    <td class="py-1 px-2 text-right tabular-nums">(C$ {{ pnl.total_general_expenses|floatformat:2 }})</td>
+                </tr>
+                {% for gen in pnl.general_expense_items %}
+                <tr class="border-b border-slate-200 text-slate-700">
+                    <td class="py-1 px-4 font-sans">{{ gen.code }} · {{ gen.name }}</td>
+                    <td class="py-1 px-2 text-right tabular-nums">C$ {{ gen.amount|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+
+                <!-- UTILIDAD NETA -->
+                <tr class="bg-slate-900 text-white font-bold text-sm">
+                    <td class="py-2 px-2 uppercase tracking-wide">(=) UTILIDAD NETA DEL EJERCICIO</td>
+                    <td class="py-2 px-2 text-right tabular-nums">C$ {{ pnl.net_income|floatformat:2 }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 2. BALANCE GENERAL (ESTADO DE SITUACIÓN FINANCIERA) -->
+    <div class="space-y-2 pt-4">
+        <div class="border-b-2 border-slate-900 pb-1 flex justify-between items-baseline font-mono">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-900">2. Balance General (Estado de Situación Financiera)</h2>
+            <span class="text-[10px] text-slate-500">AL CORTE {{ as_of_date|date:"d/m/Y" }}</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 text-xs font-mono">
+            <!-- ACTIVOS -->
+            <div class="border border-slate-300 p-3 space-y-3">
+                <div class="font-bold border-b border-slate-300 pb-1 text-slate-900 flex justify-between">
+                    <span>ACTIVOS (CLASE 1)</span>
+                    <span class="tabular-nums">C$ {{ balance.total_assets|floatformat:2 }}</span>
+                </div>
+                <div class="space-y-1">
+                    <div class="text-[10px] text-slate-500 uppercase font-bold">Caja y Bancos</div>
+                    {% for a in balance.cash_and_banks %}
+                    <div class="flex justify-between text-slate-700">
+                        <span class="font-sans">{{ a.code }} · {{ a.name }}</span>
+                        <span class="tabular-nums">C$ {{ a.balance|floatformat:2 }}</span>
+                    </div>
+                    {% endfor %}
+
+                    <div class="text-[10px] text-slate-500 uppercase font-bold pt-1">Cuentas por Cobrar</div>
+                    {% for a in balance.receivables %}
+                    <div class="flex justify-between text-slate-700">
+                        <span class="font-sans">{{ a.code }} · {{ a.name }}</span>
+                        <span class="tabular-nums">C$ {{ a.balance|floatformat:2 }}</span>
+                    </div>
+                    {% endfor %}
+
+                    <div class="text-[10px] text-slate-500 uppercase font-bold pt-1">Créditos Fiscales y Anticipos</div>
+                    {% for a in balance.tax_assets %}
+                    <div class="flex justify-between text-slate-700">
+                        <span class="font-sans">{{ a.code }} · {{ a.name }}</span>
+                        <span class="tabular-nums">C$ {{ a.balance|floatformat:2 }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="border-t border-slate-400 pt-1 font-bold flex justify-between text-slate-900">
+                    <span>TOTAL ACTIVOS</span>
+                    <span class="tabular-nums">C$ {{ balance.total_assets|floatformat:2 }}</span>
+                </div>
+            </div>
+
+            <!-- PASIVOS Y PATRIMONIO -->
+            <div class="space-y-4">
+                <!-- Pasivos -->
+                <div class="border border-slate-300 p-3 space-y-3">
+                    <div class="font-bold border-b border-slate-300 pb-1 text-slate-900 flex justify-between">
+                        <span>PASIVOS (CLASE 2)</span>
+                        <span class="tabular-nums">C$ {{ balance.total_liabilities|floatformat:2 }}</span>
+                    </div>
+                    <div class="space-y-1">
+                        {% for l in balance.accounts_payable %}
+                        <div class="flex justify-between text-slate-700">
+                            <span class="font-sans">{{ l.code }} · {{ l.name }}</span>
+                            <span class="tabular-nums">C$ {{ l.balance|floatformat:2 }}</span>
+                        </div>
+                        {% endfor %}
+                        {% for l in balance.tax_payables %}
+                        <div class="flex justify-between text-slate-700">
+                            <span class="font-sans">{{ l.code }} · {{ l.name }}</span>
+                            <span class="tabular-nums">C$ {{ l.balance|floatformat:2 }}</span>
+                        </div>
+                        {% endfor %}
+                        {% for l in balance.payroll_payables %}
+                        <div class="flex justify-between text-slate-700">
+                            <span class="font-sans">{{ l.code }} · {{ l.name }}</span>
+                            <span class="tabular-nums">C$ {{ l.balance|floatformat:2 }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="border-t border-slate-400 pt-1 font-bold flex justify-between text-slate-900">
+                        <span>TOTAL PASIVOS</span>
+                        <span class="tabular-nums">C$ {{ balance.total_liabilities|floatformat:2 }}</span>
+                    </div>
+                </div>
+
+                <!-- Patrimonio -->
+                <div class="border border-slate-300 p-3 space-y-2">
+                    <div class="font-bold border-b border-slate-300 pb-1 text-slate-900 flex justify-between">
+                        <span>PATRIMONIO NETO (CLASE 3)</span>
+                        <span class="tabular-nums">C$ {{ balance.total_equity_and_results|floatformat:2 }}</span>
+                    </div>
+                    <div class="space-y-1">
+                        {% for e in balance.equity_items %}
+                        <div class="flex justify-between text-slate-700">
+                            <span class="font-sans">{{ e.code }} · {{ e.name }}</span>
+                            <span class="tabular-nums">C$ {{ e.balance|floatformat:2 }}</span>
+                        </div>
+                        {% endfor %}
+                        <div class="flex justify-between text-slate-900 font-bold bg-slate-100 p-1 rounded">
+                            <span class="font-sans">Resultado del Ejercicio (P&L)</span>
+                            <span class="tabular-nums">C$ {{ balance.net_income|floatformat:2 }}</span>
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-400 pt-1 font-bold flex justify-between text-slate-900">
+                        <span>TOTAL PATRIMONIO</span>
+                        <span class="tabular-nums">C$ {{ balance.total_equity_and_results|floatformat:2 }}</span>
+                    </div>
+                </div>
+
+                <!-- Total Pasivo + Patrimonio -->
+                <div class="bg-slate-100 border border-slate-400 p-2 font-bold flex justify-between text-slate-900">
+                    <span>TOTAL PASIVOS + PATRIMONIO</span>
+                    <span class="tabular-nums">C$ {{ balance.total_liabilities_and_equity|floatformat:2 }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block signature_block %}
+<!-- Bloque Legal de Firmas Contables (CPA & Representante Legal) -->
+<div class="pt-12 grid grid-cols-2 gap-12 text-center text-xs font-sans">
+    <div class="border-t-2 border-slate-900 pt-2 space-y-1">
+        <div class="font-bold text-slate-900 uppercase">Lic. Contador Público Autorizado (CPA)</div>
+        <div class="text-[11px] text-slate-500 font-mono">Registro Profesional CPA N° ________</div>
+        <div class="text-[10px] text-slate-400">Certificación y Dictamen Contable NIIF para PYMES</div>
+    </div>
+    <div class="border-t-2 border-slate-900 pt-2 space-y-1">
+        <div class="font-bold text-slate-900 uppercase">Representante Legal / Gerencia General</div>
+        <div class="text-[11px] text-slate-500 font-mono">{{ current_org.legal_name|default:current_org.name }}</div>
+        <div class="text-[10px] text-slate-400">RUC: {{ current_org.tax_id }}</div>
+    </div>
+</div>
+{% endblock %}

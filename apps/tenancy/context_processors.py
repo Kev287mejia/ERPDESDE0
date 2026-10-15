@@ -90,6 +90,7 @@ def tenancy_context(request):
         'can_approve_sst': role_level >= RoleLevel.SST_OFFICER,
         'can_plan_crews': role_level >= RoleLevel.OPERATIONS_COORD,
         'can_view_financials': (role_level >= RoleLevel.OPERATIONS_COORD) if membership else False,
+        'can_view_financial_statements': (role_level >= RoleLevel.COMMERCIAL_MGR) if membership else False,
         'is_field_tech_only': role_level == RoleLevel.TECHNICIAN,
     }
 
@@ -116,6 +117,7 @@ def tenancy_context(request):
         'current_role_label': current_role_label,
         'user_memberships': user_memberships,
         'nav_access': nav_access,
+        'can_view_financial_statements': (role_level >= RoleLevel.COMMERCIAL_MGR) if membership else False,
         'RoleLevel': RoleLevel,
         'role_choices': RoleLevel.choices,
         'role_choices_desc': sorted(RoleLevel.choices, key=lambda x: x[0], reverse=True),

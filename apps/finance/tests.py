@@ -15,13 +15,24 @@ from apps.finance.models import (
     PettyCashExpense,
     PettyCashReplenishment,
     FinancialTransaction,
+    AccountingAccount,
+    JournalEntry,
+    JournalEntryLine,
 )
 from apps.finance.services import (
     allocate_petty_cash_fund,
     record_petty_cash_expense,
     submit_petty_cash_replenishment,
     disburse_petty_cash_replenishment,
+    ensure_default_chart_of_accounts,
 )
+from apps.finance.services_statements import FinancialStatementsService
+from apps.finance.services_dgi_tax import NicaraguaDgiTaxService
+from apps.billing.models import Invoice
+from apps.payroll.models import PayrollPeriod
+from apps.payroll.services import ensure_payroll_accounting_accounts
+from apps.purchasing.models import Supplier, PurchaseOrder
+from apps.inventory.models import Warehouse
 
 User = get_user_model()
 
@@ -556,3 +567,562 @@ class FinanceModuleEndToEndTestCase(TestCase):
         # Intento de consultar detalle de caja de Tenant A -> 404
         resp_detail = client_intruder.get(reverse('finance:fund_detail', kwargs={'pk': self.fund_alfa.pk}))
         self.assertEqual(resp_detail.status_code, 404)
+
+
+class FinancialStatementsAndDgiTaxTestCase(TestCase):
+    """
+    Suite de Pruebas Unitarias y de Integración para el Motor de Estados Financieros
+    y Consola Tributaria DGI VET (Paso 17.1).
+    Valida:
+    1. FinancialStatementsService:
+       - Balanza de Comprobación: sum_debits == sum_credits, is_balanced == True.
+       - Estado de Resultados P&L: desglose de ingresos, costos, gastos de nómina, utilidad neta y margen %.
+       - Balance General: Activo == Pasivo + Patrimonio + Resultado del Ejercicio (is_balanced == True).
+    2. NicaraguaDgiTaxService:
+       - Liquidación IVA 15% (Débito vs Crédito).
+       - Retenciones IR e IMI, Retención Salarial Ley 822 y Cargas Sociales INSS/INATEC.
+       - Generación y descarga CSV formato VET DGI (HTTP 200, headers oficiales técnicos).
+    3. Vista de Impresión Oficial (/finance/statements/print/) con firmas CPA y Representante Legal.
+    4. Matriz de Autoridad Jerárquica RBAC:
+       - Niveles 20 (Técnico), 50 (Ingeniero), 70 (Oficial SST) y 80 (Coordinador) -> HTTP 403 Forbidden.
+       - Niveles 85 (Gerente Comercial) y 100 (Owner / Administrador) -> HTTP 200 OK.
+    """
+
+    def setUp(self):
+        # 1. Configuración de Jurisdicción Fiscal Nicaragua
+        self.country_ni, _ = CountryConfig.objects.get_or_create(
+            code='NI',
+            defaults={
+                'name': 'Nicaragua',
+                'flag_emoji': '🇳🇮',
+                'primary_currency_code': 'NIO',
+                'primary_currency_symbol': 'C$',
+                'secondary_currency_code': 'USD',
+                'secondary_currency_symbol': '$',
+                'tax_id_label': 'RUC',
+                'tax_id_regex': r'^[A-Z]\d{13}$',
+                'personal_id_label': 'Cédula de Identidad',
+                'personal_id_regex': r'^\d{3}-\d{6}-\d{4}[A-Z]$',
+                'default_tax_name': 'IVA',
+                'default_tax_rate': Decimal('15.00'),
+                'is_active': True,
+            }
+        )
+
+        # 2. Organización
+        self.org = Organization.objects.create(
+            name="SERMANSA Ingeniería S.A.",
+            legal_name="Servicios y Mantenimiento Electromecánico S.A.",
+            slug="sermansa-audit-finance",
+            tax_id="J0310000311223",
+            country=self.country_ni,
+            enabled_modules=['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'payroll', 'purchasing'],
+            is_active=True,
+        )
+
+        # Catálogo de Cuentas Contables Oficial
+        ensure_default_chart_of_accounts(self.org)
+        ensure_payroll_accounting_accounts(self.org)
+        self.acc_bank = AccountingAccount.objects.get(organization=self.org, code='1102-01')
+        self.acc_ar = AccountingAccount.objects.get(organization=self.org, code='1103-01')
+        self.acc_tax_credit = AccountingAccount.objects.get(organization=self.org, code='1104-01')
+        self.acc_ap = AccountingAccount.objects.get(organization=self.org, code='2101-01')
+        self.acc_tax_payable = AccountingAccount.objects.get(organization=self.org, code='2102-01')
+        self.acc_salaries_payable = AccountingAccount.objects.get(organization=self.org, code='2104-01')
+        self.acc_inss_payable = AccountingAccount.objects.get(organization=self.org, code='2104-02')
+        self.acc_ir_withheld = AccountingAccount.objects.get(organization=self.org, code='2104-03')
+        self.acc_provisions_payable = AccountingAccount.objects.get(organization=self.org, code='2104-04')
+        self.acc_capital = AccountingAccount.objects.get(organization=self.org, code='3101-01')
+        self.acc_sales = AccountingAccount.objects.get(organization=self.org, code='4101-01')
+        self.acc_cost_services = AccountingAccount.objects.get(organization=self.org, code='5101-01')
+        self.acc_exp_salaries = AccountingAccount.objects.get(organization=self.org, code='5201-01')
+        self.acc_exp_inss = AccountingAccount.objects.get(organization=self.org, code='5201-02')
+        self.acc_exp_provisions = AccountingAccount.objects.get(organization=self.org, code='5201-03')
+
+        # 3. Usuarios de la Matriz RBAC
+        # Nivel 100: Owner / Admin
+        self.user_owner = User.objects.create_user(
+            email='owner.fin@sermansa.com.ni',
+            full_name='Ing. Roberto Meza (Owner)',
+            password='Password123!',
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_owner,
+            organization=self.org,
+            role_level=RoleLevel.OWNER_ADMIN,
+            job_title='Director General',
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # Nivel 85: Gerente Comercial
+        self.user_comm_mgr = User.objects.create_user(
+            email='comercial.fin@sermansa.com.ni',
+            full_name='Lic. Sofia Valenzuela (Gerente Comercial)',
+            password='Password123!',
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_comm_mgr,
+            organization=self.org,
+            role_level=RoleLevel.COMMERCIAL_MGR,
+            job_title='Gerente Comercial',
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # Nivel 80: Coordinador Operativo
+        self.user_coord = User.objects.create_user(
+            email='coord.fin@sermansa.com.ni',
+            full_name='Ing. Carlos Pineda (Coordinador)',
+            password='Password123!',
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_coord,
+            organization=self.org,
+            role_level=RoleLevel.OPERATIONS_COORD,
+            job_title='Coordinador de Proyectos',
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # Nivel 70: Oficial SST
+        self.user_sst = User.objects.create_user(
+            email='sst.fin@sermansa.com.ni',
+            full_name='Lic. Valeria Solís (Oficial SST)',
+            password='Password123!',
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_sst,
+            organization=self.org,
+            role_level=RoleLevel.SST_OFFICER,
+            job_title='Oficial SST',
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # Nivel 50: Ingeniero Residente
+        self.user_engineer = User.objects.create_user(
+            email='eng.fin@sermansa.com.ni',
+            full_name='Ing. Andrea Salgado (Residente)',
+            password='Password123!',
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_engineer,
+            organization=self.org,
+            role_level=RoleLevel.ENGINEER,
+            job_title='Ingeniero Residente',
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # Nivel 20: Técnico
+        self.user_tech = User.objects.create_user(
+            email='tech.fin@sermansa.com.ni',
+            full_name='Armando Solís (Técnico)',
+            password='Password123!',
+        )
+        OrganizationMembership.objects.create(
+            user=self.user_tech,
+            organization=self.org,
+            role_level=RoleLevel.TECHNICIAN,
+            job_title='Técnico Electricista',
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # 4. Asientos Contables de Partida Doble Cuadrados
+        today = timezone.now().date()
+        self.today = today
+
+        # Asiento 1: Aporte de Capital Inicial (C$ 500,000.00)
+        entry_cap = JournalEntry.objects.create(
+            organization=self.org,
+            number="POL-2026-CAPITAL",
+            date=today,
+            concept="Aporte inicial de capital de los socios",
+            entry_type=JournalEntry.EntryType.ADJUSTMENT,
+            created_by=self.user_owner,
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_cap,
+            account=self.acc_bank,
+            debit=Decimal('500000.00'),
+            credit=Decimal('0.00'),
+            concept="Ingreso a cuenta bancaria",
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_cap,
+            account=self.acc_capital,
+            debit=Decimal('0.00'),
+            credit=Decimal('500000.00'),
+            concept="Constitución de Capital Social",
+        )
+        entry_cap.verify_and_save_balance()
+
+        # Asiento 2: Facturación de Servicios de Montaje (C$ 200,000.00 + IVA C$ 30,000.00)
+        entry_sales = JournalEntry.objects.create(
+            organization=self.org,
+            number="POL-2026-VENTAS",
+            date=today,
+            concept="Facturación de servicios de montaje electromecánico",
+            entry_type=JournalEntry.EntryType.SALES,
+            created_by=self.user_owner,
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_sales,
+            account=self.acc_ar,
+            debit=Decimal('230000.00'),
+            credit=Decimal('0.00'),
+            concept="Cuentas por cobrar comerciales cliente",
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_sales,
+            account=self.acc_sales,
+            debit=Decimal('0.00'),
+            credit=Decimal('200000.00'),
+            concept="Ingresos por servicios de montaje",
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_sales,
+            account=self.acc_tax_payable,
+            debit=Decimal('0.00'),
+            credit=Decimal('30000.00'),
+            concept="IVA por pagar 15% débito fiscal",
+        )
+        entry_sales.verify_and_save_balance()
+
+        # Asiento 3: Costos Operativos de Subcontrato (C$ 30,000.00 + IVA Acreditable C$ 4,500.00)
+        entry_cost = JournalEntry.objects.create(
+            organization=self.org,
+            number="POL-2026-COSTOS",
+            date=today,
+            concept="Servicios de grúa y logística de subcontratista",
+            entry_type=JournalEntry.EntryType.PURCHASES,
+            created_by=self.user_owner,
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_cost,
+            account=self.acc_cost_services,
+            debit=Decimal('30000.00'),
+            credit=Decimal('0.00'),
+            concept="Costo directo por servicio de grúas",
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_cost,
+            account=self.acc_tax_credit,
+            debit=Decimal('4500.00'),
+            credit=Decimal('0.00'),
+            concept="IVA Crédito fiscal acreditable 15%",
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_cost,
+            account=self.acc_ap,
+            debit=Decimal('0.00'),
+            credit=Decimal('34500.00'),
+            concept="Cuentas por pagar proveedores",
+        )
+        entry_cost.verify_and_save_balance()
+
+        # Asiento 4: Póliza de Nómina (Sueldos C$ 60,000.00, Cargas Patronales C$ 14,700.00, Provisiones C$ 10,000.00)
+        entry_payroll = JournalEntry.objects.create(
+            organization=self.org,
+            number="POL-2026-NOMINA",
+            date=today,
+            concept="Póliza contable devengado quincenal nómina",
+            entry_type=JournalEntry.EntryType.ADJUSTMENT,
+            created_by=self.user_owner,
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_payroll,
+            account=self.acc_exp_salaries,
+            debit=Decimal('60000.00'),
+            credit=Decimal('0.00'),
+            concept="Gasto de sueldos y salarios quincenales",
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_payroll,
+            account=self.acc_exp_inss,
+            debit=Decimal('14700.00'),
+            credit=Decimal('0.00'),
+            concept="Cargas sociales INSS patronal 22.5% e INATEC 2%",
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_payroll,
+            account=self.acc_exp_provisions,
+            debit=Decimal('10000.00'),
+            credit=Decimal('0.00'),
+            concept="Provisiones laborales aguinaldo, indemnización y vacaciones",
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_payroll,
+            account=self.acc_salaries_payable,
+            debit=Decimal('0.00'),
+            credit=Decimal('51800.00'),
+            concept="Sueldos netos por transferir",
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_payroll,
+            account=self.acc_inss_payable,
+            debit=Decimal('0.00'),
+            credit=Decimal('18900.00'),
+            concept="Retenciones y cargas INSS/INATEC por enterar",
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_payroll,
+            account=self.acc_ir_withheld,
+            debit=Decimal('0.00'),
+            credit=Decimal('4000.00'),
+            concept="Retenciones IR salarial Art. 23 Ley 822",
+        )
+        JournalEntryLine.objects.create(
+            organization=self.org,
+            entry=entry_payroll,
+            account=self.acc_provisions_payable,
+            debit=Decimal('0.00'),
+            credit=Decimal('10000.00'),
+            concept="Pasivo provisiones laborales acumuladas MITRAB",
+        )
+        entry_payroll.verify_and_save_balance()
+
+        # 5. Documentos Comerciales y de Nómina para el Motor Tributario DGI
+        self.client_acc = Account.objects.create(
+            organization=self.org,
+            commercial_name="Minera de Nicaragua S.A.",
+            legal_name="Minera de Nicaragua S.A.",
+            tax_id="J0310000223344",
+        )
+        self.invoice = Invoice.objects.create(
+            organization=self.org,
+            number="FAC-2026-0001",
+            account=self.client_acc,
+            status=Invoice.Status.ISSUED,
+            issue_date=today,
+            subtotal=Decimal('200000.00'),
+            apply_tax=True,
+            tax_total=Decimal('30000.00'),
+            gross_total=Decimal('230000.00'),
+            ir_retention_amount=Decimal('4000.00'),
+            imi_retention_amount=Decimal('2000.00'),
+            net_receivable=Decimal('224000.00'),
+        )
+        self.payroll_run = PayrollPeriod.objects.create(
+            organization=self.org,
+            number="NOM-2026-0001",
+            period_name="Planilla Quincenal Octubre 2026",
+            status=PayrollPeriod.Status.CLOSED,
+            start_date=today,
+            end_date=today,
+            payment_date=today,
+            total_gross_salary=Decimal('60000.00'),
+            total_inss_employee=Decimal('4200.00'),
+            total_ir_tax=Decimal('4000.00'),
+            total_net_salary=Decimal('51800.00'),
+            total_inss_employer=Decimal('13500.00'),
+            total_inatec=Decimal('1200.00'),
+            total_provisions=Decimal('10000.00'),
+            total_company_cost=Decimal('84700.00'),
+        )
+
+        self.supplier = Supplier.objects.create(
+            organization=self.org,
+            commercial_name="Suministros Eléctricos S.A.",
+            legal_name="Suministros Eléctricos S.A.",
+            tax_id="J0310000445566",
+        )
+        self.warehouse = Warehouse.objects.create(
+            organization=self.org,
+            code="BOD-01",
+            name="Bodega Central Managua",
+        )
+        self.purchase_order = PurchaseOrder.objects.create(
+            organization=self.org,
+            number="OC-2026-0001",
+            supplier=self.supplier,
+            target_warehouse=self.warehouse,
+            supplier_invoice_number="FAC-SUM-1002",
+            status=PurchaseOrder.Status.RECEIVED,
+            issue_date=today,
+            apply_tax=True,
+            subtotal=Decimal('30000.00'),
+            tax_total=Decimal('4500.00'),
+            gross_total=Decimal('34500.00'),
+            ir_withholding_rate=Decimal('2.00'),
+            ir_withheld_amount=Decimal('600.00'),
+            imi_withholding_rate=Decimal('1.00'),
+            imi_withheld_amount=Decimal('300.00'),
+            net_payable=Decimal('33600.00'),
+        )
+
+    def test_financial_statements_service_trial_balance(self):
+        """
+        Verifica que la Balanza de Comprobación sume exactamente débitos y créditos
+        y reporte is_balanced == True sin descuadre.
+        """
+        tb = FinancialStatementsService.get_trial_balance(self.org)
+        self.assertTrue(tb['is_balanced'])
+        self.assertEqual(tb['difference'], Decimal('0.00'))
+        self.assertEqual(tb['sum_debits'], Decimal('849200.00'))
+        self.assertEqual(tb['sum_credits'], Decimal('849200.00'))
+        self.assertGreater(len(tb['accounts']), 0)
+
+    def test_financial_statements_service_income_statement(self):
+        """
+        Verifica el cálculo del Estado de Resultados (P&L):
+        Ventas - Costos Operativos = Utilidad Bruta
+        Utilidad Bruta - Gastos Nómina = Utilidad Neta
+        """
+        pnl = FinancialStatementsService.get_income_statement(self.org)
+        self.assertEqual(pnl['total_revenue'], Decimal('200000.00'))
+        self.assertEqual(pnl['total_operational_costs'], Decimal('30000.00'))
+        self.assertEqual(pnl['gross_profit'], Decimal('170000.00'))
+        self.assertEqual(pnl['total_payroll_expenses'], Decimal('84700.00'))
+        self.assertEqual(pnl['total_operating_expenses'], Decimal('114700.00'))
+        self.assertEqual(pnl['net_income'], Decimal('85300.00'))
+        self.assertEqual(pnl['net_margin_pct'], Decimal('42.65'))
+
+    def test_financial_statements_service_balance_sheet(self):
+        """
+        Verifica que el Balance General cumpla estrictamente la Ecuación Contable:
+        Activo (C$ 734,500.00) == Pasivo (C$ 149,200.00) + Patrimonio (C$ 585,300.00)
+        """
+        bs = FinancialStatementsService.get_balance_sheet(self.org)
+        self.assertEqual(bs['total_assets'], Decimal('734500.00'))
+        self.assertEqual(bs['total_liabilities'], Decimal('149200.00'))
+        self.assertEqual(bs['total_equity_and_results'], Decimal('585300.00'))
+        self.assertEqual(bs['accounting_equation_diff'], Decimal('0.00'))
+        self.assertTrue(bs['is_balanced'])
+
+    def test_nicaragua_dgi_tax_service_consolidation(self):
+        """
+        Verifica la consolidación tributaria DGI Nicaragua:
+        - IVA Débito de facturación
+        - Retención IR Salarial (Ley 822)
+        - Cargas Sociales INSS e INATEC
+        """
+        tax = NicaraguaDgiTaxService.get_tax_summary(
+            self.org,
+            year=self.today.year,
+            month=self.today.month,
+        )
+        self.assertEqual(tax['iva_debit_sales'], Decimal('30000.00'))
+        self.assertEqual(tax['iva_credit_purchases'], Decimal('4500.00'))
+        self.assertEqual(tax['net_iva_payable'], Decimal('25500.00'))
+        self.assertEqual(tax['ir_professional_and_goods'], Decimal('600.00'))
+        self.assertEqual(tax['imi_municipal_tax'], Decimal('300.00'))
+        self.assertEqual(tax['ir_salary_withholding'], Decimal('4000.00'))
+        self.assertEqual(tax['inss_inatec_payable'], Decimal('18900.00'))
+        self.assertEqual(tax['total_dgi_payable'], Decimal('30100.00'))
+        self.assertEqual(tax['invoices_count'], 1)
+        self.assertEqual(tax['purchases_count'], 1)
+        self.assertEqual(tax['payrolls_count'], 1)
+
+    def test_dgi_vet_csv_export_format_and_response(self):
+        """
+        Verifica la exportación formal CSV para la Ventanilla Electrónica Tributaria (VET):
+        - Header Content-Type text/csv
+        - Content-Disposition attachment con RUC
+        - Encabezados técnicos oficiales
+        """
+        client = Client()
+        client.force_login(self.user_comm_mgr)
+        resp = client.get(reverse('finance:dgi_vet_export_csv'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp['Content-Type'].startswith('text/csv'))
+        self.assertIn('SABANA_VET_DGI_J0310000311223', resp['Content-Disposition'])
+
+        csv_content = resp.content.decode('utf-8')
+        # Encabezados
+        self.assertIn('RUC_CONTRIBUYENTE', csv_content)
+        self.assertIn('RAZON_SOCIAL', csv_content)
+        self.assertIn('FECHA_DOCUMENTO', csv_content)
+        self.assertIn('TIPO_OPERACION', csv_content)
+        self.assertIn('FOLIO_FACTURA_O_NOMINA', csv_content)
+        self.assertIn('SUBTOTAL_GRAVADO_NIO', csv_content)
+        self.assertIn('IVA_15_NIO', csv_content)
+        self.assertIn('RETENCION_IR_NIO', csv_content)
+        self.assertIn('RETENCION_IMI_NIO', csv_content)
+        self.assertIn('TOTAL_NETO_NIO', csv_content)
+        # Registros
+        self.assertIn('FAC-2026-0001', csv_content)
+        self.assertIn('FAC-SUM-1002', csv_content)
+        self.assertIn('NOM-2026-0001', csv_content)
+        self.assertIn('J0310000311223', csv_content)
+
+    def test_financial_statements_print_view(self):
+        """
+        Verifica que la vista oficial de impresión (/finance/statements/print/)
+        responda HTTP 200 y contenga los bloques de certificación CPA y Representante Legal.
+        """
+        client = Client()
+        client.force_login(self.user_owner)
+        resp = client.get(reverse('finance:statements_print'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "SERMANSA Ingeniería S.A.")
+        self.assertContains(resp, "Estado de Resultados Integral (P&L)")
+        self.assertContains(resp, "Balance General (Estado de Situación Financiera)")
+        self.assertContains(resp, "Contador Público Autorizado")
+        self.assertContains(resp, "Representante Legal")
+
+    def test_financial_and_tax_views_rbac_security_matrix(self):
+        """
+        Verifica la Matriz de Seguridad y Confidencialidad RBAC:
+        - Roles Nivel < 85 (Técnico 20, Ingeniero 50, Oficial SST 70, Coordinador 80) -> HTTP 403 Forbidden.
+        - Roles Nivel >= 85 (Gerente Comercial 85, Owner/Admin 100) -> HTTP 200 OK.
+        """
+        endpoints = [
+            reverse('finance:statements'),
+            reverse('finance:statements_print'),
+            reverse('finance:dgi_vet'),
+            reverse('finance:dgi_vet_export_csv'),
+        ]
+
+        forbidden_users = [
+            self.user_tech,       # Nivel 20
+            self.user_engineer,   # Nivel 50
+            self.user_sst,        # Nivel 70
+            self.user_coord,      # Nivel 80
+        ]
+
+        authorized_users = [
+            self.user_comm_mgr,   # Nivel 85
+            self.user_owner,      # Nivel 100
+        ]
+
+        # Validar 403 Forbidden para roles sin autoridad
+        for user in forbidden_users:
+            client = Client()
+            client.force_login(user)
+            for url in endpoints:
+                resp = client.get(url)
+                self.assertEqual(
+                    resp.status_code,
+                    403,
+                    f"Fallo de seguridad RBAC: Usuario {user.email} con rol inferior a 85 pudo acceder a {url}",
+                )
+
+        # Validar 200 OK para roles autorizados
+        for user in authorized_users:
+            client = Client()
+            client.force_login(user)
+            for url in endpoints:
+                resp = client.get(url)
+                self.assertEqual(
+                    resp.status_code,
+                    200,
+                    f"Fallo de acceso: Usuario {user.email} con rol {user.memberships.first().role_level} no pudo acceder a {url}",
+                )
+

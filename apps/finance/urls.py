@@ -18,4 +18,12 @@ urlpatterns = [
     path('expenses/create/', views.PettyCashExpenseCreateView.as_view(), name='expense_create'),
     path('replenishments/submit/', views.PettyCashReplenishSubmitView.as_view(), name='replenish_submit'),
     path('replenishments/disburse/', views.PettyCashDisburseView.as_view(), name='replenish_disburse'),
+
+    # Estados Financieros en Tiempo Real (P&L, Balance General, Balanza de Comprobación)
+    path('statements/', views.FinancialStatementsDashboardView.as_view(), name='statements'),
+    path('statements/print/', views.FinancialStatementsPrintView.as_view(), name='statements_print'),
+
+    # Consola Tributaria DGI Nicaragua y Exportación VET
+    path('dgi-vet/', views.DgiTaxConsoleView.as_view(), name='dgi_vet'),
+    path('dgi-vet/export-csv/', views.DgiVetCsvExportView.as_view(), name='dgi_vet_export_csv'),
 ]
