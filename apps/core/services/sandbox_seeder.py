@@ -48,6 +48,7 @@ from apps.tenancy.models import (
     Organization,
     OrganizationMembership,
     RoleLevel,
+    SaasSubscriptionInvoice,
 )
 
 User = get_user_model()
@@ -132,6 +133,9 @@ class SandboxScenarioSeeder:
         # 7.5 Agenda Corporativa y Calendario Fiscal (apps/tenancy / apps/core)
         CorporateEvent.objects.filter(organization=organization).delete()
 
+        # 7.6 Facturación de Suscripción SaaS HQ
+        SaasSubscriptionInvoice.objects.filter(organization=organization).delete()
+
         # 8. Miembros subordinados del equipo
         OrganizationMembership.objects.filter(
             organization=organization
@@ -149,7 +153,16 @@ class SandboxScenarioSeeder:
         organization.enabled_modules = all_modules
         organization.business_profile = Organization.BusinessProfile.ENGINEERING_SERVICES
         organization.onboarding_completed = True
-        organization.save(update_fields=['enabled_modules', 'business_profile', 'onboarding_completed'])
+        organization.subscription_plan = Organization.SubscriptionPlan.ENTERPRISE
+        organization.subscription_status = Organization.SubscriptionStatus.ACTIVE
+        organization.monthly_fee_usd = Decimal('249.00')
+        organization.max_users = 999
+        organization.subscription_renews_at = datetime.date(2026, 11, 1)
+        organization.save(update_fields=[
+            'enabled_modules', 'business_profile', 'onboarding_completed',
+            'subscription_plan', 'subscription_status', 'monthly_fee_usd',
+            'max_users', 'subscription_renews_at',
+        ])
 
         # Limpiar datos previos manteniendo solo el Owner
         cls.reset_organization_data(organization)
@@ -1959,6 +1972,38 @@ class SandboxScenarioSeeder:
                 'min_role_level': RoleLevel.ENGINEER,
                 'assigned_to': resident_eng,
                 'created_by': ops_coord,
+            }
+        )
+
+        # =========================================================================
+        # 16. HISTORIAL DE FACTURACIÓN DE SUSCRIPCIÓN SAAS HQ (apps/tenancy)
+        # =========================================================================
+        SaasSubscriptionInvoice.objects.get_or_create(
+            organization=organization,
+            number='SAAS-2026-0001',
+            defaults={
+                'plan_snapshot': 'ENTERPRISE',
+                'billing_period': '2026-09',
+                'amount_usd': Decimal('249.00'),
+                'exchange_rate': Decimal('36.6243'),
+                'amount_nio': Decimal('9119.45'),
+                'status': SaasSubscriptionInvoice.Status.PAID,
+                'payment_reference': 'STRIPE-NI-88412 / BAC-USD',
+                'issued_at': datetime.date(2026, 9, 1),
+            }
+        )
+        SaasSubscriptionInvoice.objects.get_or_create(
+            organization=organization,
+            number='SAAS-2026-0002',
+            defaults={
+                'plan_snapshot': 'ENTERPRISE',
+                'billing_period': '2026-10',
+                'amount_usd': Decimal('249.00'),
+                'exchange_rate': Decimal('36.6243'),
+                'amount_nio': Decimal('9119.45'),
+                'status': SaasSubscriptionInvoice.Status.PAID,
+                'payment_reference': 'STRIPE-NI-99231 / BAC-USD',
+                'issued_at': datetime.date(2026, 10, 1),
             }
         )
 

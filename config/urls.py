@@ -5,9 +5,13 @@ Admin exclusivo de SuperAdmin de la plataforma en 'platform-superadmin/'.
 from django.contrib import admin
 from django.urls import include, path
 
+from apps.core.views_health import SystemHealthcheckView
 from apps.core.views_pwa import PWAManifestView, PWAServiceWorkerView
 
 urlpatterns = [
+    # Healthcheck para Docker, Kubernetes y balanceadores de carga
+    path('healthz/', SystemHealthcheckView.as_view(), name='healthz'),
+
     # Infraestructura PWA Instalable de Campo
     path('manifest.json', PWAManifestView.as_view(), name='pwa_manifest'),
     path('service-worker.js', PWAServiceWorkerView.as_view(), name='pwa_service_worker'),

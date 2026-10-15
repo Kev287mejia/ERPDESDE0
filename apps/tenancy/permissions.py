@@ -52,6 +52,15 @@ class TenantRequiredMixin(LoginRequiredMixin):
                 request,
                 reason="La organización o su membresía operativa se encuentran suspendidas o inactivas."
             )
+
+        # Candado de Suspensión Comercial SaaS (Modo Solo Lectura en Mutaciones POST)
+        if request.method == 'POST' and getattr(request.organization, 'is_write_blocked_by_saas_suspension', lambda: False)():
+            if not request.path.startswith('/saas-hq/'):
+                return render_403_rbac(
+                    request,
+                    reason="SUSPENSIÓN COMERCIAL SAAS: La suscripción de la organización se encuentra suspendida (Modo Solo Lectura). Regularice su plan en SaaS HQ para habilitar operaciones de registro."
+                )
+
         return None
 
     def dispatch(self, request, *args, **kwargs):
@@ -141,6 +150,12 @@ def tenant_required(view_func):
             return redirect('tenancy:onboarding')
         if not request.organization.is_active or not request.membership.is_active:
             return render_403_rbac(request, reason="Organización o membresía inactiva.")
+        if request.method == 'POST' and getattr(request.organization, 'is_write_blocked_by_saas_suspension', lambda: False)():
+            if not request.path.startswith('/saas-hq/'):
+                return render_403_rbac(
+                    request,
+                    reason="SUSPENSIÓN COMERCIAL SAAS: La suscripción de la organización se encuentra suspendida (Modo Solo Lectura). Regularice su plan en SaaS HQ para habilitar operaciones de registro."
+                )
         return view_func(request, *args, **kwargs)
     return _wrapped_view
 

@@ -170,5 +170,8 @@ def __getattr__(name):
     if name == 'CorporateEvent':
         from apps.tenancy.models import CorporateEvent
         return CorporateEvent
+    if name == 'SaasSubscriptionInvoice':
+        from apps.tenancy.models import SaasSubscriptionInvoice
+        return SaasSubscriptionInvoice
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -14,6 +15,17 @@ class Organization(TimeStampedModel):
     class Currency(models.TextChoices):
         NIO = 'NIO', 'Córdoba Nicaragüense (C$)'
         USD = 'USD', 'Dólar Estadounidense ($)'
+
+    class SubscriptionPlan(models.TextChoices):
+        STARTER = 'STARTER', 'Starter Comercial ($49 USD/mes · 5 Usuarios)'
+        PYME_PRO = 'PYME_PRO', 'Pyme Profesional ($119 USD/mes · 15 Usuarios)'
+        ENTERPRISE = 'ENTERPRISE', 'Enterprise Corporativo ($249 USD/mes · Usuarios Ilimitados)'
+
+    class SubscriptionStatus(models.TextChoices):
+        TRIAL = 'TRIAL', 'Periodo de Prueba (Trial)'
+        ACTIVE = 'ACTIVE', 'Suscripción Activa al Día'
+        PAST_DUE = 'PAST_DUE', 'Pago Vencido (Gracia)'
+        SUSPENDED = 'SUSPENDED', 'Servicio Suspendido (Solo Lectura)'
 
     class TaxRegime(models.TextChoices):
         GENERAL = 'GENERAL', 'Régimen General DGI (IR Anual + Retenciones)'
@@ -141,6 +153,41 @@ class Organization(TimeStampedModel):
         help_text="Lista de códigos de módulos contratados (ej: ['crm', 'operations', 'sst', 'inventory'])"
     )
 
+    # Gobierno Comercial SaaS y Cuotas de Licenciamiento (Paso 15.1)
+    subscription_plan = models.CharField(
+        max_length=25,
+        choices=SubscriptionPlan.choices,
+        default=SubscriptionPlan.ENTERPRISE,
+        verbose_name="Plan de Suscripción SaaS",
+        help_text="Plan comercial activo del tenant"
+    )
+    subscription_status = models.CharField(
+        max_length=20,
+        choices=SubscriptionStatus.choices,
+        default=SubscriptionStatus.ACTIVE,
+        db_index=True,
+        verbose_name="Estado de Suscripción",
+        help_text="Estado de cobranza y operatividad del tenant en SaaS HQ"
+    )
+    monthly_fee_usd = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('249.00'),
+        verbose_name="Tarifa Mensual (USD)",
+        help_text="Canon mensual contratado en dólares"
+    )
+    max_users = models.PositiveIntegerField(
+        default=50,
+        verbose_name="Límite Máximo de Usuarios",
+        help_text="Límite máximo de membresías activas permitidas por el plan"
+    )
+    subscription_renews_at = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Renovación / Próximo Cobro",
+        help_text="Fecha de vencimiento o corte del periodo de suscripción"
+    )
+
     class Meta:
         verbose_name = "Organización (Tenant)"
         verbose_name_plural = "Organizaciones (Tenants)"
@@ -201,6 +248,49 @@ class Organization(TimeStampedModel):
             if preset and 'default_modules' in preset:
                 self.enabled_modules = list(preset['default_modules'])
             self.save(update_fields=['business_vertical', 'enabled_modules', 'updated_at'])
+
+    # Métodos Helper de Gobierno SaaS y Cuotas (Paso 15.1)
+    def apply_subscription_plan(self, plan_code: str):
+        """
+        Ajusta cuotas y tarifas del plan SaaS:
+        - STARTER: $49.00 USD, 5 usuarios.
+        - PYME_PRO: $119.00 USD, 15 usuarios.
+        - ENTERPRISE: $249.00 USD, 999 usuarios.
+        """
+        code = str(plan_code).upper().strip()
+        if code == self.SubscriptionPlan.STARTER:
+            self.subscription_plan = self.SubscriptionPlan.STARTER
+            self.monthly_fee_usd = Decimal('49.00')
+            self.max_users = 5
+        elif code == self.SubscriptionPlan.PYME_PRO:
+            self.subscription_plan = self.SubscriptionPlan.PYME_PRO
+            self.monthly_fee_usd = Decimal('119.00')
+            self.max_users = 15
+        elif code == self.SubscriptionPlan.ENTERPRISE:
+            self.subscription_plan = self.SubscriptionPlan.ENTERPRISE
+            self.monthly_fee_usd = Decimal('249.00')
+            self.max_users = 999
+        else:
+            return
+        self.save(update_fields=['subscription_plan', 'monthly_fee_usd', 'max_users', 'updated_at'])
+
+    def active_members_count(self) -> int:
+        """Retorna la cantidad de colaboradores activos en la organización."""
+        return self.memberships.filter(is_active=True).count()
+
+    def can_add_more_users(self) -> tuple[bool, str]:
+        """Verifica si la organización dispone de cupos para incorporar nuevos colaboradores."""
+        active = self.active_members_count()
+        if active >= self.max_users:
+            return (
+                False,
+                f"Límite de asientos alcanzado ({active}/{self.max_users}) en su plan {self.get_subscription_plan_display()}. Actualice su plan SaaS."
+            )
+        return (True, "OK")
+
+    def is_write_blocked_by_saas_suspension(self) -> bool:
+        """Determina si la organización se encuentra en modo Solo Lectura por suspensión comercial."""
+        return self.subscription_status == self.SubscriptionStatus.SUSPENDED
 
 
 class RoleLevel(models.IntegerChoices):
@@ -616,4 +706,106 @@ class CorporateEvent(TenantScopedModel):
             self.code = candidate
 
         super().save(*args, **kwargs)
+
+
+class SaasSubscriptionInvoice(TenantScopedModel):
+    """
+    Comprobante de Cobro y Facturación de Suscripción SaaS (SaaS HQ).
+    Trazabilidad de pagos por licenciamiento recurrente B2B en USD y NIO.
+    """
+    class Status(models.TextChoices):
+        PAID = 'PAID', 'Pagada'
+        PENDING = 'PENDING', 'Pendiente'
+        VOID = 'VOID', 'Anulada'
+
+    number = models.CharField(
+        max_length=25,
+        db_index=True,
+        verbose_name="Número de Factura SaaS",
+        help_text="ej: SAAS-2026-0001",
+    )
+    plan_snapshot = models.CharField(
+        max_length=25,
+        default='ENTERPRISE',
+        verbose_name="Plan Facturado",
+    )
+    billing_period = models.CharField(
+        max_length=30,
+        verbose_name="Periodo de Facturación",
+        help_text="ej: 2026-10",
+    )
+    amount_usd = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('249.00'),
+        verbose_name="Monto en USD",
+    )
+    exchange_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        default=Decimal('36.6243'),
+        verbose_name="Tipo de Cambio Oficial DGI",
+    )
+    amount_nio = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('9119.45'),
+        verbose_name="Monto Equivalente en C$ (NIO)",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PAID,
+        db_index=True,
+        verbose_name="Estado de Cobro",
+    )
+    payment_reference = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Referencia de Pasarela / Transferencia",
+        help_text="ej: STRIPE-NI-88412 / BAC-USD",
+    )
+    issued_at = models.DateField(
+        default=timezone.now,
+        verbose_name="Fecha de Emisión",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Factura de Suscripción SaaS"
+        verbose_name_plural = "Facturas de Suscripción SaaS"
+        ordering = ['-issued_at', '-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'number'],
+                name='unique_saas_invoice_number_per_tenant',
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.number} · {self.billing_period} [{self.plan_snapshot}] (${self.amount_usd} USD)"
+
+    def save(self, *args, **kwargs):
+        if not self.amount_nio and self.amount_usd and self.exchange_rate:
+            self.amount_nio = (self.amount_usd * self.exchange_rate).quantize(Decimal('0.01'))
+
+        if not self.number and self.organization_id:
+            year = self.issued_at.year if self.issued_at else timezone.now().year
+            prefix = f"SAAS-{year}-"
+            count = (
+                SaasSubscriptionInvoice.objects.filter(
+                    organization_id=self.organization_id,
+                    number__startswith=prefix,
+                ).count()
+                + 1
+            )
+            candidate = f"{prefix}{count:04d}"
+            while SaasSubscriptionInvoice.objects.filter(
+                organization_id=self.organization_id, number=candidate
+            ).exists():
+                count += 1
+                candidate = f"{prefix}{count:04d}"
+            self.number = candidate
+
+        super().save(*args, **kwargs)
+
 

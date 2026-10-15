@@ -734,6 +734,14 @@
                                 <span>Parámetros & Personal</span>
                             </a>
                         </li>
+                        <li>
+                            <a href="{% url 'tenancy:saas_hq' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'saas-hq' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                                <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6H2.25m0 0H3m-1.5 0h1.5m0 0h16.5m0 0h1.5m-1.5 0a.75.75 0 01.75-.75V4.5m0 0a.75.75 0 00-.75-.75H3.75A.75.75 0 003 4.5m18 0v1.5M3 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18V6"/>
+                                </svg>
+                                <span>Consola SaaS HQ (MRR)</span>
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 {% endif %}

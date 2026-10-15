@@ -8,7 +8,7 @@ from django.views import View
 from apps.tenancy.constants import ERP_MODULES_BY_CODE, ERP_MODULES_CATALOG, BusinessVertical
 from apps.tenancy.forms import MemberRoleUpdateForm, TeamCreateMemberForm
 from apps.tenancy.models import Organization, OrganizationMembership, RoleLevel
-from apps.tenancy.permissions import RoleLevelRequiredMixin, TenantRequiredMixin
+from apps.tenancy.permissions import RoleLevelRequiredMixin, TenantRequiredMixin, render_403_rbac
 
 User = get_user_model()
 
@@ -97,6 +97,12 @@ class TeamCreateMemberView(RoleLevelRequiredMixin, View):
     min_role_level = RoleLevel.OWNER_ADMIN
 
     def post(self, request, *args, **kwargs):
+        # Candado de Cuota de Asientos / Usuarios SaaS (Paso 15.1)
+        can_add, reason = request.organization.can_add_more_users()
+        if not can_add:
+            messages.error(request, reason)
+            return render_403_rbac(request, reason=reason)
+
         form = TeamCreateMemberForm(
             organization=request.organization,
             current_user_role_level=request.role_level,
