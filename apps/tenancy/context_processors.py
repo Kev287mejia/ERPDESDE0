@@ -1,3 +1,4 @@
+from apps.tenancy.constants import BusinessVertical, VERTICAL_PRESETS_CONFIG
 from apps.tenancy.models import OrganizationMembership, RoleLevel
 
 
@@ -15,6 +16,29 @@ def tenancy_context(request):
 
     # Identificación del país de operación
     current_country = getattr(organization, 'country', None) if organization else None
+
+    # Vertical de Industria y Presets Operativos (Paso 12.1)
+    current_vertical = getattr(organization, 'business_vertical', BusinessVertical.ENGINEERING_SERVICES) if organization else BusinessVertical.ENGINEERING_SERVICES
+    vertical_preset = VERTICAL_PRESETS_CONFIG.get(current_vertical, VERTICAL_PRESETS_CONFIG[BusinessVertical.ENGINEERING_SERVICES])
+    current_vertical_label = vertical_preset.get('name', 'Ingeniería, Construcción y Servicios de Campo')
+    current_vertical_short = vertical_preset.get('short_name', 'INGENIERÍA')
+
+    vertical_features = {
+        'enable_pos': vertical_preset.get('enable_pos', False),
+        'enable_batches_expiry': vertical_preset.get('enable_batches_expiry', False),
+        'enable_tiered_pricing': vertical_preset.get('enable_tiered_pricing', False),
+        'enable_workorders_sst': vertical_preset.get('enable_workorders_sst', True),
+    }
+
+    available_verticals = [
+        {
+            'code': code,
+            'name': config['name'],
+            'short_name': config['short_name'],
+            'is_active': (code == current_vertical),
+        }
+        for code, config in VERTICAL_PRESETS_CONFIG.items()
+    ]
 
     # Etiqueta del rol activo (mostrando el rol simulado si la simulación está activa)
     if role_level in RoleLevel.values:
@@ -79,4 +103,9 @@ def tenancy_context(request):
         'RoleLevel': RoleLevel,
         'role_choices': RoleLevel.choices,
         'role_choices_desc': sorted(RoleLevel.choices, key=lambda x: x[0], reverse=True),
+        'current_vertical': current_vertical,
+        'current_vertical_label': current_vertical_label,
+        'current_vertical_short': current_vertical_short,
+        'vertical_features': vertical_features,
+        'available_verticals': available_verticals,
     }

@@ -2,7 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from apps.core.models import TimeStampedModel
-from apps.tenancy.constants import MODULE_THRESHOLD_MAP
+from apps.tenancy.constants import MODULE_THRESHOLD_MAP, BusinessVertical, VERTICAL_PRESETS_CONFIG
 
 
 class Organization(TimeStampedModel):
@@ -41,6 +41,8 @@ class Organization(TimeStampedModel):
         'FIELD_CONTRACTOR': ['operations', 'sst', 'inventory', 'purchasing', 'repository', 'tickets'],
         'HYBRID_ENTERPRISE': ['crm', 'operations', 'sst', 'inventory', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
     }
+
+    BusinessVertical = BusinessVertical
 
     class AccountingTemplate(models.TextChoices):
         NIIF_PYMES = 'NIIF_PYMES', 'Catálogo Estándar NIIF para PYMES (Nicaragua DGI)'
@@ -98,6 +100,13 @@ class Organization(TimeStampedModel):
         default=BusinessProfile.HYBRID_ENTERPRISE,
         verbose_name="Perfil de Giro de Negocio",
         help_text="Configuración predeterminada de arquitectura modular según el giro comercial"
+    )
+    business_vertical = models.CharField(
+        max_length=40,
+        choices=BusinessVertical.choices,
+        default=BusinessVertical.ENGINEERING_SERVICES,
+        verbose_name="Giro / Vertical de Industria",
+        help_text="Vertical operativa que adapta módulos, flujos POS y catálogos"
     )
     accounting_template = models.CharField(
         max_length=30,
@@ -166,6 +175,31 @@ class Organization(TimeStampedModel):
             self.business_profile = profile_code
             self.enabled_modules = list(self.BUSINESS_PROFILE_PRESETS.get(profile_code, self.enabled_modules))
             self.save(update_fields=['business_profile', 'enabled_modules', 'updated_at'])
+
+    def is_pharmacy_vertical(self) -> bool:
+        """Indica si el tenant opera bajo la vertical de farmacia y salud."""
+        return self.business_vertical == BusinessVertical.PHARMACY_HEALTH
+
+    def is_hardware_vertical(self) -> bool:
+        """Indica si el tenant opera bajo la vertical de ferretería y distribución."""
+        return self.business_vertical == BusinessVertical.HARDWARE_STORE
+
+    def is_sme_vertical(self) -> bool:
+        """Indica si el tenant opera bajo la vertical de PYME comercial y tienda."""
+        return self.business_vertical == BusinessVertical.SME_RETAIL
+
+    def is_engineering_vertical(self) -> bool:
+        """Indica si el tenant opera bajo la vertical de ingeniería y servicios de campo."""
+        return self.business_vertical == BusinessVertical.ENGINEERING_SERVICES
+
+    def apply_vertical_preset(self, vertical_code: str):
+        """Aplica la configuración modular y operativa predefinida según la vertical de industria."""
+        if vertical_code in BusinessVertical.values:
+            self.business_vertical = vertical_code
+            preset = VERTICAL_PRESETS_CONFIG.get(vertical_code)
+            if preset and 'default_modules' in preset:
+                self.enabled_modules = list(preset['default_modules'])
+            self.save(update_fields=['business_vertical', 'enabled_modules', 'updated_at'])
 
 
 class RoleLevel(models.IntegerChoices):

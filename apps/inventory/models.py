@@ -131,6 +131,80 @@ class InventoryItem(TenantScopedModel):
         verbose_name="Ítem Activo",
     )
 
+    # Extensiones Polimórficas de Industria (Paso 12.1)
+    # 1. Ferreterías y Mayoristas (Escalas de Precios y Unidades de Conversión)
+    price_retail = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Precio Público / Detalle",
+        help_text="Precio de venta estándar en mostrador al cliente final",
+    )
+    price_contractor = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Precio Maestro de Obra / Contratista",
+        help_text="Precio preferencial para maestros de obra y subcontratistas",
+    )
+    price_wholesale = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Precio Mayorista por Volumen",
+        help_text="Precio por compras mayores o iguales al umbral mínimo mayorista",
+    )
+    wholesale_min_qty = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('12.00'),
+        verbose_name="Cantidad Mínima Mayorista",
+        help_text="Cantidad mínima a partir de la cual aplica el precio mayorista",
+    )
+    purchase_unit = models.CharField(
+        max_length=20,
+        default='UND',
+        verbose_name="Unidad de Compra / Embalaje",
+        help_text="ej: CAJA, ROLLO, QUINTAL, TAMBOR",
+    )
+    conversion_factor = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('1.00'),
+        verbose_name="Factor de Conversión a Unidad Base",
+        help_text="ej: 1 ROLLO = 100 METROS -> factor 100.00",
+    )
+
+    # 2. Farmacias y Droguerías (Normativa Sanitaria MINSA & Control FEFO)
+    requires_batch_control = models.BooleanField(
+        default=False,
+        verbose_name="Requiere Control de Lotes & Vencimiento",
+        help_text="Activa el trazado sanitario FEFO obligatorio",
+    )
+    sanitary_registration = models.CharField(
+        max_length=80,
+        blank=True,
+        verbose_name="Registro Sanitario MINSA",
+        help_text="ej: RS-NI-2026-04819",
+    )
+    active_ingredient = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Principio Activo / Ficha Farmacológica",
+        help_text="ej: Amoxicilina 500mg + Ácido Clavulánico",
+    )
+    laboratory_brand = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Laboratorio / Fabricante",
+        help_text="ej: Laboratorios Ramos / Bayer / MK",
+    )
+    requires_prescription = models.BooleanField(
+        default=False,
+        verbose_name="Requiere Receta Médica / Medicamento Controlado",
+        help_text="Alerta sanitaria obligatoria para despacho en mostrador",
+    )
+
     class Meta(TenantScopedModel.Meta):
         verbose_name = "Ítem de Inventario"
         verbose_name_plural = "Catálogo Maestro de Inventario"
@@ -210,6 +284,87 @@ class StockBalance(TenantScopedModel):
         super().save(*args, **kwargs)
 
 
+class InventoryBatch(TenantScopedModel):
+    """
+    Control Sanitario y de Perecederos FEFO (First Expired, First Out).
+    Gestiona trazabilidad de lotes, fechas de elaboración, vencimiento y existencias.
+    """
+    item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.CASCADE,
+        related_name='batches',
+        verbose_name="Ítem de Inventario",
+    )
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.CASCADE,
+        related_name='batches',
+        verbose_name="Bodega de Custodia",
+    )
+    batch_number = models.CharField(
+        max_length=60,
+        db_index=True,
+        verbose_name="Número de Lote de Fabricación",
+        help_text="ej: LOT-2026-09A",
+    )
+    manufacturing_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de Fabricación / Envasado",
+    )
+    expiration_date = models.DateField(
+        db_index=True,
+        verbose_name="Fecha de Expiración / Caducidad",
+    )
+    quantity_available = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name="Cantidad Disponible en Lote",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Lote de Inventario (FEFO)"
+        verbose_name_plural = "Lotes de Inventario (FEFO)"
+        ordering = ['expiration_date', 'batch_number']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'warehouse', 'item', 'batch_number'],
+                name='unique_warehouse_item_batch'
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.item.sku} | Lote: {self.batch_number} (Vence: {self.expiration_date}) - {self.quantity_available} {self.item.unit}"
+
+    @property
+    def expiry_status(self) -> str:
+        """
+        Calcula el estado sanitario del lote en base al vencimiento:
+        - EXPIRED: Caducado (bloqueado para venta).
+        - EXPIRING_SOON: Vence en <= 90 días (prioridad de salida FEFO).
+        - OPTIMAL: Vence en más de 90 días.
+        """
+        today = timezone.now().date()
+        if self.expiration_date <= today:
+            return 'EXPIRED'
+        delta = (self.expiration_date - today).days
+        if delta <= 90:
+            return 'EXPIRING_SOON'
+        return 'OPTIMAL'
+
+    @property
+    def days_until_expiry(self) -> int:
+        return (self.expiration_date - timezone.now().date()).days
+
+    def save(self, *args, **kwargs):
+        if self.warehouse_id and not self.organization_id:
+            self.organization_id = self.warehouse.organization_id
+        elif self.item_id and not self.organization_id:
+            self.organization_id = self.item.organization_id
+        super().save(*args, **kwargs)
+
+
 class StockMovement(TenantScopedModel):
     """
     Libro Mayor de Kardex Transaccional Inmutable.
@@ -222,6 +377,7 @@ class StockMovement(TenantScopedModel):
         TRANSFER_OUT = 'TRANSFER_OUT', 'Traslado entre Bodegas (Salida)'
         TRANSFER_IN = 'TRANSFER_IN', 'Traslado entre Bodegas (Entrada)'
         OUT_WORKORDER = 'OUT_WORKORDER', 'Despacho a Orden de Trabajo (OT)'
+        OUT_SALE_POS = 'OUT_SALE_POS', 'Venta en Mostrador / POS'
 
     number = models.CharField(
         max_length=25,
@@ -253,6 +409,22 @@ class StockMovement(TenantScopedModel):
         on_delete=models.PROTECT,
         related_name='movements',
         verbose_name="Ítem de Inventario",
+    )
+    batch = models.ForeignKey(
+        InventoryBatch,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='movements',
+        verbose_name="Lote Sanitario (FEFO)",
+    )
+    invoice = models.ForeignKey(
+        'billing.Invoice',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='stock_movements',
+        verbose_name="Factura Fiscal / Venta Mostrador",
     )
     work_order = models.ForeignKey(
         'operations.WorkOrder',

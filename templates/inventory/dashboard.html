@@ -155,6 +155,15 @@
                             <th class="py-2.5 px-3 text-right font-mono">Stock Total</th>
                             <th class="py-2.5 px-3 text-right font-mono">Mínimo</th>
                             <th class="py-2.5 px-3">Estado</th>
+                            {% if vertical_features.enable_tiered_pricing %}
+                            <th class="py-2.5 px-3 text-right font-mono text-[10px]">Púb. Detalle</th>
+                            <th class="py-2.5 px-3 text-right font-mono text-[10px]">Contratista</th>
+                            <th class="py-2.5 px-3 text-right font-mono text-[10px]">Mayorista</th>
+                            {% elif vertical_features.enable_batches_expiry %}
+                            <th class="py-2.5 px-3 font-mono text-[10px]">Principio Activo</th>
+                            <th class="py-2.5 px-3 font-mono text-[10px]">Reg. MINSA</th>
+                            <th class="py-2.5 px-3 text-center font-mono text-[10px]">Lote FEFO</th>
+                            {% endif %}
                             {% if can_view_financials %}
                             <th class="py-2.5 px-3 text-right font-mono">Costo Prom. ({{ current_country.primary_currency_symbol }})</th>
                             {% endif %}
@@ -193,6 +202,33 @@
                                 </span>
                                 {% endif %}
                             </td>
+                            {% if vertical_features.enable_tiered_pricing %}
+                            <td class="py-2.5 px-3 text-right tabular-nums font-semibold text-slate-900">
+                                {{ item.price_retail|floatformat:2 }}
+                            </td>
+                            <td class="py-2.5 px-3 text-right tabular-nums text-slate-700">
+                                {{ item.price_contractor|floatformat:2 }}
+                            </td>
+                            <td class="py-2.5 px-3 text-right tabular-nums text-slate-700">
+                                {{ item.price_wholesale|floatformat:2 }}
+                            </td>
+                            {% elif vertical_features.enable_batches_expiry %}
+                            <td class="py-2.5 px-3 font-sans text-slate-800 text-[11px]">
+                                {{ item.active_ingredient|default:"—" }}
+                            </td>
+                            <td class="py-2.5 px-3 font-mono text-slate-600 text-[10px]">
+                                {{ item.sanitary_registration|default:"—" }}
+                            </td>
+                            <td class="py-2.5 px-3 text-center">
+                                {% if item.requires_batch_control %}
+                                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    FEFO ACTIVO
+                                </span>
+                                {% else %}
+                                <span class="text-slate-400 font-mono text-[10px]">ESTÁNDAR</span>
+                                {% endif %}
+                            </td>
+                            {% endif %}
                             {% if can_view_financials %}
                             <td class="py-2.5 px-3 text-right tabular-nums text-slate-700">
                                 {{ item.unit_cost|floatformat:2 }}

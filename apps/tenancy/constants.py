@@ -128,3 +128,62 @@ DEFAULT_ENABLED_MODULES = [mod['code'] for mod in ERP_MODULES_CATALOG if mod['de
 
 # Mapeo de umbrales jerárquicos de acceso RBAC
 MODULE_THRESHOLD_MAP = {mod['code']: mod['min_role_level'] for mod in ERP_MODULES_CATALOG}
+
+
+# ==============================================================================
+# VERTICALES DE INDUSTRIA & PRESETS OPERATIVOS (PASO 12.1)
+# ==============================================================================
+
+from django.db import models
+
+
+class BusinessVertical(models.TextChoices):
+    ENGINEERING_SERVICES = 'ENGINEERING', 'Ingeniería, Construcción y Servicios de Campo'
+    HARDWARE_STORE = 'HARDWARE', 'Ferretería, Materiales y Distribución Mayorista'
+    PHARMACY_HEALTH = 'PHARMACY', 'Farmacia, Droguería e Insumos Médicos (MINSA)'
+    SME_RETAIL = 'SME_RETAIL', 'PYME Comercial, Tienda y Servicios Generales'
+
+
+BusinessVertical.ENGINEERING = BusinessVertical.ENGINEERING_SERVICES
+BusinessVertical.HARDWARE = BusinessVertical.HARDWARE_STORE
+BusinessVertical.PHARMACY = BusinessVertical.PHARMACY_HEALTH
+
+
+VERTICAL_PRESETS_CONFIG = {
+    BusinessVertical.ENGINEERING_SERVICES: {
+        'name': 'Ingeniería, Construcción y Servicios de Campo',
+        'short_name': 'INGENIERÍA',
+        'default_modules': ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
+        'enable_pos': False,
+        'enable_batches_expiry': False,
+        'enable_tiered_pricing': False,
+        'enable_workorders_sst': True,
+    },
+    BusinessVertical.HARDWARE_STORE: {
+        'name': 'Ferretería, Materiales y Distribución Mayorista',
+        'short_name': 'FERRETERÍA',
+        'default_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
+        'enable_pos': True,
+        'enable_batches_expiry': False,
+        'enable_tiered_pricing': True,
+        'enable_workorders_sst': False,
+    },
+    BusinessVertical.PHARMACY_HEALTH: {
+        'name': 'Farmacia, Droguería e Insumos Médicos (MINSA)',
+        'short_name': 'FARMACIA',
+        'default_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
+        'enable_pos': True,
+        'enable_batches_expiry': True,
+        'enable_tiered_pricing': False,
+        'enable_workorders_sst': False,
+    },
+    BusinessVertical.SME_RETAIL: {
+        'name': 'PYME Comercial, Tienda y Servicios Generales',
+        'short_name': 'PYME COMERCIAL',
+        'default_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent'],
+        'enable_pos': True,
+        'enable_batches_expiry': False,
+        'enable_tiered_pricing': True,
+        'enable_workorders_sst': False,
+    },
+}

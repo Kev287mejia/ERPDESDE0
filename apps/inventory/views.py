@@ -9,7 +9,7 @@ from django.views.generic import TemplateView
 from apps.tenancy.models import RoleLevel
 from apps.tenancy.permissions import ModuleAccessRequiredMixin, render_403_rbac
 from apps.operations.models import WorkOrder
-from apps.inventory.models import Warehouse, InventoryItem, StockBalance, StockMovement
+from apps.inventory.models import Warehouse, InventoryItem, StockBalance, StockMovement, InventoryBatch
 from apps.inventory.forms import (
     WarehouseForm,
     InventoryItemForm,
@@ -267,3 +267,128 @@ class StockDispatchToOTView(ModuleAccessRequiredMixin, View):
         if next_url:
             return redirect(next_url)
         return redirect('inventory:dashboard')
+
+
+class BatchExpiryMonitorView(ModuleAccessRequiredMixin, View):
+    """
+    Tablero de Control Sanitario FEFO (First Expired, First Out) & Vencimientos Farmacéuticos.
+    Monitorea lotes activos, lotes próximos a vencer (<90 días) y lotes caducados bloqueados (MINSA).
+    Permite registrar nuevos lotes con número de serie y fecha de expiración.
+    """
+    required_module = 'inventory'
+    min_role_level = RoleLevel.TECHNICIAN
+    template_name = 'inventory/batches_fefo.html'
+
+    def get(self, request):
+        from django.utils import timezone
+        org = request.organization
+        batches = list(
+            InventoryBatch.objects.for_org(org)
+            .select_related('item', 'warehouse')
+            .order_by('expiration_date', 'item__name')
+        )
+
+        today = timezone.now().date()
+        optimal_batches = []
+        expiring_soon_batches = []
+        expired_batches = []
+
+        for b in batches:
+            status = b.expiry_status
+            if status == 'EXPIRED':
+                expired_batches.append(b)
+            elif status == 'EXPIRING_SOON':
+                expiring_soon_batches.append(b)
+            else:
+                optimal_batches.append(b)
+
+        warehouses = list(Warehouse.objects.for_org(org).filter(is_active=True))
+        items = list(InventoryItem.objects.for_org(org).filter(is_active=True))
+
+        context = {
+            'batches': batches,
+            'optimal_count': len(optimal_batches),
+            'expiring_soon_count': len(expiring_soon_batches),
+            'expired_count': len(expired_batches),
+            'total_batches_count': len(batches),
+            'warehouses': warehouses,
+            'items': items,
+            'today': today,
+        }
+        return render(request, self.template_name, context)
+
+    def post(self, request):
+        from django.utils import timezone
+        org = request.organization
+        role_level = getattr(request, 'role_level', 0)
+        if role_level < RoleLevel.ENGINEER:
+            messages.error(request, "Permisos insuficientes para registrar lotes de inventario (Mínimo Nivel 50).")
+            return redirect('inventory:batches_fefo')
+
+        item_id = request.POST.get('item_id')
+        warehouse_id = request.POST.get('warehouse_id')
+        batch_number = (request.POST.get('batch_number') or '').strip().upper()
+        manufacturing_date = request.POST.get('manufacturing_date') or None
+        expiration_date = request.POST.get('expiration_date')
+        quantity_str = request.POST.get('quantity') or '0.00'
+
+        if not item_id or not warehouse_id or not batch_number or not expiration_date:
+            messages.error(request, "Campos obligatorios incompletos: Producto, Bodega, N° de Lote y Fecha de Vencimiento son requeridos.")
+            return redirect('inventory:batches_fefo')
+
+        try:
+            item = get_object_or_404(InventoryItem, id=item_id, organization=org)
+            warehouse = get_object_or_404(Warehouse, id=warehouse_id, organization=org)
+            qty = Decimal(quantity_str)
+            if qty < Decimal('0.00'):
+                raise ValidationError("La cantidad no puede ser negativa.")
+
+            with transaction.atomic():
+                batch, created = InventoryBatch.objects.get_or_create(
+                    organization=org,
+                    warehouse=warehouse,
+                    item=item,
+                    batch_number=batch_number,
+                    defaults={
+                        'manufacturing_date': manufacturing_date,
+                        'expiration_date': expiration_date,
+                        'quantity_available': qty,
+                    }
+                )
+                if not created:
+                    batch.quantity_available += qty
+                    if manufacturing_date:
+                        batch.manufacturing_date = manufacturing_date
+                    batch.expiration_date = expiration_date
+                    batch.save()
+
+                # Actualizar también StockBalance de esa bodega e ítem
+                if qty > Decimal('0.00'):
+                    balance, _ = StockBalance.objects.select_for_update().get_or_create(
+                        organization=org,
+                        warehouse=warehouse,
+                        item=item,
+                        defaults={'quantity': Decimal('0.00')}
+                    )
+                    balance.quantity += qty
+                    balance.save(update_fields=['quantity', 'updated_at'])
+
+                    # Kardex inmutable
+                    StockMovement.objects.create(
+                        organization=org,
+                        movement_type=StockMovement.MovementType.IN_ADJUSTMENT,
+                        warehouse=warehouse,
+                        item=item,
+                        batch=batch,
+                        quantity=qty,
+                        unit_cost_snapshot=item.unit_cost,
+                        balance_after=balance.quantity,
+                        reference_note=f"Alta/Ingreso de Lote FEFO: {batch.batch_number}",
+                        performed_by=request.user,
+                    )
+
+            messages.success(request, f"Lote {batch_number} para '{item.name}' registrado exitosamente ({qty} {item.unit}).")
+        except Exception as e:
+            messages.error(request, f"Error al registrar lote: {str(e)}")
+
+        return redirect('inventory:batches_fefo')

@@ -5,7 +5,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 
 from apps.billing.models import Invoice, InvoiceItem, PaymentReceipt
-from apps.crm.models import Quote
+from apps.crm.models import Quote, Account
+from apps.inventory.models import InventoryItem, Warehouse, InventoryBatch
 from apps.operations.models import WorkOrder, WorkOrderTimelineLog
 from apps.tenancy.models import RoleLevel
 from apps.tenancy.permissions import ModuleAccessRequiredMixin
@@ -358,3 +359,144 @@ class InvoicePrintView(ModuleAccessRequiredMixin, View):
             'items': invoice.items.all(),
             'payments': invoice.payments.all(),
         })
+
+
+class PointOfSaleTerminalView(ModuleAccessRequiredMixin, View):
+    """
+    Consola de Punto de Venta Rápido de Mostrador (POS) de Alta Velocidad (Swiss Grid).
+    Permite cobro en mostrador, emisión de factura fiscal y recibo de caja instantáneo,
+    conmutación de escala de precios (Ferretería/PYME) y trazabilidad FEFO (Farmacias).
+    """
+    required_module = 'billing'
+    min_role_level = RoleLevel.TECHNICIAN
+    template_name = 'billing/pos_terminal.html'
+
+    def get(self, request, *args, **kwargs):
+        import json
+        org = request.organization
+        items = list(
+            InventoryItem.objects.for_org(org)
+            .filter(is_active=True)
+            .prefetch_related('batches', 'balances', 'balances__warehouse')
+            .order_by('name')
+        )
+        warehouses = list(Warehouse.objects.for_org(org).filter(is_active=True))
+        accounts = list(Account.objects.for_org(org).order_by('commercial_name')[:100])
+        default_account = Account.objects.for_org(org).filter(commercial_name__icontains='Consumidor Final').first()
+
+        # Generar catálogo JSON estructurado para el buscador instantáneo en Alpine.js
+        catalog_data = []
+        for it in items:
+            total_stock = it.total_stock()
+            batches_list = []
+            for b in it.batches.all():
+                batches_list.append({
+                    'id': str(b.id),
+                    'batch_number': b.batch_number,
+                    'warehouse_id': str(b.warehouse_id),
+                    'expiration_date': b.expiration_date.strftime('%d/%m/%Y'),
+                    'quantity_available': float(b.quantity_available),
+                    'expiry_status': b.expiry_status,
+                })
+            batches_list.sort(key=lambda x: x['expiration_date'])
+
+            catalog_data.append({
+                'id': str(it.id),
+                'sku': it.sku,
+                'name': it.name,
+                'unit': it.unit,
+                'price_retail': float(it.price_retail or it.unit_cost),
+                'price_contractor': float(it.price_contractor or it.price_retail or it.unit_cost),
+                'price_wholesale': float(it.price_wholesale or it.price_retail or it.unit_cost),
+                'wholesale_min_qty': float(it.wholesale_min_qty),
+                'requires_batch_control': it.requires_batch_control,
+                'active_ingredient': it.active_ingredient or '',
+                'sanitary_registration': it.sanitary_registration or '',
+                'laboratory_brand': it.laboratory_brand or '',
+                'requires_prescription': it.requires_prescription,
+                'total_stock': float(total_stock),
+                'batches': batches_list,
+            })
+
+        return render(request, self.template_name, {
+            'items': items,
+            'catalog_json': json.dumps(catalog_data),
+            'warehouses': warehouses,
+            'accounts': accounts,
+            'default_account': default_account,
+            'payment_methods': PaymentReceipt.PaymentMethod.choices,
+        })
+
+    def post(self, request, *args, **kwargs):
+        import json
+        from django.core.exceptions import ValidationError
+        from apps.billing.services import execute_pos_sale
+
+        org = request.organization
+        warehouse_id = request.POST.get('warehouse_id')
+        account_id = request.POST.get('account_id')
+        payment_method = request.POST.get('payment_method') or PaymentReceipt.PaymentMethod.CASH
+        price_tier = (request.POST.get('price_tier') or 'RETAIL').upper()
+        notes = request.POST.get('notes', '')
+
+        warehouse = Warehouse.objects.for_org(org).filter(id=warehouse_id).first() if warehouse_id else Warehouse.objects.for_org(org).filter(is_active=True).first()
+        account = Account.objects.for_org(org).filter(id=account_id).first() if account_id else None
+
+        # Procesar items: payload JSON o entradas individuales
+        items_payload = request.POST.get('items_payload') or request.POST.get('cart_items')
+        items_data = []
+        if items_payload:
+            try:
+                parsed = json.loads(items_payload)
+                for entry in parsed:
+                    items_data.append({
+                        'item_id': entry.get('item_id') or entry.get('id'),
+                        'quantity': Decimal(str(entry.get('quantity', 1))),
+                        'unit_price': Decimal(str(entry.get('unit_price'))) if entry.get('unit_price') is not None else None,
+                        'batch_id': entry.get('batch_id'),
+                        'price_tier': entry.get('price_tier') or price_tier,
+                    })
+            except Exception as e:
+                messages.error(request, f"Error al decodificar partidas del carrito: {str(e)}")
+                return redirect('billing:pos_terminal')
+        else:
+            item_ids = request.POST.getlist('item_id') or ([request.POST.get('item_id')] if request.POST.get('item_id') else [])
+            quantities = request.POST.getlist('quantity') or ([request.POST.get('quantity')] if request.POST.get('quantity') else [])
+            prices = request.POST.getlist('unit_price') or ([request.POST.get('unit_price')] if request.POST.get('unit_price') else [])
+            batch_ids = request.POST.getlist('batch_id') or ([request.POST.get('batch_id')] if request.POST.get('batch_id') else [])
+
+            for idx, item_id in enumerate(item_ids):
+                qty = quantities[idx] if idx < len(quantities) else 1
+                pr = prices[idx] if idx < len(prices) and prices[idx] else None
+                b_id = batch_ids[idx] if idx < len(batch_ids) and batch_ids[idx] else None
+                items_data.append({
+                    'item_id': item_id,
+                    'quantity': Decimal(str(qty)),
+                    'unit_price': Decimal(str(pr)) if pr else None,
+                    'batch_id': b_id,
+                    'price_tier': price_tier,
+                })
+
+        try:
+            invoice = execute_pos_sale(
+                organization=org,
+                user=request.user,
+                warehouse=warehouse,
+                account=account,
+                items_data=items_data,
+                payment_method=payment_method,
+                price_tier=price_tier,
+                notes=notes,
+            )
+            messages.success(
+                request,
+                f"Factura de mostrador emitida exitosamente: {invoice.number} "
+                f"({invoice.currency_symbol} {invoice.net_receivable:,.2f}) - Cancelada al contado."
+            )
+            return redirect('billing:invoice_detail', pk=invoice.pk)
+        except ValidationError as e:
+            messages.error(request, f"{e.message if hasattr(e, 'message') else str(e)}")
+            return redirect('billing:pos_terminal')
+        except Exception as e:
+            messages.error(request, f"Error al emitir factura en mostrador: {str(e)}")
+            return redirect('billing:pos_terminal')

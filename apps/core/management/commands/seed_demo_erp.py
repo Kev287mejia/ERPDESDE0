@@ -79,9 +79,15 @@ class Command(BaseCommand):
         self.stdout.write("[SEED-DEMO] 3/3 Sembrando datos operativos, fiscal DGI y cartera...")
         result = SandboxScenarioSeeder.populate_for_organization(org, owner_user=admin_user)
 
+        # Poblar catálogos multi-vertical para pruebas y demostración completa
+        from apps.core.services.sandbox_seeder import ensure_vertical_demo_catalog
+        ensure_vertical_demo_catalog(org, 'HARDWARE')
+        ensure_vertical_demo_catalog(org, 'PHARMACY')
+
         self.stdout.write(
             self.style.SUCCESS(
-                f"[SEED-DEMO] Escenario sembrado exitosamente en {org.name} con {result.get('invoices_count', 1)} factura(s) "
-                f"y {result.get('receipts_count', 1)} recibo(s) oficial(es) de caja ROC."
+                f"[SEED-DEMO] Escenario sembrado exitosamente en {org.name} con {result.get('invoices_count', 1)} factura(s), "
+                f"{result.get('receipts_count', 1)} recibo(s) oficial(es) de caja ROC y catálogos multi-vertical (Ferretería y Farmacia FEFO)."
             )
         )
+

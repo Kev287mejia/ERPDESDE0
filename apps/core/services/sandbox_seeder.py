@@ -26,7 +26,7 @@ from apps.finance.models import (
     PettyCashFund,
     PettyCashReplenishment,
 )
-from apps.inventory.models import InventoryItem, StockBalance, StockMovement, Warehouse
+from apps.inventory.models import InventoryItem, StockBalance, StockMovement, Warehouse, InventoryBatch
 from apps.inventory.services import record_stock_entry
 from apps.operations.models import (
     Crew,
@@ -93,6 +93,7 @@ class SandboxScenarioSeeder:
 
         # 4. Inventario, Bodegas y Kardex
         StockMovement.objects.filter(organization=organization).delete()
+        InventoryBatch.objects.filter(organization=organization).delete()
         StockBalance.objects.filter(organization=organization).delete()
         InventoryItem.objects.filter(organization=organization).delete()
         Warehouse.objects.filter(organization=organization).delete()
@@ -1704,6 +1705,191 @@ class SandboxScenarioSeeder:
             'mcp_tokens_count': 2,
             'mcp_logs_count': 3,
         }
+
+
+def ensure_vertical_demo_catalog(organization: Organization, vertical_code: str):
+    """
+    Garantiza que el catálogo de la organización posea los ítems de muestra de la vertical elegida
+    (Ferretería con 3 listas de precios o Farmacia con lotes FEFO y candado sanitario).
+    Idempotente: no duplica si los SKUs ya existen.
+    """
+    bod1 = Warehouse.objects.filter(organization=organization, is_active=True).first()
+    if not bod1:
+        bod1 = Warehouse.objects.create(
+            organization=organization,
+            code='BOD-01',
+            name='Bodega Central Mostrador',
+            warehouse_type=Warehouse.WarehouseType.CENTRAL,
+        )
+
+    today = timezone.now().date()
+
+    if vertical_code in ['HARDWARE', 'SME_RETAIL']:
+        hardware_items = [
+            {
+                'sku': 'FER-CEM-01',
+                'name': 'Cemento Canal 42.5kg (UGC)',
+                'category': InventoryItem.Category.MECHANICAL,
+                'unit': 'BOL',
+                'purchase_unit': 'BOLSA',
+                'conversion_factor': Decimal('1.00'),
+                'min_stock_level': Decimal('50.00'),
+                'unit_cost': Decimal('260.00'),
+                'price_retail': Decimal('340.00'),
+                'price_contractor': Decimal('315.00'),
+                'price_wholesale': Decimal('295.00'),
+                'wholesale_min_qty': Decimal('20.00'),
+            },
+            {
+                'sku': 'FER-VAR-01',
+                'name': 'Varilla Corrugada 3/8" Grado 40',
+                'category': InventoryItem.Category.MECHANICAL,
+                'unit': 'UND',
+                'purchase_unit': 'ATADO',
+                'conversion_factor': Decimal('100.00'),
+                'min_stock_level': Decimal('100.00'),
+                'unit_cost': Decimal('200.00'),
+                'price_retail': Decimal('285.00'),
+                'price_contractor': Decimal('260.00'),
+                'price_wholesale': Decimal('240.00'),
+                'wholesale_min_qty': Decimal('50.00'),
+            },
+            {
+                'sku': 'FER-PIN-01',
+                'name': 'Pintura Anticorrosiva Lanco Galón',
+                'category': InventoryItem.Category.CONSUMABLE,
+                'unit': 'GAL',
+                'purchase_unit': 'GALON',
+                'conversion_factor': Decimal('1.00'),
+                'min_stock_level': Decimal('12.00'),
+                'unit_cost': Decimal('550.00'),
+                'price_retail': Decimal('850.00'),
+                'price_contractor': Decimal('780.00'),
+                'price_wholesale': Decimal('710.00'),
+                'wholesale_min_qty': Decimal('6.00'),
+            },
+        ]
+        for spec in hardware_items:
+            item, created = InventoryItem.objects.get_or_create(
+                organization=organization,
+                sku=spec['sku'],
+                defaults={'is_active': True, **spec}
+            )
+            StockBalance.objects.get_or_create(
+                organization=organization,
+                warehouse=bod1,
+                item=item,
+                defaults={'quantity': Decimal('100.00')}
+            )
+
+    elif vertical_code == 'PHARMACY':
+        pharmacy_items = [
+            {
+                'sku': 'MED-AMX-01',
+                'name': 'Amoxicilina + Ácido Clavulánico 500mg (Caja x 14)',
+                'category': InventoryItem.Category.CONSUMABLE,
+                'unit': 'CAJA',
+                'purchase_unit': 'CAJA',
+                'conversion_factor': Decimal('1.00'),
+                'min_stock_level': Decimal('15.00'),
+                'unit_cost': Decimal('320.00'),
+                'price_retail': Decimal('480.00'),
+                'price_contractor': Decimal('450.00'),
+                'price_wholesale': Decimal('410.00'),
+                'wholesale_min_qty': Decimal('12.00'),
+                'requires_batch_control': True,
+                'sanitary_registration': 'RS-NI-2026-0412',
+                'active_ingredient': 'Amoxicilina 500mg + Ácido Clavulánico 125mg',
+                'laboratory_brand': 'Laboratorios Ramos',
+                'requires_prescription': True,
+            },
+            {
+                'sku': 'MED-LOS-01',
+                'name': 'Losartán Potásico 50mg MK',
+                'category': InventoryItem.Category.CONSUMABLE,
+                'unit': 'CAJA',
+                'purchase_unit': 'CAJA',
+                'conversion_factor': Decimal('1.00'),
+                'min_stock_level': Decimal('20.00'),
+                'unit_cost': Decimal('110.00'),
+                'price_retail': Decimal('195.00'),
+                'price_contractor': Decimal('180.00'),
+                'price_wholesale': Decimal('160.00'),
+                'wholesale_min_qty': Decimal('10.00'),
+                'requires_batch_control': True,
+                'sanitary_registration': 'RS-NI-2025-0199',
+                'active_ingredient': 'Losartán Potásico 50mg',
+                'laboratory_brand': 'MK / Tecnoquímicas',
+                'requires_prescription': False,
+            },
+            {
+                'sku': 'MED-SAL-01',
+                'name': 'Solución Salina 0.9% 1000ml',
+                'category': InventoryItem.Category.CONSUMABLE,
+                'unit': 'FCO',
+                'purchase_unit': 'FRASCO',
+                'conversion_factor': Decimal('1.00'),
+                'min_stock_level': Decimal('25.00'),
+                'unit_cost': Decimal('65.00'),
+                'price_retail': Decimal('120.00'),
+                'price_contractor': Decimal('105.00'),
+                'price_wholesale': Decimal('90.00'),
+                'wholesale_min_qty': Decimal('24.00'),
+                'requires_batch_control': True,
+                'sanitary_registration': 'RS-NI-2024-0088',
+                'active_ingredient': 'Cloruro de Sodio 0.9%',
+                'laboratory_brand': 'Laboratorios Baxter',
+                'requires_prescription': False,
+            },
+        ]
+        for spec in pharmacy_items:
+            item, created = InventoryItem.objects.get_or_create(
+                organization=organization,
+                sku=spec['sku'],
+                defaults={'is_active': True, **spec}
+            )
+            StockBalance.objects.get_or_create(
+                organization=organization,
+                warehouse=bod1,
+                item=item,
+                defaults={'quantity': Decimal('125.00')}
+            )
+
+        amx_item = InventoryItem.objects.filter(organization=organization, sku='MED-AMX-01').first()
+        if amx_item:
+            InventoryBatch.objects.get_or_create(
+                organization=organization,
+                warehouse=bod1,
+                item=amx_item,
+                batch_number='LOT-2026-OPT1',
+                defaults={
+                    'manufacturing_date': today - datetime.timedelta(days=60),
+                    'expiration_date': today + datetime.timedelta(days=365),
+                    'quantity_available': Decimal('80.00'),
+                }
+            )
+            InventoryBatch.objects.get_or_create(
+                organization=organization,
+                warehouse=bod1,
+                item=amx_item,
+                batch_number='LOT-2026-SOON',
+                defaults={
+                    'manufacturing_date': today - datetime.timedelta(days=300),
+                    'expiration_date': today + datetime.timedelta(days=45),
+                    'quantity_available': Decimal('30.00'),
+                }
+            )
+            InventoryBatch.objects.get_or_create(
+                organization=organization,
+                warehouse=bod1,
+                item=amx_item,
+                batch_number='LOT-2025-EXP1',
+                defaults={
+                    'manufacturing_date': today - datetime.timedelta(days=700),
+                    'expiration_date': today - datetime.timedelta(days=10),
+                    'quantity_available': Decimal('15.00'),
+                }
+            )
 
 
 

@@ -4,6 +4,9 @@ from apps.billing import views
 app_name = 'billing'
 
 urlpatterns = [
+    # Terminal de Punto de Venta Rápido de Mostrador (POS)
+    path('pos/', views.PointOfSaleTerminalView.as_view(), name='pos_terminal'),
+
     # Directorio de Facturas y Cartera
     path('', views.InvoiceListView.as_view(), name='invoice_list'),
     path('invoices/<uuid:pk>/', views.InvoiceDetailView.as_view(), name='invoice_detail'),

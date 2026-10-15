@@ -1,0 +1,400 @@
+{% extends "layouts/base_erp.html" %}
+
+{% block title %}Terminal Punto de Venta (POS) | {{ current_org.name }}{% endblock %}
+
+{% block content %}
+<div class="h-[calc(100vh-6rem)] flex flex-col space-y-3" x-data="posTerminal()">
+    <!-- Topbar POS Swiss Grid -->
+    <div class="flex items-center justify-between border-b border-zinc-200 pb-2.5 bg-white flex-shrink-0">
+        <div>
+            <div class="flex items-center space-x-2 text-[10px] text-zinc-500 font-mono">
+                <span>VENTAS DE MOSTRADOR</span>
+                <span>/</span>
+                <span class="text-zinc-800 font-semibold uppercase">{{ current_vertical_short }}</span>
+                {% if vertical_features.enable_batches_expiry %}
+                <span class="px-1.5 py-0.2 rounded-[2px] bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">FEFO ACTIVO</span>
+                {% endif %}
+            </div>
+            <h1 class="text-lg font-bold tracking-tight text-zinc-900">
+                Terminal de Punto de Venta (POS)
+            </h1>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <!-- Moneda y Hora Técnica -->
+            <div class="hidden md:flex items-center gap-2 font-mono text-[11px] text-zinc-600 bg-zinc-50 border border-zinc-200 px-2.5 py-1 rounded-[4px]">
+                <span>CAJA: <strong>PRINCIPAL</strong></span>
+                <span class="text-zinc-300">|</span>
+                <span>MONEDA: <strong>{{ current_org.currency }}</strong> ({{ current_org.currency_symbol }})</span>
+            </div>
+            <a href="{% url 'billing:invoice_list' %}" class="px-2.5 py-1 text-xs font-mono text-zinc-700 bg-white border border-zinc-200 rounded-[4px] hover:bg-zinc-50 transition-colors">
+                &larr; Facturas &amp; Cartera
+            </a>
+        </div>
+    </div>
+
+    <!-- Consola Dividida (Grid 12 Columnas) -->
+    <div class="flex-1 grid grid-cols-12 gap-4 overflow-hidden">
+        
+        <!-- ========================================================= -->
+        <!-- COLUMNA IZQUIERDA: BUSCADOR & CATÁLOGO DE PRODUCTOS (7/12) -->
+        <!-- ========================================================= -->
+        <div class="col-span-12 lg:col-span-7 flex flex-col bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+            <!-- Buscador Rápido -->
+            <div class="p-3 border-b border-zinc-200 bg-zinc-50/50">
+                <div class="relative">
+                    <input type="text" 
+                           x-model="searchQuery" 
+                           @keydown.escape="searchQuery = ''"
+                           placeholder="Buscar por SKU, nombre{% if vertical_features.enable_batches_expiry %}, principio activo o MINSA{% endif %}..." 
+                           class="w-full h-9 pl-9 pr-3 text-xs bg-white border border-zinc-200 rounded-[4px] font-sans focus:outline-none focus:border-zinc-400 placeholder-zinc-400">
+                    <svg class="w-4 h-4 text-zinc-400 absolute left-2.5 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Listado de Productos -->
+            <div class="flex-1 overflow-y-auto divide-y divide-zinc-200 p-2 space-y-1">
+                <template x-for="item in filteredCatalog" :key="item.id">
+                    <div class="p-2.5 rounded-[4px] border border-zinc-100 hover:border-zinc-300 hover:bg-zinc-50/60 transition-all flex items-center justify-between gap-3 text-xs">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono font-semibold text-zinc-900" x-text="item.sku"></span>
+                                {% if vertical_features.enable_batches_expiry %}
+                                <template x-if="item.requires_prescription">
+                                    <span class="px-1.5 py-0.2 rounded-[2px] bg-rose-50 border border-rose-200 text-rose-700 text-[9px] font-mono font-bold">
+                                        RECETA REQ.
+                                    </span>
+                                </template>
+                                {% endif %}
+                            </div>
+                            <div class="font-medium text-zinc-900 truncate mt-0.5" x-text="item.name"></div>
+
+                            <!-- Ficha Sanitaria Farmacéutica -->
+                            {% if vertical_features.enable_batches_expiry %}
+                            <div class="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-zinc-500 font-mono">
+                                <template x-if="item.active_ingredient">
+                                    <span class="text-zinc-700" x-text="'Activo: ' + item.active_ingredient"></span>
+                                </template>
+                                <template x-if="item.sanitary_registration">
+                                    <span class="text-zinc-400" x-text="'MINSA: ' + item.sanitary_registration"></span>
+                                </template>
+                            </div>
+                            <!-- Datos de Lote FEFO más próximo -->
+                            <template x-if="getFefoBatch(item)">
+                                <div class="mt-1 flex items-center gap-1.5 font-mono text-[10px]">
+                                    <span class="text-zinc-500">Lote FEFO:</span>
+                                    <span class="font-bold text-zinc-800" x-text="getFefoBatch(item).batch_number"></span>
+                                    <span class="text-zinc-400" x-text="'(Vence: ' + getFefoBatch(item).expiration_date + ')'"></span>
+                                    <template x-if="getFefoBatch(item).expiry_status === 'EXPIRED'">
+                                        <span class="px-1.5 py-0.2 rounded-[2px] bg-rose-50 border border-rose-200 text-rose-700 font-bold">CADUCADO (BLOQUEADO)</span>
+                                    </template>
+                                    <template x-if="getFefoBatch(item).expiry_status === 'EXPIRING_SOON'">
+                                        <span class="px-1.5 py-0.2 rounded-[2px] bg-amber-50 border border-amber-200 text-amber-700 font-bold">FEFO &le;90d</span>
+                                    </template>
+                                </div>
+                            </template>
+                            {% endif %}
+
+                            <!-- Escala de Precios Ferretera/PYME -->
+                            {% if vertical_features.enable_tiered_pricing %}
+                            <div class="mt-1 flex items-center gap-2 font-mono text-[11px] text-zinc-500">
+                                <span>Púb: <strong class="text-zinc-800 tabular-nums" x-text="formatMoney(item.price_retail)"></strong></span>
+                                <span class="text-zinc-300">|</span>
+                                <span>Contr: <strong class="text-zinc-800 tabular-nums" x-text="formatMoney(item.price_contractor)"></strong></span>
+                                <span class="text-zinc-300">|</span>
+                                <span>Mayorista: <strong class="text-zinc-800 tabular-nums" x-text="formatMoney(item.price_wholesale)"></strong> (&ge;<span x-text="item.wholesale_min_qty"></span> <span x-text="item.unit"></span>)</span>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Precio Activo & Botón de Agregar -->
+                        <div class="text-right flex-shrink-0">
+                            <div class="font-mono font-bold text-sm text-zinc-900 tabular-nums" x-text="formatMoney(getItemPrice(item))"></div>
+                            <div class="text-[10px] font-mono text-zinc-400 mt-0.5">
+                                Stock: <span class="font-semibold text-zinc-700" x-text="item.total_stock"></span> <span x-text="item.unit"></span>
+                            </div>
+
+                            <button type="button" 
+                                    @click="addToCart(item)"
+                                    :disabled="isItemBlocked(item)"
+                                    :class="isItemBlocked(item) ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed border-zinc-200' : 'bg-zinc-900 text-white hover:bg-zinc-800 border-zinc-900'"
+                                    class="mt-1.5 px-3 py-1 rounded-[3px] text-[11px] font-semibold border transition-colors">
+                                <span x-text="isItemBlocked(item) ? 'BLOQUEADO' : '+ Agregar'"></span>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="filteredCatalog.length === 0" class="py-8 text-center text-zinc-400 font-mono text-xs">
+                    No se encontraron productos que coincidan con la búsqueda.
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- COLUMNA DERECHA: CARRITO & CHECKOUT TERMINAL (5/12)        -->
+        <!-- ========================================================= -->
+        <div class="col-span-12 lg:col-span-5 flex flex-col bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+            <form method="POST" action="{% url 'billing:pos_terminal' %}" @submit="submitCart($event)" class="h-full flex flex-col">
+                {% csrf_token %}
+                <input type="hidden" name="items_payload" :value="JSON.stringify(cartPayload)">
+                <input type="hidden" name="price_tier" :value="activePriceTier">
+
+                <!-- Parámetros de Venta -->
+                <div class="p-3 border-b border-zinc-200 bg-zinc-50/70 space-y-2 text-xs">
+                    <!-- Selector de Bodega -->
+                    <div class="flex items-center justify-between gap-2">
+                        <label class="font-mono text-[10px] text-zinc-500 uppercase tracking-tight">Bodega Despacho:</label>
+                        <select name="warehouse_id" x-model="selectedWarehouse" class="h-7 text-xs px-2 bg-white border border-zinc-200 rounded-[3px] focus:outline-none focus:border-zinc-400 font-mono">
+                            {% for wh in warehouses %}
+                            <option value="{{ wh.id }}">{{ wh.code }} · {{ wh.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Selector de Cliente -->
+                    <div class="flex items-center justify-between gap-2">
+                        <label class="font-mono text-[10px] text-zinc-500 uppercase tracking-tight">Cliente:</label>
+                        <select name="account_id" class="h-7 text-xs px-2 bg-white border border-zinc-200 rounded-[3px] focus:outline-none focus:border-zinc-400 max-w-[220px] truncate">
+                            {% if default_account %}
+                            <option value="{{ default_account.id }}" selected>{{ default_account.commercial_name }} (Contado)</option>
+                            {% else %}
+                            <option value="" selected>Consumidor Final (Contado)</option>
+                            {% endif %}
+                            {% for acc in accounts %}
+                            {% if acc.id != default_account.id %}
+                            <option value="{{ acc.id }}">{{ acc.commercial_name }} {% if acc.tax_id %}({{ acc.tax_id }}){% endif %}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Selector de Escala de Precios (Ferretería / PYME) -->
+                    {% if vertical_features.enable_tiered_pricing %}
+                    <div class="flex items-center justify-between gap-2 pt-1 border-t border-zinc-200/60">
+                        <label class="font-mono text-[10px] text-zinc-500 uppercase tracking-tight">Escala de Precios:</label>
+                        <div class="inline-flex rounded-[3px] border border-zinc-200 bg-white p-0.5">
+                            <button type="button" @click="activePriceTier = 'RETAIL'" :class="activePriceTier === 'RETAIL' ? 'bg-zinc-900 text-white font-bold' : 'text-zinc-600 hover:bg-zinc-100'" class="px-2 py-0.5 text-[10px] font-mono rounded-[2px] transition-colors">
+                                PÚBLICO
+                            </button>
+                            <button type="button" @click="activePriceTier = 'CONTRACTOR'" :class="activePriceTier === 'CONTRACTOR' ? 'bg-zinc-900 text-white font-bold' : 'text-zinc-600 hover:bg-zinc-100'" class="px-2 py-0.5 text-[10px] font-mono rounded-[2px] transition-colors">
+                                CONTRATISTA
+                            </button>
+                            <button type="button" @click="activePriceTier = 'WHOLESALE'" :class="activePriceTier === 'WHOLESALE' ? 'bg-zinc-900 text-white font-bold' : 'text-zinc-600 hover:bg-zinc-100'" class="px-2 py-0.5 text-[10px] font-mono rounded-[2px] transition-colors">
+                                MAYORISTA
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Partidas en Carrito -->
+                <div class="flex-1 overflow-y-auto p-2 divide-y divide-zinc-100">
+                    <template x-for="(cartItem, idx) in cart" :key="cartItem.id + '_' + (cartItem.batch_id || '')">
+                        <div class="py-2 flex items-center justify-between gap-2 text-xs">
+                            <div class="flex-1 min-w-0">
+                                <div class="font-medium text-zinc-900 truncate" x-text="cartItem.name"></div>
+                                <div class="font-mono text-[10px] text-zinc-400 flex items-center gap-1.5">
+                                    <span x-text="cartItem.sku"></span>
+                                    <template x-if="cartItem.batch_number">
+                                        <span class="text-zinc-700 bg-zinc-100 px-1 py-0.2 rounded" x-text="'Lote: ' + cartItem.batch_number"></span>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Controles de Cantidad -->
+                            <div class="flex items-center gap-1">
+                                <button type="button" @click="decrementQty(idx)" class="w-6 h-6 flex items-center justify-center rounded-[3px] border border-zinc-200 text-zinc-600 hover:bg-zinc-100 font-mono">-</button>
+                                <input type="number" step="0.01" min="0.01" x-model.number="cartItem.quantity" class="w-14 h-6 text-center text-xs font-mono tabular-nums border border-zinc-200 rounded-[3px] focus:outline-none">
+                                <button type="button" @click="incrementQty(idx)" class="w-6 h-6 flex items-center justify-center rounded-[3px] border border-zinc-200 text-zinc-600 hover:bg-zinc-100 font-mono">+</button>
+                            </div>
+
+                            <!-- Total Renglón -->
+                            <div class="text-right w-20 flex-shrink-0 font-mono">
+                                <span class="font-bold text-zinc-900 tabular-nums" x-text="formatMoney(cartItem.quantity * cartItem.unit_price)"></span>
+                                <button type="button" @click="removeFromCart(idx)" class="block text-[10px] text-rose-500 hover:underline ml-auto">Quitar</button>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="cart.length === 0" class="h-full flex flex-col items-center justify-center text-center p-6 text-zinc-400 font-mono text-xs">
+                        <span>Carrito vacío</span>
+                        <span class="text-[10px] text-zinc-400 mt-1">Selecciona productos del catálogo</span>
+                    </div>
+                </div>
+
+                <!-- Totales y Botón de Pago -->
+                <div class="p-3 border-t border-zinc-200 bg-zinc-50/70 space-y-2 text-xs">
+                    <!-- Método de Pago -->
+                    <div class="flex items-center justify-between gap-2">
+                        <label class="font-mono text-[10px] text-zinc-500 uppercase tracking-tight">Método de Cobro:</label>
+                        <select name="payment_method" class="h-7 text-xs px-2 bg-white border border-zinc-200 rounded-[3px] focus:outline-none font-mono">
+                            {% for code, label in payment_methods %}
+                            <option value="{{ code }}" {% if code == 'CASH' %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Desglose Fiscal DGI -->
+                    <div class="space-y-1 pt-2 border-t border-zinc-200 font-mono text-[11px]">
+                        <div class="flex items-center justify-between text-zinc-600">
+                            <span>Subtotal:</span>
+                            <span class="tabular-nums" x-text="formatMoney(subtotal)"></span>
+                        </div>
+                        <div class="flex items-center justify-between text-zinc-600">
+                            <span>IVA (15%):</span>
+                            {% if current_org.is_pharmacy_vertical %}
+                            <span class="tabular-nums text-emerald-700 font-semibold">C$ 0.00 (EXENTO MINSA)</span>
+                            {% else %}
+                            <span class="tabular-nums" x-text="formatMoney(taxAmount)"></span>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center justify-between text-sm font-bold text-zinc-900 pt-1 border-t border-zinc-200">
+                            <span>TOTAL A COBRAR:</span>
+                            <span class="text-base tabular-nums" x-text="formatMoney(totalAmount)"></span>
+                        </div>
+                    </div>
+
+                    <!-- Botón de Cobro Primario -->
+                    <button type="submit" 
+                            :disabled="cart.length === 0"
+                            :class="cart.length === 0 ? 'bg-zinc-200 text-zinc-400 cursor-not-allowed border-zinc-200' : 'bg-zinc-900 text-white hover:bg-zinc-800 border-zinc-900'"
+                            class="w-full h-10 rounded-[4px] font-semibold text-xs border transition-colors flex items-center justify-center gap-2">
+                        <span>COBRAR &amp; EMITIR FACTURA DGI</span>
+                        <span class="font-mono tabular-nums font-bold" x-text="'(' + formatMoney(totalAmount) + ')'"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function posTerminal() {
+    return {
+        catalog: {{ catalog_json|safe }},
+        searchQuery: '',
+        activePriceTier: 'RETAIL',
+        selectedWarehouse: '{% if warehouses %}{{ warehouses.0.id }}{% endif %}',
+        cart: [],
+        currencySymbol: '{{ current_org.currency_symbol }}',
+        isPharmacy: {% if current_org.is_pharmacy_vertical %}true{% else %}false{% endif %},
+
+        get filteredCatalog() {
+            if (!this.searchQuery.trim()) return this.catalog;
+            const q = this.searchQuery.toLowerCase().trim();
+            return this.catalog.filter(it => 
+                it.name.toLowerCase().includes(q) ||
+                it.sku.toLowerCase().includes(q) ||
+                (it.active_ingredient && it.active_ingredient.toLowerCase().includes(q)) ||
+                (it.sanitary_registration && it.sanitary_registration.toLowerCase().includes(q))
+            );
+        },
+
+        getFefoBatch(item) {
+            if (!item.batches || item.batches.length === 0) return null;
+            return item.batches[0]; // Earliest expiry batch
+        },
+
+        isItemBlocked(item) {
+            if (this.isPharmacy && item.requires_batch_control) {
+                const batch = this.getFefoBatch(item);
+                if (batch && batch.expiry_status === 'EXPIRED') return true;
+            }
+            return false;
+        },
+
+        getItemPrice(item) {
+            if (this.activePriceTier === 'CONTRACTOR') {
+                return item.price_contractor || item.price_retail;
+            } else if (this.activePriceTier === 'WHOLESALE') {
+                return item.price_wholesale || item.price_retail;
+            }
+            return item.price_retail;
+        },
+
+        addToCart(item) {
+            if (this.isItemBlocked(item)) {
+                alert('Este producto tiene su lote más próximo vencido y está bloqueado para venta por normativa sanitaria MINSA.');
+                return;
+            }
+
+            const fefoBatch = this.getFefoBatch(item);
+            const batchId = fefoBatch ? fefoBatch.id : null;
+            const batchNumber = fefoBatch ? fefoBatch.batch_number : null;
+
+            const existingIndex = this.cart.findIndex(c => c.id === item.id && c.batch_id === batchId);
+            const currentPrice = this.getItemPrice(item);
+
+            if (existingIndex >= 0) {
+                this.cart[existingIndex].quantity += 1;
+            } else {
+                this.cart.push({
+                    id: item.id,
+                    sku: item.sku,
+                    name: item.name,
+                    unit: item.unit,
+                    quantity: 1,
+                    unit_price: currentPrice,
+                    batch_id: batchId,
+                    batch_number: batchNumber,
+                });
+            }
+        },
+
+        removeFromCart(index) {
+            this.cart.splice(index, 1);
+        },
+
+        incrementQty(index) {
+            this.cart[index].quantity += 1;
+        },
+
+        decrementQty(index) {
+            if (this.cart[index].quantity > 1) {
+                this.cart[index].quantity -= 1;
+            } else {
+                this.removeFromCart(index);
+            }
+        },
+
+        get subtotal() {
+            return this.cart.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+        },
+
+        get taxAmount() {
+            if (this.isPharmacy) return 0; // Exento MINSA
+            return this.subtotal * 0.15;
+        },
+
+        get totalAmount() {
+            return this.subtotal + this.taxAmount;
+        },
+
+        get cartPayload() {
+            return this.cart.map(c => ({
+                item_id: c.id,
+                quantity: c.quantity,
+                unit_price: c.unit_price,
+                batch_id: c.batch_id,
+                price_tier: this.activePriceTier,
+            }));
+        },
+
+        formatMoney(val) {
+            const num = Number(val) || 0;
+            return this.currencySymbol + ' ' + num.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        },
+
+        submitCart(e) {
+            if (this.cart.length === 0) {
+                e.preventDefault();
+                alert('El carrito está vacío.');
+                return false;
+            }
+            return true;
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -5,7 +5,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 
-from apps.tenancy.constants import ERP_MODULES_BY_CODE, ERP_MODULES_CATALOG
+from apps.tenancy.constants import ERP_MODULES_BY_CODE, ERP_MODULES_CATALOG, BusinessVertical
 from apps.tenancy.forms import MemberRoleUpdateForm, TeamCreateMemberForm
 from apps.tenancy.models import Organization, OrganizationMembership, RoleLevel
 from apps.tenancy.permissions import RoleLevelRequiredMixin, TenantRequiredMixin
@@ -268,3 +268,39 @@ class ApplyBusinessProfilePresetView(RoleLevelRequiredMixin, View):
             messages.error(request, "Perfil de giro comercial no reconocido.")
 
         return redirect('tenancy:team_management')
+
+
+class SwitchBusinessVerticalView(RoleLevelRequiredMixin, View):
+    """
+    Exclusiva para Administrador General (real_role_level == 100).
+    Permite cambiar en caliente el business_vertical de la organización actual
+    y ajustar automáticamente sus enabled_modules según el preset elegido.
+    """
+    min_role_level = RoleLevel.OWNER_ADMIN
+
+    def post(self, request, *args, **kwargs):
+        real_role = getattr(request, 'real_role_level', request.role_level)
+        if real_role < RoleLevel.OWNER_ADMIN:
+            messages.error(request, "Acción restringida: Solo el Administrador General (Nivel 100) puede conmutar el giro de industria.")
+            return redirect('tenancy:dashboard')
+
+        vertical_code = (request.POST.get('business_vertical') or request.POST.get('vertical') or '').strip().upper()
+        if vertical_code in BusinessVertical.values:
+            request.organization.apply_vertical_preset(vertical_code)
+
+            try:
+                from apps.core.services.sandbox_seeder import ensure_vertical_demo_catalog
+                ensure_vertical_demo_catalog(request.organization, vertical_code)
+            except Exception:
+                pass
+
+            messages.success(
+                request,
+                f"Giro de industria conmutado a: {request.organization.get_business_vertical_display()}. "
+                f"Módulos actualizados según preset."
+            )
+        else:
+            messages.error(request, f"Vertical de industria '{vertical_code}' no reconocida.")
+
+        next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or 'tenancy:dashboard'
+        return redirect(next_url)

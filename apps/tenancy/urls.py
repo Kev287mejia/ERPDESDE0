@@ -25,6 +25,7 @@ urlpatterns = [
     path('settings/modules/', views_team.OrganizationModulesUpdateView.as_view(), name='update_modules'),
     path('settings/apply-preset/', views_team.ApplyBusinessProfilePresetView.as_view(), name='apply_preset'),
     path('settings/apply-business-preset/', views_team.ApplyBusinessProfilePresetView.as_view(), name='apply_business_preset'),
+    path('settings/switch-vertical/', views_team.SwitchBusinessVerticalView.as_view(), name='switch_vertical'),
 
     # Subsistemas Dinámicos Opcionales
     path('tech/', views_modules.TechDashboardView.as_view(), name='tech_dashboard'),

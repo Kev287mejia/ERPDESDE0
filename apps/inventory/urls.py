@@ -18,4 +18,8 @@ urlpatterns = [
     path('movements/transfer/action/', views.StockTransferCreateView.as_view(), name='stock_transfer'),
     path('movements/dispatch-ot/', views.StockDispatchToOTView.as_view(), name='movement_dispatch_ot'),
     path('movements/dispatch-ot/action/', views.StockDispatchToOTView.as_view(), name='stock_dispatch_ot'),
+
+    # Control Sanitario de Lotes y Vencimientos FEFO (Farmacias y Perecederos)
+    path('batches-fefo/', views.BatchExpiryMonitorView.as_view(), name='batches_fefo'),
+    path('batches-fefo/create/', views.BatchExpiryMonitorView.as_view(), name='batch_create'),
 ]
