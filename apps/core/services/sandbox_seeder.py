@@ -2151,7 +2151,7 @@ def ensure_vertical_demo_catalog(organization: Organization, vertical_code: str)
 
     today = timezone.now().date()
 
-    if vertical_code in ['HARDWARE', 'SME_RETAIL']:
+    if vertical_code == 'HARDWARE':
         hardware_items = [
             {
                 'sku': 'FER-CEM-01',
@@ -2207,6 +2207,64 @@ def ensure_vertical_demo_catalog(organization: Organization, vertical_code: str)
                 warehouse=bod1,
                 item=item,
                 defaults={'quantity': Decimal('100.00')}
+            )
+
+    elif vertical_code == 'SME_RETAIL':
+        sme_items = [
+            {
+                'sku': 'ART-OF-01',
+                'name': 'Papel Bond Carta 75g (Resma x 500)',
+                'category': InventoryItem.Category.CONSUMABLE,
+                'unit': 'RES',
+                'purchase_unit': 'CAJA',
+                'conversion_factor': Decimal('10.00'),
+                'min_stock_level': Decimal('20.00'),
+                'unit_cost': Decimal('140.00'),
+                'price_retail': Decimal('210.00'),
+                'price_contractor': Decimal('195.00'),
+                'price_wholesale': Decimal('180.00'),
+                'wholesale_min_qty': Decimal('5.00'),
+            },
+            {
+                'sku': 'ART-OF-02',
+                'name': 'Archivador Palanca Tamaño Oficio',
+                'category': InventoryItem.Category.CONSUMABLE,
+                'unit': 'UND',
+                'purchase_unit': 'DOCENA',
+                'conversion_factor': Decimal('12.00'),
+                'min_stock_level': Decimal('15.00'),
+                'unit_cost': Decimal('65.00'),
+                'price_retail': Decimal('115.00'),
+                'price_contractor': Decimal('105.00'),
+                'price_wholesale': Decimal('95.00'),
+                'wholesale_min_qty': Decimal('12.00'),
+            },
+            {
+                'sku': 'ART-TEC-01',
+                'name': 'Teclado y Mouse Inalámbrico Logitech MK270',
+                'category': InventoryItem.Category.CONSUMABLE,
+                'unit': 'KIT',
+                'purchase_unit': 'KIT',
+                'conversion_factor': Decimal('1.00'),
+                'min_stock_level': Decimal('10.00'),
+                'unit_cost': Decimal('680.00'),
+                'price_retail': Decimal('980.00'),
+                'price_contractor': Decimal('920.00'),
+                'price_wholesale': Decimal('850.00'),
+                'wholesale_min_qty': Decimal('3.00'),
+            },
+        ]
+        for spec in sme_items:
+            item, created = InventoryItem.objects.get_or_create(
+                organization=organization,
+                sku=spec['sku'],
+                defaults={'is_active': True, **spec}
+            )
+            StockBalance.objects.get_or_create(
+                organization=organization,
+                warehouse=bod1,
+                item=item,
+                defaults={'quantity': Decimal('60.00')}
             )
 
     elif vertical_code == 'PHARMACY':
@@ -2322,6 +2380,145 @@ def ensure_vertical_demo_catalog(organization: Organization, vertical_code: str)
         sal_item = InventoryItem.objects.filter(organization=organization, sku='MED-SAL-01').first()
         if sal_item:
             StockBalance.objects.filter(organization=organization, warehouse=bod1, item=sal_item).update(quantity=Decimal('5.00'))
+
+
+def seed_multi_vertical_demo_organizations(country, users):
+    """
+    Siembra 4 organizaciones independientes para evaluación limpia de cada vertical de negocio:
+    1. SERMANSA Ingeniería S.A. (ENGINEERING) - Flujo industrial completo, OTs, SST, Nómina.
+    2. Ferretería El Maestro S.A. (HARDWARE) - POS, 3 listas de precios, compras ferreteras.
+    3. Farmacia Santa Lucía S.A. (PHARMACY) - POS, lotes FEFO, registro MINSA, dispensación médica.
+    4. Comercial Masaya S.A. (SME_RETAIL) - Tienda PYME, facturación y caja ágil.
+    """
+    from apps.tenancy.constants import BusinessVertical
+    from apps.finance.models import BankAccount, PettyCashFund
+
+    org_definitions = [
+        {
+            'slug': 'ferreteria-el-maestro',
+            'name': 'Ferretería El Maestro S.A.',
+            'legal_name': 'Distribuidora y Ferretería El Maestro Sociedad Anónima',
+            'tax_id': 'J0310000771234',
+            'business_vertical': BusinessVertical.HARDWARE_STORE,
+            'business_profile': Organization.BusinessProfile.COMMERCIAL_RETAIL,
+            'enabled_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
+            'industry': Organization.Industry.COMMERCE,
+            'warehouse_name': 'Bodega Ferretera Central',
+            'bank_name': 'BAC Credomatic - Córdobas (Ferretería)',
+            'fund_name': 'Caja Chica Mostrador Ferretería',
+            'fund_amount': Decimal('15000.00'),
+        },
+        {
+            'slug': 'farmacia-santa-lucia',
+            'name': 'Farmacia Santa Lucía S.A.',
+            'legal_name': 'Droguería y Farmacia Santa Lucía Sociedad Anónima',
+            'tax_id': 'J0310000885678',
+            'business_vertical': BusinessVertical.PHARMACY_HEALTH,
+            'business_profile': Organization.BusinessProfile.COMMERCIAL_RETAIL,
+            'enabled_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
+            'industry': Organization.Industry.COMMERCE,
+            'warehouse_name': 'Bodega Farmacéutica Climatizada',
+            'bank_name': 'Banco Lafise Bancentro - Córdobas (Farmacia)',
+            'fund_name': 'Caja Chica Farmacia Turno A',
+            'fund_amount': Decimal('10000.00'),
+        },
+        {
+            'slug': 'comercial-masaya',
+            'name': 'Comercial Masaya S.A.',
+            'legal_name': 'Distribuciones Comerciales de Masaya Sociedad Anónima',
+            'tax_id': 'J0310000994321',
+            'business_vertical': BusinessVertical.SME_RETAIL,
+            'business_profile': Organization.BusinessProfile.COMMERCIAL_RETAIL,
+            'enabled_modules': ['crm', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'payroll'],
+            'industry': Organization.Industry.COMMERCE,
+            'warehouse_name': 'Tienda y Almacén General',
+            'bank_name': 'Banco Avanz - Córdobas (Comercial Masaya)',
+            'fund_name': 'Caja Principal Tienda Masaya',
+            'fund_amount': Decimal('8000.00'),
+        },
+    ]
+
+    created_orgs = []
+    for spec in org_definitions:
+        org, _ = Organization.objects.get_or_create(
+            slug=spec['slug'],
+            defaults={
+                'name': spec['name'],
+                'legal_name': spec['legal_name'],
+                'tax_id': spec['tax_id'],
+                'country': country,
+                'currency': Organization.Currency.NIO,
+                'tax_regime': Organization.TaxRegime.GENERAL,
+                'industry': spec['industry'],
+                'business_vertical': spec['business_vertical'],
+                'business_profile': spec['business_profile'],
+                'accounting_template': Organization.AccountingTemplate.NIIF_PYMES,
+                'enabled_modules': spec['enabled_modules'],
+                'onboarding_completed': True,
+                'is_active': True,
+            }
+        )
+        org.name = spec['name']
+        org.legal_name = spec['legal_name']
+        org.tax_id = spec['tax_id']
+        org.business_vertical = spec['business_vertical']
+        org.business_profile = spec['business_profile']
+        org.enabled_modules = spec['enabled_modules']
+        org.onboarding_completed = True
+        org.is_active = True
+        org.save()
+
+        for u in users:
+            OrganizationMembership.objects.update_or_create(
+                user=u,
+                organization=org,
+                defaults={
+                    'role_level': RoleLevel.OWNER_ADMIN,
+                    'job_title': 'Director General / Socio',
+                    'is_active': True,
+                }
+            )
+
+        Warehouse.objects.get_or_create(
+            organization=org,
+            code='BOD-01',
+            defaults={
+                'name': spec['warehouse_name'],
+                'warehouse_type': Warehouse.WarehouseType.CENTRAL,
+                'is_active': True,
+            }
+        )
+
+        BankAccount.objects.get_or_create(
+            organization=org,
+            account_number=f"360-{org.tax_id[-6:]}-1",
+            defaults={
+                'bank_name': BankAccount.BankName.BAC,
+                'description': spec['bank_name'],
+                'currency': 'NIO',
+                'account_type': BankAccount.AccountType.CHECKING,
+                'current_balance': Decimal('250000.00'),
+                'is_active': True,
+            }
+        )
+
+        PettyCashFund.objects.get_or_create(
+            organization=org,
+            code='CAJA-01',
+            defaults={
+                'name': spec['fund_name'],
+                'custodian': users[0],
+                'currency': 'NIO',
+                'allocated_amount': spec['fund_amount'],
+                'current_balance': spec['fund_amount'],
+                'is_active': True,
+            }
+        )
+
+        ensure_vertical_demo_catalog(org, spec['business_vertical'])
+        created_orgs.append(org)
+
+    return created_orgs
 
 
 

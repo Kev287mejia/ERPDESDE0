@@ -7,6 +7,9 @@
     step: 1, 
     country_code: '{{ form.country_code.value|default:active_country.code|default:'NI' }}',
     countries: {{ countries_json|safe }},
+    business_vertical: '{{ form.business_vertical.value|default:'ENGINEERING' }}',
+    verticalPresets: {{ vertical_presets_json|safe }},
+    selectedModules: ({{ vertical_presets_json|safe }} && {{ vertical_presets_json|safe }}['{{ form.business_vertical.value|default:'ENGINEERING' }}']) ? {{ vertical_presets_json|safe }}['{{ form.business_vertical.value|default:'ENGINEERING' }}'] : ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'payroll'],
     get currentCountry() {
         return (this.countries && this.countries[this.country_code]) ? this.countries[this.country_code] : {};
     },
@@ -14,6 +17,12 @@
         this.country_code = code;
         if (this.currentCountry && this.currentCountry.primary_currency_code) {
             this.currency = this.currentCountry.primary_currency_code;
+        }
+    },
+    selectVertical(code) {
+        this.business_vertical = code;
+        if (this.verticalPresets && this.verticalPresets[code]) {
+            this.selectedModules = [...this.verticalPresets[code]];
         }
     },
     name: '{{ form.name.value|default:'' }}',
@@ -37,16 +46,16 @@
             </div>
             <h1 class="text-base font-semibold text-zinc-900 tracking-tight">Despliegue de Organización Operativa</h1>
             <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                Configure la jurisdicción fiscal, la identidad tributaria y los subsistemas de operación para su nuevo espacio de trabajo.
+                Configure la jurisdicción fiscal, el giro de negocio permanente, la identidad tributaria y los subsistemas operativos para su nuevo espacio de trabajo.
             </p>
 
-            <!-- Línea de Tiempo Técnica Numerada (3 Pasos de 1px) -->
-            <div class="grid grid-cols-3 gap-3 mt-6 pt-4 border-t border-zinc-100 text-xs font-mono">
+            <!-- Línea de Tiempo Técnica Numerada (4 Pasos de 1px) -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 pt-4 border-t border-zinc-100 text-xs font-mono">
                 <!-- Paso 1 -->
                 <button type="button" 
                         @click="step = 1"
                         :class="step === 1 ? 'border-zinc-900 text-zinc-900 bg-zinc-50/50' : 'border-zinc-200 text-zinc-400 hover:text-zinc-600'"
-                        class="border-l-2 pl-3 py-1.5 text-left transition-colors">
+                        class="border-l-2 pl-3 py-1.5 text-left transition-colors cursor-pointer">
                     <span class="text-[10px] block font-semibold" :class="step === 1 ? 'text-zinc-900' : 'text-zinc-400'">01 JURISDICCIÓN</span>
                     <span class="font-medium text-[11px]">Fiscal Regional</span>
                 </button>
@@ -55,17 +64,26 @@
                 <button type="button" 
                         @click="if (country_code) step = 2"
                         :class="step === 2 ? 'border-zinc-900 text-zinc-900 bg-zinc-50/50' : 'border-zinc-200 text-zinc-400 hover:text-zinc-600'"
-                        class="border-l-2 pl-3 py-1.5 text-left transition-colors">
-                    <span class="text-[10px] block font-semibold" :class="step === 2 ? 'text-zinc-900' : 'text-zinc-400'">02 IDENTIDAD</span>
-                    <span class="font-medium text-[11px]" x-text="'Legal & ' + (currentCountry.tax_id_label || 'Tributario')">Legal & Tributario</span>
+                        class="border-l-2 pl-3 py-1.5 text-left transition-colors cursor-pointer">
+                    <span class="text-[10px] block font-semibold" :class="step === 2 ? 'text-zinc-900' : 'text-zinc-400'">02 GIRO PRINCIPAL</span>
+                    <span class="font-medium text-[11px]">Vertical de Industria</span>
                 </button>
 
                 <!-- Paso 3 -->
                 <button type="button" 
-                        @click="if (country_code && name && tax_id) step = 3"
+                        @click="if (country_code && business_vertical) step = 3"
                         :class="step === 3 ? 'border-zinc-900 text-zinc-900 bg-zinc-50/50' : 'border-zinc-200 text-zinc-400 hover:text-zinc-600'"
-                        class="border-l-2 pl-3 py-1.5 text-left transition-colors">
-                    <span class="text-[10px] block font-semibold" :class="step === 3 ? 'text-zinc-900' : 'text-zinc-400'">03 MÓDULOS</span>
+                        class="border-l-2 pl-3 py-1.5 text-left transition-colors cursor-pointer">
+                    <span class="text-[10px] block font-semibold" :class="step === 3 ? 'text-zinc-900' : 'text-zinc-400'">03 IDENTIDAD</span>
+                    <span class="font-medium text-[11px]" x-text="'Legal & ' + (currentCountry.tax_id_label || 'Tributario')">Legal & Tributario</span>
+                </button>
+
+                <!-- Paso 4 -->
+                <button type="button" 
+                        @click="if (country_code && business_vertical && name && tax_id) step = 4"
+                        :class="step === 4 ? 'border-zinc-900 text-zinc-900 bg-zinc-50/50' : 'border-zinc-200 text-zinc-400 hover:text-zinc-600'"
+                        class="border-l-2 pl-3 py-1.5 text-left transition-colors cursor-pointer">
+                    <span class="text-[10px] block font-semibold" :class="step === 4 ? 'text-zinc-900' : 'text-zinc-400'">04 MÓDULOS</span>
                     <span class="font-medium text-[11px]">Operativos</span>
                 </button>
             </div>
@@ -87,6 +105,7 @@
         <form method="POST" action="{% url 'tenancy:onboarding' %}" class="p-6">
             {% csrf_token %}
             <input type="hidden" name="country_code" :value="country_code">
+            <input type="hidden" name="business_vertical" :value="business_vertical">
 
             <!-- ============================================================= -->
             <!-- PASO 1: JURISDICCIÓN FISCAL (CENTROAMÉRICA - 3 COLUMNAS)      -->
@@ -98,7 +117,7 @@
                             Paso 1: Jurisdicción Fiscal Regional (Centroamérica)
                         </h2>
                         <p class="text-xs text-zinc-500 mt-0.5">
-                            Seleccione el marco normativo donde radicará la contabilidad oficial y la emisión de comprobantes.
+                            Seleccione el marco normativo donde radicará la contabilidad oficial y la emisión de comprobantes fiscales.
                         </p>
                     </div>
                     <span class="text-[10px] font-mono text-zinc-400" x-text="'SELECCIONADO: ' + (currentCountry.name || '') + ' (' + (currentCountry.code || '') + ')'"></span>
@@ -173,7 +192,7 @@
                     <button type="button" 
                             @click="step = 2"
                             class="h-8 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] flex items-center gap-1.5 transition-colors cursor-pointer">
-                        <span>Continuar a Identidad</span>
+                        <span>Continuar a Giro Principal</span>
                         <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
                         </svg>
@@ -182,13 +201,76 @@
             </div>
 
             <!-- ============================================================= -->
-            <!-- PASO 2: IDENTIDAD LEGAL Y TRIBUTARIA (LAYOUT 2/3 + 1/3)       -->
+            <!-- PASO 2: GIRO PRINCIPAL DEL NEGOCIO (VERTICAL OPERATIVA)       -->
             <!-- ============================================================= -->
             <div x-show="step === 2" x-cloak class="space-y-4">
                 <div class="flex items-center justify-between pb-2 border-b border-zinc-100">
                     <div>
                         <h2 class="text-xs font-mono uppercase tracking-wider font-semibold text-zinc-900">
-                            Paso 2: Identidad Legal y Registro Tributario
+                            Paso 2: Giro Principal del Negocio (Vertical de Industria)
+                        </h2>
+                        <p class="text-xs text-zinc-500 mt-0.5">
+                            Seleccione la naturaleza de su empresa. Esta definición configura permanentemente los catálogos, el terminal de venta (POS) y los módulos activos.
+                        </p>
+                    </div>
+                    <span class="text-[10px] font-mono text-zinc-400">IDENTIDAD INMUTABLE</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {% for vert in business_verticals %}
+                    <div @click="selectVertical('{{ vert.code }}')"
+                         :class="business_vertical === '{{ vert.code }}' ? 'border-zinc-900 ring-1 ring-zinc-900 bg-zinc-50/40' : 'border-zinc-200 bg-white hover:border-zinc-300'"
+                         class="p-4 border rounded-[4px] cursor-pointer transition-all relative flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-[4px] text-[10px] font-mono font-semibold bg-zinc-100 text-zinc-800 border border-zinc-200">
+                                    {{ vert.tag }}
+                                </span>
+                                <span class="text-[10px] font-mono font-medium"
+                                      :class="business_vertical === '{{ vert.code }}' ? 'text-zinc-900 font-bold' : 'text-zinc-400'">
+                                    <span x-show="business_vertical === '{{ vert.code }}'">&#10003; SELECCIONADO</span>
+                                    <span x-show="business_vertical !== '{{ vert.code }}'">ELEGIR</span>
+                                </span>
+                            </div>
+                            <h3 class="text-sm font-semibold text-zinc-900 tracking-tight">{{ vert.name }}</h3>
+                            <p class="text-xs text-zinc-500 mt-1 leading-relaxed">{{ vert.description }}</p>
+                        </div>
+
+                        <div class="mt-3.5 pt-2.5 border-t border-zinc-100">
+                            <div class="text-[11px] font-mono text-zinc-600 bg-zinc-100/70 p-2 rounded-[3px] border border-zinc-200/80">
+                                <span class="text-zinc-400 block text-[9px] uppercase font-bold">Arquitectura Pre-Activada:</span>
+                                <span>{{ vert.highlight }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="pt-4 flex items-center justify-between border-t border-zinc-100">
+                    <button type="button" 
+                            @click="step = 1"
+                            class="h-8 px-3 text-xs font-medium bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-[4px] transition-colors cursor-pointer">
+                        &larr; Regresar a Jurisdicción
+                    </button>
+                    <button type="button" 
+                            @click="step = 3"
+                            class="h-8 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] flex items-center gap-1.5 transition-colors cursor-pointer">
+                        <span>Continuar a Identidad Legal</span>
+                        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- PASO 3: IDENTIDAD LEGAL Y TRIBUTARIA (LAYOUT 2/3 + 1/3)       -->
+            <!-- ============================================================= -->
+            <div x-show="step === 3" x-cloak class="space-y-4">
+                <div class="flex items-center justify-between pb-2 border-b border-zinc-100">
+                    <div>
+                        <h2 class="text-xs font-mono uppercase tracking-wider font-semibold text-zinc-900">
+                            Paso 3: Identidad Legal y Registro Tributario
                         </h2>
                         <p class="text-xs text-zinc-500 mt-0.5">
                             Parámetros fiscales inscritos ante la autoridad tributaria correspondiente.
@@ -211,7 +293,7 @@
                                    x-model="name"
                                    required
                                    value="{{ form.name.value|default:'' }}"
-                                   placeholder="ej: SIE Nicaragua"
+                                   placeholder="ej: Ferretería El Maestro S.A."
                                    class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
                             <p class="text-[10px] font-mono text-zinc-400 mt-1">Se utilizará en el App Shell y encabezados de reportes.</p>
                         </div>
@@ -227,7 +309,7 @@
                                    x-model="legal_name"
                                    required
                                    value="{{ form.legal_name.value|default:'' }}"
-                                   placeholder="ej: Soluciones de Ingeniería Eléctrica S.A."
+                                   placeholder="ej: Materiales de Construcción El Maestro Sociedad Anónima"
                                    class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
                             <p class="text-[10px] font-mono text-zinc-400 mt-1">Nombre formal registrado ante el Registro Público Mercantil.</p>
                         </div>
@@ -281,14 +363,14 @@
                                         id="id_industry" 
                                         x-model="industry"
                                         class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
+                                    <option value="COMMERCE">Comercio, Distribución & Ferretería</option>
                                     <option value="SERVICES">Servicios Industriales & Mantenimiento</option>
                                     <option value="CONSTRUCTION">Construcción, Ingeniería & Obras</option>
                                     <option value="ENERGY_TELCO">Energía, Redes Eléctricas & Telco</option>
-                                    <option value="COMMERCE">Comercio & Distribución</option>
-                                    <option value="MANUFACTURING">Manufactura & Agroindustria</option>
+                                    <option value="MANUFACTURING">Manufactura & Farmacéutica</option>
                                     <option value="OTHER">Otro Giro Comercial</option>
                                 </select>
-                                <p class="text-[10px] font-mono text-zinc-400 mt-1">Define las plantillas de operación y cuentas.</p>
+                                <p class="text-[10px] font-mono text-zinc-400 mt-1">Rubro ante la cámara de comercio.</p>
                             </div>
                         </div>
 
@@ -330,14 +412,14 @@
                         <!-- Botones de Navegación -->
                         <div class="pt-4 flex items-center justify-between border-t border-zinc-100">
                             <button type="button" 
-                                    @click="step = 1"
-                                    class="h-8 px-3 text-xs font-medium bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-[4px] transition-colors">
-                                &larr; Regresar a Jurisdicción
+                                    @click="step = 2"
+                                    class="h-8 px-3 text-xs font-medium bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-[4px] transition-colors cursor-pointer">
+                                &larr; Regresar a Giro Principal
                             </button>
                             <button type="button" 
-                                    @click="if (name && tax_id) step = 3"
+                                    @click="if (name && tax_id) step = 4"
                                     class="h-8 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] flex items-center gap-1.5 transition-colors cursor-pointer">
-                                <span>Continuar a Módulos</span>
+                                <span>Continuar a Módulos Operativos</span>
                                 <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
                                 </svg>
@@ -354,6 +436,10 @@
 
                         <div class="space-y-2.5 text-[11px]">
                             <div>
+                                <span class="text-zinc-400 block text-[10px]">GIRO PRINCIPAL:</span>
+                                <span class="font-bold text-zinc-900 block" x-text="business_vertical"></span>
+                            </div>
+                            <div>
                                 <span class="text-zinc-400 block text-[10px]">NOMBRE COMERCIAL:</span>
                                 <span class="font-medium text-zinc-900 truncate block" x-text="name || 'No definido'"></span>
                             </div>
@@ -365,13 +451,9 @@
                                 <span class="text-zinc-400 block text-[10px]" x-text="(currentCountry.tax_id_label || 'IDENTIFICADOR') + ':"></span>
                                 <span class="font-medium text-zinc-900 tabular-nums uppercase" x-text="tax_id || 'Pendiente'"></span>
                             </div>
-                            <div>
-                                <span class="text-zinc-400 block text-[10px]">GIRO / RUBRO:</span>
-                                <span class="font-medium text-zinc-900 truncate block" x-text="industry"></span>
-                            </div>
                             <div class="pt-2 border-t border-zinc-200/60 space-y-1 text-zinc-600">
                                 <div class="flex justify-between">
-                                    <span class="text-zinc-400">MONEDA CONTABLE:</span>
+                                    <span class="text-zinc-400">MONEDA:</span>
                                     <span class="text-zinc-900 font-medium" x-text="currency + ' (' + (currency === currentCountry.primary_currency_code ? (currentCountry.primary_currency_symbol || 'C$') : '$') + ')'"></span>
                                 </div>
                                 <div class="flex justify-between">
@@ -386,10 +468,6 @@
                                     <span class="text-zinc-400" x-text="'TASA ' + (currentCountry.default_tax_name || 'IVA') + ':'"></span>
                                     <span class="text-zinc-900 font-medium tabular-nums" x-text="(currentCountry.default_tax_rate || '0.00') + '%'"></span>
                                 </div>
-                                <div class="flex justify-between">
-                                    <span class="text-zinc-400">ZONA HORARIA:</span>
-                                    <span class="text-zinc-900 font-medium" x-text="currentCountry.timezone || 'UTC-6'"></span>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -397,16 +475,16 @@
             </div>
 
             <!-- ============================================================= -->
-            <!-- PASO 3: SELECCIÓN DE ARQUITECTURA MODULAR (LAYOUT 2/3 + 1/3)  -->
+            <!-- PASO 4: CONFIRMACIÓN Y AJUSTE DE MÓDULOS OPERATIVOS           -->
             <!-- ============================================================= -->
-            <div x-show="step === 3" x-cloak class="space-y-4">
+            <div x-show="step === 4" x-cloak class="space-y-4">
                 <div class="flex items-center justify-between pb-2 border-b border-zinc-100">
                     <div>
                         <h2 class="text-xs font-mono uppercase tracking-wider font-semibold text-zinc-900">
-                            Paso 3: Arquitectura Modular del Tenant
+                            Paso 4: Confirmación de Módulos Operativos
                         </h2>
                         <p class="text-xs text-zinc-500 mt-0.5">
-                            Seleccione los subsistemas operativos que estarán suscritos y habilitados desde el primer arranque.
+                            Los subsistemas han sido pre-marcados según el giro seleccionado. Puede ajustar la selección final antes del despliegue.
                         </p>
                     </div>
                     <span class="text-[10px] font-mono text-zinc-400">MODULACIÓN DINÁMICA</span>
@@ -416,11 +494,12 @@
                     <!-- Lista de Módulos (2/3) Dinámica desde Catálogo Centralizado -->
                     <div class="lg:col-span-2 space-y-2.5">
                         {% for mod in modules_catalog %}
-                        <label class="p-3 border border-zinc-200 rounded-[4px] flex items-start gap-3 bg-white hover:bg-zinc-50/50 cursor-pointer transition-colors">
+                        <label class="p-3 border rounded-[4px] flex items-start gap-3 cursor-pointer transition-colors"
+                               :class="selectedModules.includes('{{ mod.code }}') ? 'border-zinc-900/60 bg-zinc-50/50' : 'border-zinc-200 bg-white hover:bg-zinc-50/30'">
                             <input type="checkbox" 
                                    name="enabled_modules" 
                                    value="{{ mod.code }}" 
-                                   {% if mod.default_enabled %}checked{% endif %}
+                                   x-model="selectedModules"
                                    class="mt-0.5 w-4 h-4 text-zinc-900 rounded-[3px] border-zinc-300 focus:ring-zinc-900">
                             <div class="flex-1 text-xs">
                                 <div class="flex items-center justify-between">
@@ -437,9 +516,9 @@
                         <!-- Botones de Acción -->
                         <div class="pt-4 flex items-center justify-between border-t border-zinc-100">
                             <button type="button" 
-                                    @click="step = 2"
-                                    class="h-8 px-3 text-xs font-medium bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-[4px] transition-colors">
-                                &larr; Regresar a Identidad
+                                    @click="step = 3"
+                                    class="h-8 px-3 text-xs font-medium bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded-[4px] transition-colors cursor-pointer">
+                                &larr; Regresar a Identidad Legal
                             </button>
                             <button type="submit" 
                                     class="h-9 px-5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] flex items-center gap-1.5 transition-colors cursor-pointer">
@@ -459,21 +538,21 @@
 
                         <div class="space-y-2 text-[11px] text-zinc-600">
                             <div class="p-2.5 bg-white border border-zinc-200 rounded-[3px] space-y-1">
+                                <span class="text-zinc-400 block text-[10px]">GIRO INMUTABLE:</span>
+                                <span class="font-bold text-zinc-900 block" x-text="business_vertical"></span>
+                                <span class="text-[10px] text-zinc-500 block">La empresa mantendrá esta identidad y catálogo en su operación diaria.</span>
+                            </div>
+
+                            <div class="p-2.5 bg-white border border-zinc-200 rounded-[3px] space-y-1">
                                 <span class="text-zinc-400 block text-[10px]">AUTORIDAD DE USUARIO:</span>
                                 <span class="font-bold text-zinc-900 block">NIVEL 100 · OWNER / ADMIN</span>
                                 <span class="text-[10px] text-zinc-500 block">Tendrá control absoluto sobre los parámetros, nómina y roles.</span>
                             </div>
 
                             <div class="p-2.5 bg-white border border-zinc-200 rounded-[3px] space-y-1">
-                                <span class="text-zinc-400 block text-[10px]">ESTRUCTURA DE DATOS:</span>
-                                <span class="font-bold text-zinc-900 block">AISLAMIENTO COMPLETO</span>
-                                <span class="text-[10px] text-zinc-500 block">Las transacciones quedarán restringidas estrictamente a este Tenant.</span>
-                            </div>
-
-                            <div class="p-2.5 bg-white border border-zinc-200 rounded-[3px] space-y-1">
-                                <span class="text-zinc-400 block text-[10px]">REGLA DE ACCESO ESTRICTA:</span>
-                                <span class="font-bold text-zinc-900 block">VISIBILIDAD 100% MODULAR</span>
-                                <span class="text-[10px] text-zinc-500 block">Únicamente los módulos seleccionados se desplegarán en el menú, dashboard y permisos. Lo no seleccionado quedará completamente oculto.</span>
+                                <span class="text-zinc-400 block text-[10px]">MÓDULOS ACTIVOS:</span>
+                                <span class="font-bold text-zinc-900 block" x-text="selectedModules.length + ' SELECCIONADOS'"></span>
+                                <span class="text-[10px] text-zinc-500 block">Únicamente los módulos marcados se desplegarán en el menú y permisos.</span>
                             </div>
                         </div>
                     </div>

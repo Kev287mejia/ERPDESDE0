@@ -14,7 +14,7 @@ from apps.core.services.sandbox_seeder import SandboxScenarioSeeder
 from apps.crm.models import Quote
 from apps.operations.models import WorkOrder
 from apps.sst.models import SafetyChecklist, LeaveRequest
-from apps.tenancy.constants import ERP_MODULES_CATALOG
+from apps.tenancy.constants import BusinessVertical, ERP_MODULES_CATALOG, VERTICAL_PRESETS_CONFIG
 from apps.tenancy.forms import OrganizationOnboardingForm
 from apps.tenancy.models import Organization, OrganizationMembership, RoleLevel
 from apps.tenancy.permissions import RoleLevelRequiredMixin
@@ -22,10 +22,11 @@ from apps.tenancy.permissions import RoleLevelRequiredMixin
 
 class OnboardingWizardView(LoginRequiredMixin, View):
     """
-    Flujo de configuración en 3 fases para la inicialización y despliegue del Tenant.
+    Flujo de configuración en 4 fases para la inicialización y despliegue del Tenant.
     Fase 1: Jurisdicción Fiscal Centroamericana.
-    Fase 2: Identidad Legal y RUC (DGI Nicaragua).
-    Fase 3: Selección de Arquitectura Modular.
+    Fase 2: Giro Principal del Negocio (Vertical Operativa Inmutable).
+    Fase 3: Identidad Legal y RUC (DGI Nicaragua).
+    Fase 4: Confirmación y Ajuste de Módulos Operativos.
     """
     template_name = 'tenancy/onboarding_wizard.html'
 
@@ -51,12 +52,52 @@ class OnboardingWizardView(LoginRequiredMixin, View):
                 'is_active': c.is_active,
             }
 
+        verticals_list = [
+            {
+                'code': BusinessVertical.ENGINEERING_SERVICES,
+                'name': 'Ingeniería, Construcción y Operaciones de Campo',
+                'tag': 'INGENIERÍA',
+                'description': 'Proyectos electromecánicos, obras civiles, OTs, cuadrillas de linieros y SST Ley 618.',
+                'highlight': 'Pre-activa OTs, Cuadrillas, SST Ley 618, Kardex de Obra y Planilla.',
+                'modules': VERTICAL_PRESETS_CONFIG[BusinessVertical.ENGINEERING_SERVICES]['default_modules'],
+            },
+            {
+                'code': BusinessVertical.HARDWARE_STORE,
+                'name': 'Ferretería, Materiales y Distribución Mayorista',
+                'tag': 'FERRETERÍA',
+                'description': 'Ventas de mostrador, materiales de construcción, 3 listas de precios y abastecimiento.',
+                'highlight': 'Pre-activa Terminal POS, Listas Detalle/Contratista/Mayorista y Compras.',
+                'modules': VERTICAL_PRESETS_CONFIG[BusinessVertical.HARDWARE_STORE]['default_modules'],
+            },
+            {
+                'code': BusinessVertical.PHARMACY_HEALTH,
+                'name': 'Farmacia, Droguería e Insumos Médicos MINSA',
+                'tag': 'FARMACIA MINSA',
+                'description': 'Dispensación farmacéutica, control de lotes y vencimientos FEFO con registro sanitario.',
+                'highlight': 'Pre-activa Terminal POS, Lotes FEFO y Registro Sanitario; apaga OTs y SST.',
+                'modules': VERTICAL_PRESETS_CONFIG[BusinessVertical.PHARMACY_HEALTH]['default_modules'],
+            },
+            {
+                'code': BusinessVertical.SME_RETAIL,
+                'name': 'PYME Comercial, Tienda y Servicios Generales',
+                'tag': 'PYME COMERCIAL',
+                'description': 'Comercio minorista, facturación ágil, inventario de tienda y cobranza inmediata.',
+                'highlight': 'Pre-activa Terminal POS, Inventario, Facturación y Caja; apaga módulos industriales pesados.',
+                'modules': VERTICAL_PRESETS_CONFIG[BusinessVertical.SME_RETAIL]['default_modules'],
+            },
+        ]
+        vertical_presets_dict = {
+            v['code']: v['modules'] for v in verticals_list
+        }
+
         return {
             'countries': countries,
             'active_country': active_country,
             'countries_json': json.dumps(countries_dict),
             'countries_dict': countries_dict,
             'modules_catalog': ERP_MODULES_CATALOG,
+            'business_verticals': verticals_list,
+            'vertical_presets_json': json.dumps(vertical_presets_dict),
             'form': form,
         }
 
@@ -66,7 +107,8 @@ class OnboardingWizardView(LoginRequiredMixin, View):
 
         form = OrganizationOnboardingForm(initial={
             'country_code': active_country.code if active_country else 'NI',
-            'enabled_modules': ['crm', 'operations', 'sst'],
+            'business_vertical': BusinessVertical.ENGINEERING_SERVICES,
+            'enabled_modules': VERTICAL_PRESETS_CONFIG[BusinessVertical.ENGINEERING_SERVICES]['default_modules'],
         })
 
         return render(request, self.template_name, self._get_wizard_context(form))
@@ -85,11 +127,17 @@ class OnboardingWizardView(LoginRequiredMixin, View):
                 currency = form.cleaned_data.get('currency', Organization.Currency.NIO)
                 tax_regime = form.cleaned_data.get('tax_regime', Organization.TaxRegime.GENERAL)
                 industry = form.cleaned_data.get('industry', Organization.Industry.SERVICES)
+                business_vertical = form.cleaned_data.get('business_vertical') or BusinessVertical.ENGINEERING_SERVICES
                 accounting_template = form.cleaned_data.get('accounting_template', Organization.AccountingTemplate.NIIF_PYMES)
                 enabled_modules = form.cleaned_data['enabled_modules']
                 slug = form.generate_unique_slug(name, tax_id)
 
-                # 1. Crear Organización operativa
+                if business_vertical == BusinessVertical.ENGINEERING_SERVICES:
+                    business_profile = Organization.BusinessProfile.ENGINEERING_SERVICES
+                else:
+                    business_profile = Organization.BusinessProfile.COMMERCIAL_RETAIL
+
+                # 1. Crear Organización operativa con giro de negocio inmutable
                 organization = Organization.objects.create(
                     country=country,
                     name=name,
@@ -98,12 +146,20 @@ class OnboardingWizardView(LoginRequiredMixin, View):
                     currency=currency,
                     tax_regime=tax_regime,
                     industry=industry,
+                    business_profile=business_profile,
+                    business_vertical=business_vertical,
                     accounting_template=accounting_template,
                     slug=slug,
                     enabled_modules=enabled_modules,
                     onboarding_completed=True,
                     is_active=True,
                 )
+
+                try:
+                    from apps.core.services.sandbox_seeder import ensure_vertical_demo_catalog
+                    ensure_vertical_demo_catalog(organization, business_vertical)
+                except Exception:
+                    pass
 
                 # 2. Desmarcar default previo
                 OrganizationMembership.objects.filter(

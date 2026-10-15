@@ -177,6 +177,17 @@
                     <span class="tabular-nums text-zinc-600">{% if nav_access.can_view_financials %}{{ current_org.currency_symbol|default:current_country.primary_currency_symbol }} {% endif %}{{ current_org.currency|default:current_country.primary_currency_code }}</span>
                 </div>
                 {% endif %}
+
+                <!-- Píldora Técnica de Giro de Negocio Inmutable -->
+                <div class="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] bg-zinc-50 border border-zinc-200 text-[11px] font-mono text-zinc-700" title="Giro de negocio establecido para {{ current_org.name }}">
+                    <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-tight">GIRO:</span>
+                    <span class="font-medium text-zinc-900 uppercase">
+                        {% if current_org.business_vertical == 'HARDWARE' %}FERRETERÍA
+                        {% elif current_org.business_vertical == 'PHARMACY' %}FARMACIA MINSA
+                        {% elif current_org.business_vertical == 'SME_RETAIL' %}PYME COMERCIAL
+                        {% else %}INGENIERÍA{% endif %}
+                    </span>
+                </div>
             </div>
         </div>
 
@@ -199,22 +210,6 @@
         <div class="flex items-center gap-2">
             
             {% if real_role_level == 100 %}
-            <!-- Selector Compacto de Giro / Vertical de Industria (Exclusivo Nivel 100) -->
-            <form method="POST" action="{% url 'tenancy:switch_vertical' %}" class="inline-flex items-center">
-                {% csrf_token %}
-                <input type="hidden" name="next" value="{{ request.path }}">
-                <div class="flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 rounded-[4px] px-2 py-0.5" title="Conmutar giro / vertical de industria en caliente">
-                    <span class="text-[10px] font-mono font-semibold text-zinc-400 uppercase tracking-tight hidden sm:inline">GIRO:</span>
-                    <select name="business_vertical" 
-                            onchange="this.form.submit()" 
-                            class="h-6 text-[11px] font-mono font-medium bg-transparent text-zinc-800 focus:outline-none cursor-pointer">
-                        {% for v in available_verticals %}
-                        <option value="{{ v.code }}" {% if v.is_active %}selected{% endif %}>{{ v.short_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </form>
-
             <!-- Simulador de Rol Jerárquico Ultra Limpio (Exclusivo Nivel 100) -->
             <form method="POST" action="{% url 'tenancy:simulate_role' %}" class="inline-flex items-center">
                 {% csrf_token %}

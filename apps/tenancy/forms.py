@@ -7,6 +7,7 @@ from apps.core.models import CountryConfig
 from apps.tenancy.constants import AVAILABLE_MODULES, DEFAULT_ENABLED_MODULES, MODULE_CHOICES
 from apps.tenancy.models import (
     BloodType,
+    BusinessVertical,
     ContractType,
     Department,
     Organization,
@@ -27,6 +28,12 @@ class OrganizationOnboardingForm(forms.Form):
         max_length=2,
         initial='NI',
         widget=forms.HiddenInput(),
+    )
+    business_vertical = forms.ChoiceField(
+        label="Giro Principal del Negocio",
+        choices=BusinessVertical.choices,
+        initial=BusinessVertical.ENGINEERING_SERVICES,
+        required=False,
     )
     name = forms.CharField(
         label="Nombre Comercial",
@@ -135,6 +142,12 @@ class OrganizationOnboardingForm(forms.Form):
         initial=DEFAULT_ENABLED_MODULES,
         widget=forms.CheckboxSelectMultiple(),
     )
+
+    def clean_business_vertical(self):
+        val = self.cleaned_data.get('business_vertical')
+        if not val or val not in BusinessVertical.values:
+            val = BusinessVertical.ENGINEERING_SERVICES
+        return val
 
     def clean_country_code(self):
         code = self.cleaned_data.get('country_code', '').upper().strip()

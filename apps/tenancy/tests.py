@@ -4,6 +4,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 
 from apps.core.models import CountryConfig
+from apps.tenancy.constants import BusinessVertical
 from apps.tenancy.forms import OrganizationOnboardingForm
 from apps.tenancy.models import Organization, OrganizationMembership, RoleLevel
 from apps.tenancy.views_onboarding import DashboardWorkspaceView
@@ -597,6 +598,184 @@ class SandboxViewControlsTestCase(TestCase):
 
         response = self.client.post(reverse('tenancy:sandbox_reset'))
         self.assertEqual(response.status_code, 403)
+
+
+class BusinessVerticalArchitectureTestCase(TestCase):
+    """
+    Suite de Pruebas de Arquitectura de Giros de Negocio (Paso 16.2).
+    Garantiza:
+    1. Que la Topbar no exponga el selector interactivo de cambio de giro en caliente,
+       sino una píldora estática técnica de solo lectura correspondiente a la empresa activa.
+    2. Que el Onboarding Wizard de 4 pasos persista permanentemente el business_vertical
+       elegido por el fundador (ENGINEERING, HARDWARE, PHARMACY, SME_RETAIL).
+    3. Que la conmutación de organización (SwitchOrganizationView) adapte los módulos
+       y la navegación en el menú lateral según el giro de la empresa activa.
+    """
+
+    def setUp(self):
+        self.country_ni, _ = CountryConfig.objects.get_or_create(
+            code='NI',
+            defaults={
+                'name': 'Nicaragua',
+                'flag_emoji': '🇳🇮',
+                'primary_currency_code': 'NIO',
+                'primary_currency_symbol': 'C$',
+                'secondary_currency_code': 'USD',
+                'secondary_currency_symbol': '$',
+                'tax_id_label': 'RUC',
+                'default_tax_name': 'IVA',
+                'default_tax_rate': Decimal('15.00'),
+                'is_active': True,
+            }
+        )
+
+        self.user = User.objects.create_user(
+            email='evaluador@eternallabs.ni',
+            full_name='Evaluador de Producto',
+            password='Password123*',
+        )
+
+        # Empresa 1: Ingeniería
+        self.org_eng = Organization.objects.create(
+            name="SERMANSA Ingeniería S.A.",
+            legal_name="Servicios y Mantenimiento Electromecánico S.A.",
+            slug="sermansa-ing-test",
+            tax_id="J0310000458912",
+            country=self.country_ni,
+            currency=Organization.Currency.NIO,
+            business_vertical=BusinessVertical.ENGINEERING_SERVICES,
+            business_profile=Organization.BusinessProfile.ENGINEERING_SERVICES,
+            enabled_modules=['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'payroll'],
+            onboarding_completed=True,
+            is_active=True,
+        )
+        OrganizationMembership.objects.create(
+            user=self.user,
+            organization=self.org_eng,
+            role_level=RoleLevel.OWNER_ADMIN,
+            is_active=True,
+            is_default_org=True,
+        )
+
+        # Empresa 2: Ferretería
+        self.org_hardware = Organization.objects.create(
+            name="Ferretería El Maestro S.A.",
+            legal_name="Distribuidora y Ferretería El Maestro S.A.",
+            slug="ferreteria-test",
+            tax_id="J0310000771234",
+            country=self.country_ni,
+            currency=Organization.Currency.NIO,
+            business_vertical=BusinessVertical.HARDWARE_STORE,
+            business_profile=Organization.BusinessProfile.COMMERCIAL_RETAIL,
+            enabled_modules=['crm', 'inventory', 'finance', 'billing', 'purchasing', 'payroll'],
+            onboarding_completed=True,
+            is_active=True,
+        )
+        OrganizationMembership.objects.create(
+            user=self.user,
+            organization=self.org_hardware,
+            role_level=RoleLevel.OWNER_ADMIN,
+            is_active=True,
+            is_default_org=False,
+        )
+
+        # Empresa 3: Farmacia
+        self.org_pharmacy = Organization.objects.create(
+            name="Farmacia Santa Lucía S.A.",
+            legal_name="Droguería y Farmacia Santa Lucía S.A.",
+            slug="farmacia-test",
+            tax_id="J0310000885678",
+            country=self.country_ni,
+            currency=Organization.Currency.NIO,
+            business_vertical=BusinessVertical.PHARMACY_HEALTH,
+            business_profile=Organization.BusinessProfile.COMMERCIAL_RETAIL,
+            enabled_modules=['crm', 'inventory', 'finance', 'billing', 'purchasing', 'payroll'],
+            onboarding_completed=True,
+            is_active=True,
+        )
+        OrganizationMembership.objects.create(
+            user=self.user,
+            organization=self.org_pharmacy,
+            role_level=RoleLevel.OWNER_ADMIN,
+            is_active=True,
+            is_default_org=False,
+        )
+
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def test_topbar_renders_static_vertical_pill_and_no_interactive_dropdown(self):
+        """Verifica que la Topbar muestre la píldora técnica estática y carezca del selector interactivo de vertical."""
+        session = self.client.session
+        session['active_org_id'] = str(self.org_eng.id)
+        session.save()
+
+        response = self.client.get(reverse('tenancy:dashboard'))
+        self.assertEqual(response.status_code, 200)
+
+        # Debe mostrar la etiqueta estática
+        self.assertContains(response, 'GIRO:')
+        self.assertContains(response, 'INGENIERÍA')
+
+        # NO debe contener el formulario interactivo para cambiar de giro
+        self.assertNotContains(response, 'name="business_vertical"')
+
+    def test_onboarding_wizard_persists_vertical_and_assigns_preset_modules(self):
+        """Verifica que el wizard cree la organización con su vertical correspondiente y módulos asignados."""
+        # 1. Alta con Farmacia
+        response = self.client.post(reverse('tenancy:onboarding'), {
+            'country_code': 'NI',
+            'business_vertical': 'PHARMACY',
+            'name': 'Farmacia Central Granada',
+            'legal_name': 'Farmacia Central de Granada S.A.',
+            'tax_id': 'J0310000333333',
+            'currency': Organization.Currency.NIO,
+            'tax_regime': Organization.TaxRegime.GENERAL,
+            'industry': Organization.Industry.COMMERCE,
+            'accounting_template': Organization.AccountingTemplate.NIIF_PYMES,
+            'enabled_modules': ['crm', 'inventory', 'billing', 'finance'],
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        org_pharmacy = Organization.objects.get(tax_id='J0310000333333')
+        self.assertEqual(org_pharmacy.business_vertical, BusinessVertical.PHARMACY_HEALTH)
+        self.assertTrue(org_pharmacy.is_pharmacy_vertical())
+        self.assertFalse(org_pharmacy.is_module_enabled('operations'))
+
+        # 2. Alta con Ferretería
+        response = self.client.post(reverse('tenancy:onboarding'), {
+            'country_code': 'NI',
+            'business_vertical': 'HARDWARE',
+            'name': 'Ferretería El Tornillo',
+            'legal_name': 'Ferretería y Materiales El Tornillo S.A.',
+            'tax_id': 'J0310000444444',
+            'currency': Organization.Currency.NIO,
+            'tax_regime': Organization.TaxRegime.GENERAL,
+            'industry': Organization.Industry.COMMERCE,
+            'accounting_template': Organization.AccountingTemplate.NIIF_PYMES,
+            'enabled_modules': ['crm', 'inventory', 'billing', 'purchasing'],
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        org_hardware = Organization.objects.get(tax_id='J0310000444444')
+        self.assertEqual(org_hardware.business_vertical, BusinessVertical.HARDWARE_STORE)
+        self.assertTrue(org_hardware.is_hardware_vertical())
+
+    def test_switch_organization_adapts_sidebar_and_modules(self):
+        """Verifica que al conmutar entre organizaciones, los módulos y menú se adapten automáticamente."""
+        # 1. En SERMANSA (Ingeniería): Operaciones y SST están activos
+        self.client.post(reverse('tenancy:switch_org_post'), {'org_id': str(self.org_eng.id)}, follow=True)
+        response = self.client.get(reverse('tenancy:dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'INGENIERÍA')
+        self.assertContains(response, 'Órdenes de Trabajo')
+
+        # 2. Conmutar a Farmacia Santa Lucía: Operaciones y SST quedan apagados en el menú
+        self.client.post(reverse('tenancy:switch_org_post'), {'org_id': str(self.org_pharmacy.id)}, follow=True)
+        response = self.client.get(reverse('tenancy:dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'FARMACIA MINSA')
+        self.assertNotContains(response, 'Órdenes de Trabajo')
 
 
 

@@ -31,7 +31,7 @@ class Command(BaseCommand):
         country_ni = CountryConfig.objects.filter(code='NI').first()
         org_name = options['org_name']
 
-        self.stdout.write(f"[SEED-DEMO] 2/3 Inicializando organización '{org_name}'...")
+        self.stdout.write(f"[SEED-DEMO] 2/4 Inicializando usuarios evaluadores...")
         admin_user, _ = User.objects.get_or_create(
             email='admin@sermansa.ni',
             defaults={
@@ -44,6 +44,20 @@ class Command(BaseCommand):
             admin_user.set_password('Eternal2026*')
             admin_user.save()
 
+        evaluator_user, _ = User.objects.get_or_create(
+            email='evaluador@eternallabs.ni',
+            defaults={
+                'full_name': 'Evaluador Principal Eternal Labs',
+                'personal_id_number': '001-201090-0005M',
+                'phone': '+505 8765-4321',
+            }
+        )
+        if not evaluator_user.check_password('Eternal2026*'):
+            evaluator_user.set_password('Eternal2026*')
+            evaluator_user.save()
+
+        self.stdout.write(f"[SEED-DEMO] 3/4 Inicializando organización principal '{org_name}' (Ingeniería)...")
+        from apps.tenancy.constants import BusinessVertical
         org, _ = Organization.objects.get_or_create(
             slug='sermansa-ingenieria',
             defaults={
@@ -54,15 +68,17 @@ class Command(BaseCommand):
                 'currency': Organization.Currency.NIO,
                 'tax_regime': Organization.TaxRegime.GENERAL,
                 'industry': Organization.Industry.ENERGY_TELCO,
-                'accounting_template': Organization.AccountingTemplate.NIIF_PYMES,
-                'enabled_modules': ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'payroll'],
+                'business_vertical': BusinessVertical.ENGINEERING_SERVICES,
                 'business_profile': Organization.BusinessProfile.ENGINEERING_SERVICES,
+                'accounting_template': Organization.AccountingTemplate.NIIF_PYMES,
+                'enabled_modules': ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll'],
                 'onboarding_completed': True,
                 'is_active': True,
             }
         )
-        org.enabled_modules = ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'payroll']
+        org.business_vertical = BusinessVertical.ENGINEERING_SERVICES
         org.business_profile = Organization.BusinessProfile.ENGINEERING_SERVICES
+        org.enabled_modules = ['crm', 'operations', 'sst', 'inventory', 'finance', 'billing', 'purchasing', 'repository', 'tickets', 'ai_agent', 'payroll']
         org.onboarding_completed = True
         org.save()
 
@@ -73,21 +89,33 @@ class Command(BaseCommand):
                 'role_level': RoleLevel.OWNER_ADMIN,
                 'job_title': 'Director General & Socio Fundador',
                 'is_active': True,
+                'is_default_org': True,
+            }
+        )
+        OrganizationMembership.objects.update_or_create(
+            user=evaluator_user,
+            organization=org,
+            defaults={
+                'role_level': RoleLevel.OWNER_ADMIN,
+                'job_title': 'Evaluador de Producto / Auditor',
+                'is_active': True,
+                'is_default_org': True,
             }
         )
 
-        self.stdout.write("[SEED-DEMO] 3/3 Sembrando datos operativos, fiscal DGI y cartera...")
         result = SandboxScenarioSeeder.populate_for_organization(org, owner_user=admin_user)
 
-        # Poblar catálogos multi-vertical para pruebas y demostración completa
-        from apps.core.services.sandbox_seeder import ensure_vertical_demo_catalog
-        ensure_vertical_demo_catalog(org, 'HARDWARE')
-        ensure_vertical_demo_catalog(org, 'PHARMACY')
+        self.stdout.write("[SEED-DEMO] 4/4 Sembrando organizaciones satélites independientes por giro...")
+        from apps.core.services.sandbox_seeder import seed_multi_vertical_demo_organizations
+        satellite_orgs = seed_multi_vertical_demo_organizations(country_ni, [admin_user, evaluator_user])
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"[SEED-DEMO] Escenario sembrado exitosamente en {org.name} con {result.get('invoices_count', 1)} factura(s), "
-                f"{result.get('receipts_count', 1)} recibo(s) oficial(es) de caja ROC y catálogos multi-vertical (Ferretería y Farmacia FEFO)."
+                f"[SEED-DEMO] Escenario sembrado exitosamente en 4 organizaciones independientes:\n"
+                f"  1. {org.name} (INGENIERÍA · {result.get('invoices_count', 1)} facturas, nómina y OTs)\n"
+                f"  2. Ferretería El Maestro S.A. (HARDWARE · POS y 3 listas de precios)\n"
+                f"  3. Farmacia Santa Lucía S.A. (PHARMACY · POS, lotes FEFO y Registro MINSA)\n"
+                f"  4. Comercial Masaya S.A. (SME_RETAIL · Tienda PYME, facturación y caja)"
             )
         )
 
