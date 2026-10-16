@@ -841,6 +841,37 @@ class SaasHqGovernanceAndHardeningTestSuite(TestCase):
         session_owner['active_org_id'] = str(self.org.id)
         session_owner.save()
 
+        # Superadministrador de Plataforma Global (Eternal Labs)
+        self.org_platform = Organization.objects.create(
+            name='Eternal Labs Master HQ',
+            slug='eternal-labs-master-hq',
+            legal_name='Eternal Labs Inc.',
+            tax_id='J0310000000001',
+            country=self.country_ni,
+            currency=Organization.Currency.USD,
+            subscription_plan=Organization.SubscriptionPlan.ENTERPRISE,
+            subscription_status=Organization.SubscriptionStatus.ACTIVE,
+            is_active=True,
+        )
+        self.user_superadmin = User.objects.create_user(
+            email='superadmin@eternallabs.com',
+            password='Password123!',
+            full_name='Superadmin Eternal Labs',
+            is_superuser=True,
+            is_staff=True,
+        )
+        self.mem_superadmin = OrganizationMembership.objects.create(
+            organization=self.org_platform,
+            user=self.user_superadmin,
+            role_level=RoleLevel.OWNER_ADMIN,
+            is_active=True,
+        )
+        self.client_superadmin = Client()
+        self.client_superadmin.force_login(self.user_superadmin)
+        session_superadmin = self.client_superadmin.session
+        session_superadmin['active_org_id'] = str(self.org_platform.id)
+        session_superadmin.save()
+
         # 2. Gerente Comercial (Nivel 85)
         self.user_mgr85 = User.objects.create_user(
             email='mgr85@sermansa.ni',
@@ -915,13 +946,17 @@ class SaasHqGovernanceAndHardeningTestSuite(TestCase):
 
     def test_saas_hq_access_control_level_100_vs_lower_levels(self):
         """
-        Verifica acceso 200 OK a /saas-hq/ para Nivel 100 y bloqueo estricto 403
-        para todos los niveles jerárquicos inferiores (85, 80, 50, 20).
+        Verifica acceso 200 OK a /saas-hq/ EXCLUSIVAMENTE para Superusuario global de Plataforma
+        y bloqueo estricto 403 Forbidden para inquilinos cliente (incluso Nivel 100) y niveles inferiores (85, 80, 50, 20).
         """
-        # Nivel 100: Acceso pleno permitido
+        # Superusuario de Plataforma: Acceso pleno permitido
+        res_super = self.client_superadmin.get(reverse('tenancy:saas_hq'))
+        self.assertEqual(res_super.status_code, 200)
+        self.assertContains(res_super, 'Consola de Gobierno Multi-Tenant')
+
+        # Nivel 100 de inquilino (sin superusuario global): Bloqueo 403 Forbidden estricto
         res_owner = self.client_owner.get(reverse('tenancy:saas_hq'))
-        self.assertEqual(res_owner.status_code, 200)
-        self.assertContains(res_owner, 'Consola de Gobierno Multi-Tenant')
+        self.assertEqual(res_owner.status_code, 403)
 
         # Nivel 85: Bloqueo 403 Forbidden
         res_85 = self.client_mgr85.get(reverse('tenancy:saas_hq'))
@@ -1049,10 +1084,10 @@ class SaasHqGovernanceAndHardeningTestSuite(TestCase):
     def test_tenant_vault_backup_export_sha256_and_security(self):
         """
         Verifica la exportación del respaldo portable JSON con sello de integridad SHA-256
-        y que usuarios sin Nivel 100 no puedan descargarlo.
+        exclusivo para Superusuarios de Plataforma, y que usuarios de inquilino (incluso Nivel 100) reciban 403.
         """
-        # Descarga Nivel 100
-        res = self.client_owner.get(reverse('tenancy:saas_backup_export', args=[str(self.org.id)]))
+        # Descarga permitida para Superusuario de Plataforma
+        res = self.client_superadmin.get(reverse('tenancy:saas_backup_export', args=[str(self.org.id)]))
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res['Content-Type'], 'application/json')
         self.assertIn('attachment;', res['Content-Disposition'])
@@ -1069,6 +1104,10 @@ class SaasHqGovernanceAndHardeningTestSuite(TestCase):
         raw_deterministic = json.dumps(payload, sort_keys=True, default=str)
         expected_seal = hashlib.sha256(raw_deterministic.encode('utf-8')).hexdigest()
         self.assertEqual(backup_data['integrity_seal_sha256'], expected_seal)
+
+        # Descarga rechazada con 403 para Owner de Inquilino (Nivel 100 sin superuser global)
+        res_owner_unauthorized = self.client_owner.get(reverse('tenancy:saas_backup_export', args=[str(self.org.id)]))
+        self.assertEqual(res_owner_unauthorized.status_code, 403)
 
         # Descarga Nivel 85 (Comercial) debe ser rechazada con 403
         res_unauthorized = self.client_mgr85.get(reverse('tenancy:saas_backup_export', args=[str(self.org.id)]))

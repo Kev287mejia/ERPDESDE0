@@ -119,6 +119,33 @@ class ModuleAccessRequiredMixin(TenantRequiredMixin):
         return super().dispatch(request, *args, **kwargs)
 
 
+class PlatformSuperuserRequiredMixin(TenantRequiredMixin):
+    """
+    Guardián de Autorización Global para la Consola Maestra SaaS HQ (Eternal Labs).
+    Exige de forma estricta e incondicional que:
+    1. El usuario esté autenticado.
+    2. El usuario sea Superadministrador global de la plataforma (request.user.is_superuser == True).
+
+    Bajo NINGUNA circunstancia un rol a nivel de inquilino (incluyendo RoleLevel.OWNER_ADMIN 100)
+    concede acceso a estas vistas ni sustituye la autorización global de plataforma.
+    """
+    def dispatch(self, request, *args, **kwargs):
+        # 1. Denegar acceso inmediato si el usuario no está autenticado (302 a login)
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+
+        # 2. Denegar acceso estricto (403) si no es superusuario global de plataforma
+        if not request.user.is_superuser:
+            return render_403_rbac(
+                request,
+                min_role_level=RoleLevel.OWNER_ADMIN,
+                reason="Acceso restringido exclusivamente a la Dirección General de Eternal Labs (Superadministrador de Plataforma)."
+            )
+
+        # 3. Continuar con la validación del contexto multi-tenant
+        return super().dispatch(request, *args, **kwargs)
+
+
 class RoleLevelRequiredMixin(TenantRequiredMixin):
     """
     Guardián estricto que verifica que el role_level activo del usuario sea

@@ -9,30 +9,19 @@ from django.utils import timezone
 from django.views import View
 
 from apps.tenancy.models import Organization, OrganizationMembership, RoleLevel, SaasSubscriptionInvoice
-from apps.tenancy.permissions import RoleLevelRequiredMixin, render_403_rbac
+from apps.tenancy.permissions import PlatformSuperuserRequiredMixin, RoleLevelRequiredMixin, render_403_rbac
 
 EXCHANGE_RATE_BCN = Decimal('36.6243')
 
 
-class EternalLabsSaasHqView(RoleLevelRequiredMixin, View):
+class EternalLabsSaasHqView(PlatformSuperuserRequiredMixin, View):
     """
     Consola Maestra de Gobierno SaaS — Eternal Labs HQ.
-    Acceso restringido exclusivamente a la Dirección General / SuperAdmin (RoleLevel.OWNER_ADMIN 100).
+    Acceso restringido exclusivamente a la Dirección General de Eternal Labs (Superadministrador de Plataforma).
     Provee control global multi-tenant de planes, cuotas de usuarios, conmutación de estado
     (Active/Suspended) y cálculo en tiempo real de MRR / ARR bimonetario ($ USD / C$ NIO).
     """
-    min_role_level = RoleLevel.OWNER_ADMIN
     template_name = 'tenancy/saas_hq.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        real_level = getattr(request, 'real_role_level', getattr(request, 'role_level', 0))
-        if real_level < RoleLevel.OWNER_ADMIN and not (request.user and request.user.is_superuser):
-            return render_403_rbac(
-                request,
-                min_role_level=RoleLevel.OWNER_ADMIN,
-                reason="Acceso restringido exclusivamente a la Dirección General de Eternal Labs (Nivel 100)."
-            )
-        return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
         org = request.organization
@@ -97,12 +86,19 @@ class EternalLabsSaasHqView(RoleLevelRequiredMixin, View):
             })
 
         # 5. Métricas del Tenant Activo en sesión
-        active_members = org.active_members_count() if callable(org.active_members_count) else int(org.active_members_count)
-        max_users = org.max_users_quota or org.max_users or 50
-        quota_pct = round((active_members / max_users * 100), 1) if max_users > 0 else 100.0
-        can_add, seat_reason = org.can_add_more_users()
-
-        invoices = SaasSubscriptionInvoice.objects.filter(organization=org).order_by('-issued_at', '-created_at')
+        if org:
+            active_members = org.active_members_count() if callable(org.active_members_count) else int(org.active_members_count)
+            max_users = org.max_users_quota or org.max_users or 50
+            quota_pct = round((active_members / max_users * 100), 1) if max_users > 0 else 100.0
+            can_add, seat_reason = org.can_add_more_users()
+            invoices = SaasSubscriptionInvoice.objects.filter(organization=org).order_by('-issued_at', '-created_at')
+        else:
+            active_members = 0
+            max_users = 50
+            quota_pct = 0.0
+            can_add = True
+            seat_reason = ""
+            invoices = SaasSubscriptionInvoice.objects.none()
 
         context = {
             'organization': org,
@@ -200,24 +196,14 @@ class EternalLabsSaasHqView(RoleLevelRequiredMixin, View):
 SaasHQDashboardView = EternalLabsSaasHqView
 
 
-class TenantVaultBackupExportView(RoleLevelRequiredMixin, View):
+class TenantVaultBackupExportView(PlatformSuperuserRequiredMixin, View):
     """
     Exportador de Respaldo Criptográfico por Organización (Tenant Vault Backup).
     Genera un volcado JSON con metadatos fiscales, miembros, CRM, inventario y facturación,
     sellado con un hash SHA-256 de integridad inmutable.
-    Exclusivo para Nivel 100 / SuperAdmin.
+    Exclusivo para Superadministrador de Plataforma.
     """
-    min_role_level = RoleLevel.OWNER_ADMIN
-
     def get(self, request, org_id=None, *args, **kwargs):
-        real_level = getattr(request, 'real_role_level', getattr(request, 'role_level', 0))
-        if real_level < RoleLevel.OWNER_ADMIN and not (request.user and request.user.is_superuser):
-            return render_403_rbac(
-                request,
-                min_role_level=RoleLevel.OWNER_ADMIN,
-                reason="Acceso restringido a la Dirección General de Eternal Labs (Nivel 100)."
-            )
-
         if org_id:
             org = get_object_or_404(Organization, pk=org_id)
         else:
@@ -322,13 +308,12 @@ class TenantVaultBackupExportView(RoleLevelRequiredMixin, View):
         return response
 
 
-class SaasSwitchPlanView(RoleLevelRequiredMixin, View):
+class SaasSwitchPlanView(PlatformSuperuserRequiredMixin, View):
     """
     Conmutador de Plan Comercial SaaS para la organización activa.
     Ajusta tarifa mensual ($ USD) y cuota de membresías máximas según política.
+    Exclusivo para Superadministrador de Plataforma.
     """
-    min_role_level = RoleLevel.OWNER_ADMIN
-
     def post(self, request, *args, **kwargs):
         org = request.organization
         plan_code = request.POST.get('subscription_plan', '').strip().upper()
@@ -347,12 +332,11 @@ class SaasSwitchPlanView(RoleLevelRequiredMixin, View):
         return redirect('tenancy:saas_hq')
 
 
-class SaasUpdateStatusView(RoleLevelRequiredMixin, View):
+class SaasUpdateStatusView(PlatformSuperuserRequiredMixin, View):
     """
     Gestión del Ciclo de Vida y Estado de Suscripción (Activa, Gracia, Suspendida).
+    Exclusivo para Superadministrador de Plataforma.
     """
-    min_role_level = RoleLevel.OWNER_ADMIN
-
     def post(self, request, *args, **kwargs):
         org = request.organization
         new_status = request.POST.get('subscription_status', '').strip().upper()
@@ -379,12 +363,11 @@ class SaasUpdateStatusView(RoleLevelRequiredMixin, View):
         return redirect('tenancy:saas_hq')
 
 
-class SaasGenerateInvoiceView(RoleLevelRequiredMixin, View):
+class SaasGenerateInvoiceView(PlatformSuperuserRequiredMixin, View):
     """
     Emisión manual/inmediata de Comprobante Fiscal de Suscripción SaaS para el Tenant.
+    Exclusivo para Superadministrador de Plataforma.
     """
-    min_role_level = RoleLevel.OWNER_ADMIN
-
     def post(self, request, *args, **kwargs):
         org = request.organization
         billing_period = request.POST.get('billing_period', '').strip() or timezone.now().strftime('%Y-%m')
@@ -412,3 +395,10 @@ class SaasGenerateInvoiceView(RoleLevelRequiredMixin, View):
             f"${invoice.amount_usd} USD (C$ {invoice.amount_nio} NIO)."
         )
         return redirect('tenancy:saas_hq')
+
+
+# Alias retrocompatibles y de especificación de seguridad
+SaasHqExportTenantVaultView = TenantVaultBackupExportView
+SaasHqInspectTenantView = TenantVaultBackupExportView
+SaasHqUpdatePlanView = SaasSwitchPlanView
+SaasHqToggleSuspendView = SaasUpdateStatusView
