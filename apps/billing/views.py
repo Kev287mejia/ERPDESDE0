@@ -84,12 +84,17 @@ class InvoiceDetailView(ModuleAccessRequiredMixin, View):
         )
         items = list(invoice.items.all())
         payments = list(invoice.payments.all().select_related('received_by'))
+        from apps.finance.models import BankAccount
+        bank_accounts = list(BankAccount.objects.for_org(request.organization).filter(is_active=True))
 
+        import uuid
         return render(request, self.template_name, {
             'invoice': invoice,
             'items': items,
             'payments': payments,
             'payment_methods': PaymentReceipt.PaymentMethod.choices,
+            'bank_accounts': bank_accounts,
+            'payment_idempotency_key': str(uuid.uuid4()),
             'can_manage_billing': request.role_level >= RoleLevel.COMMERCIAL_MGR,
         })
 
@@ -276,6 +281,9 @@ class InvoiceRegisterPaymentView(ModuleAccessRequiredMixin, View):
     min_role_level = RoleLevel.COMMERCIAL_MGR
 
     def post(self, request, pk, *args, **kwargs):
+        from apps.finance.services import record_client_collection
+        from apps.finance.models import BankAccount
+
         invoice = get_object_or_404(
             Invoice.objects.for_org(request.organization),
             pk=pk
@@ -287,31 +295,39 @@ class InvoiceRegisterPaymentView(ModuleAccessRequiredMixin, View):
             payment_method = request.POST.get('payment_method', PaymentReceipt.PaymentMethod.TRANSFER_BAC)
             reference_number = request.POST.get('reference_number', '').strip()
             notes = request.POST.get('notes', '').strip()
+            bank_account_id = request.POST.get('bank_account_id') or request.POST.get('bank_account')
+            idempotency_key = request.POST.get('idempotency_key') or request.headers.get('Idempotency-Key')
 
-            if amount_paid <= Decimal('0.00'):
-                messages.error(request, "El monto recaudado debe ser estrictamente mayor a 0.")
-                return redirect('billing:invoice_detail', pk=invoice.pk)
+            bank_account = None
+            if bank_account_id:
+                bank_account = BankAccount.objects.for_org(request.organization).filter(pk=bank_account_id).first()
+                if not bank_account:
+                    bank_account = BankAccount.objects.filter(pk=bank_account_id).first()
 
-            with transaction.atomic():
-                receipt = PaymentReceipt.objects.create(
-                    organization=request.organization,
-                    invoice=invoice,
-                    currency_paid=currency_paid,
-                    amount_in_payment_currency=amount_paid,
-                    exchange_rate_applied=invoice.exchange_rate,
-                    payment_method=payment_method,
-                    reference_number=reference_number,
-                    received_by=request.user,
-                    notes=notes,
-                )
+            receipt, trx, entry = record_client_collection(
+                organization=request.organization,
+                invoice=invoice,
+                amount=amount_paid,
+                payment_method=payment_method,
+                user=request.user,
+                bank_account=bank_account,
+                currency_paid=currency_paid,
+                reference_number=reference_number,
+                notes=notes,
+                idempotency_key=idempotency_key,
+            )
 
-                messages.success(
-                    request,
-                    f"Recibo Oficial de Caja emitido: {receipt.number} por {currency_paid} {amount_paid:,.2f} "
-                    f"(Acreditado a factura: {invoice.currency_symbol} {receipt.amount_applied_to_invoice:,.2f}). "
-                    f"Saldo restante: {invoice.currency_symbol} {invoice.balance_due:,.2f} [{invoice.get_status_display()}]."
-                )
+            invoice.refresh_from_db()
+            messages.success(
+                request,
+                f"Recibo Oficial de Caja emitido: {receipt.number} por {currency_paid} {amount_paid:,.2f} "
+                f"(Acreditado a factura: {invoice.currency_symbol} {receipt.amount_applied_to_invoice:,.2f}). "
+                f"Saldo restante: {invoice.currency_symbol} {invoice.balance_due:,.2f} [{invoice.get_status_display()}]."
+            )
 
+        except ValidationError as e:
+            msg = e.message if hasattr(e, 'message') else str(e)
+            messages.error(request, f"Error al registrar cobro: {msg}")
         except Exception as e:
             messages.error(request, f"Error al registrar cobro: {str(e)}")
 

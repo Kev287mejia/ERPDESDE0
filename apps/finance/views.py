@@ -135,6 +135,7 @@ class BankAccountCreateView(ModuleAccessRequiredMixin, View):
         if form.is_valid():
             bank = form.save(commit=False)
             bank.organization = org
+            bank.current_balance = Decimal('0.00')
             bank.save()
             messages.success(request, f"Cuenta bancaria {bank.get_bank_name_display()} ({bank.account_number}) registrada exitosamente.")
         else:

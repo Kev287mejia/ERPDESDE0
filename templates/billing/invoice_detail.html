@@ -418,6 +418,7 @@
                 </span>
                 <form method="POST" action="{% url 'billing:register_payment' pk=invoice.pk %}" class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                     {% csrf_token %}
+                    <input type="hidden" name="idempotency_key" value="{{ payment_idempotency_key }}">
                     <div>
                         <label class="block font-medium text-zinc-700 mb-1">
                             Moneda de entrega:

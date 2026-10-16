@@ -441,6 +441,15 @@ class PaymentReceipt(TenantScopedModel):
         default=PaymentMethod.TRANSFER_BAC,
         verbose_name="Método de Pago"
     )
+    bank_account = models.ForeignKey(
+        'finance.BankAccount',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='payment_receipts',
+        verbose_name="Cuenta Bancaria Destino",
+        help_text="Cuenta bancaria donde se acreditaron los fondos recaudados",
+    )
     reference_number = models.CharField(
         max_length=80,
         blank=True,
@@ -492,7 +501,12 @@ class PaymentReceipt(TenantScopedModel):
             models.UniqueConstraint(
                 fields=['organization', 'number'],
                 name='unique_payment_receipt_number_per_tenant'
-            )
+            ),
+            models.UniqueConstraint(
+                fields=['organization', 'bank_account', 'reference_number'],
+                condition=models.Q(bank_account__isnull=False) & ~models.Q(reference_number=''),
+                name='unique_bank_reference_per_account',
+            ),
         ]
 
     def __str__(self) -> str:
@@ -500,6 +514,8 @@ class PaymentReceipt(TenantScopedModel):
 
     def clean(self):
         super().clean()
+        if self.reference_number:
+            self.reference_number = self.reference_number.strip()
         # Regla de Inmutabilidad Estricta
         if not self._state.adding and self.pk:
             raise ValidationError("Un Recibo Oficial de Caja (ROC) emitido es inmutable conforme a la normativa fiscal y no puede ser modificado.")
@@ -556,6 +572,62 @@ class PaymentReceipt(TenantScopedModel):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Un Recibo Oficial de Caja (ROC) emitido no puede ser eliminado por razones de auditoría y trazabilidad fiscal.")
+
+
+class PaymentIdempotencyRecord(TenantScopedModel):
+    """
+    Registro de Idempotencia Transaccional para Cobros y Pagos.
+    Garantiza que peticiones repetidas (doble clic, reintentos HTTP, problemas de red)
+    no dupliquen cobros, recibos, transacciones financieras ni pólizas contables.
+    Distingue reintentos idénticos de cuotas legítimas consecutivas por el mismo monto.
+    """
+    idempotency_key = models.CharField(
+        max_length=120,
+        db_index=True,
+        verbose_name="Clave de Idempotencia",
+        help_text="Token o UUID único asignado a la petición",
+    )
+    invoice = models.ForeignKey(
+        Invoice,
+        on_delete=models.CASCADE,
+        related_name='idempotency_records',
+        verbose_name="Factura de Destino",
+    )
+    payment_receipt = models.ForeignKey(
+        PaymentReceipt,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='idempotency_records',
+        verbose_name="Recibo Emitido",
+    )
+    request_hash = models.CharField(
+        max_length=64,
+        verbose_name="Firma Criptográfica SHA-256 de la Petición",
+    )
+    status = models.CharField(
+        max_length=20,
+        default='SUCCESS',
+        verbose_name="Estado de Operación",
+    )
+    response_payload = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Payload de Respuesta Guardado",
+    )
+
+    class Meta(TenantScopedModel.Meta):
+        verbose_name = "Registro de Idempotencia de Pago"
+        verbose_name_plural = "Registros de Idempotencia de Pagos"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['organization', 'idempotency_key'],
+                name='unique_payment_idempotency_key_per_tenant',
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.idempotency_key} · Fac {self.invoice.number} ({self.status})"
 
 
 class CashRegisterSession(TenantScopedModel):

@@ -606,6 +606,14 @@ class JournalEntry(TenantScopedModel):
         related_name='journal_entries',
         verbose_name="Orden de Compra Fuente",
     )
+    source_payment_receipt = models.ForeignKey(
+        'billing.PaymentReceipt',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='journal_entries',
+        verbose_name="Recibo de Cobro Fuente",
+    )
     total_debit = models.DecimalField(
         max_digits=14,
         decimal_places=2,
@@ -638,7 +646,17 @@ class JournalEntry(TenantScopedModel):
             models.UniqueConstraint(
                 fields=['organization', 'number'],
                 name='unique_journal_entry_number_per_tenant',
-            )
+            ),
+            models.UniqueConstraint(
+                fields=['organization', 'source_invoice', 'entry_type'],
+                condition=models.Q(source_invoice__isnull=False, entry_type='SALES'),
+                name='unique_sales_journal_entry_per_invoice',
+            ),
+            models.UniqueConstraint(
+                fields=['organization', 'source_payment_receipt', 'entry_type'],
+                condition=models.Q(source_payment_receipt__isnull=False, entry_type='COLLECTIONS'),
+                name='unique_collection_journal_entry_per_receipt',
+            ),
         ]
 
     def __str__(self) -> str:
