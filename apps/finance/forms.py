@@ -35,7 +35,6 @@ class BankAccountForm(forms.ModelForm):
             'account_number',
             'currency',
             'account_type',
-            'current_balance',
             'description',
             'is_active',
         ]
@@ -44,7 +43,6 @@ class BankAccountForm(forms.ModelForm):
             'account_number': forms.TextInput(attrs={'class': INPUT_MONO_CLS, 'placeholder': 'ej: 100-234567-89'}),
             'currency': forms.TextInput(attrs={'class': INPUT_MONO_CLS, 'placeholder': 'NIO o USD'}),
             'account_type': forms.Select(attrs={'class': SELECT_BASE_CLS}),
-            'current_balance': forms.NumberInput(attrs={'class': INPUT_MONO_CLS, 'step': '0.01'}),
             'description': forms.TextInput(attrs={'class': INPUT_BASE_CLS, 'placeholder': 'ej: Cuenta Operativa Planilla BAC'}),
             'is_active': forms.CheckboxInput(attrs={'class': CHECKBOX_CLS}),
         }

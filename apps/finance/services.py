@@ -279,12 +279,373 @@ def ensure_default_chart_of_accounts(organization):
     return accounts_map
 
 
+def record_invoice_sales_journal_entry(organization, invoice, user, accounts=None):
+    """
+    Contabiliza la emisión de una Factura de Venta en el Libro Diario (SALES).
+    Idempotente: si la factura ya posee póliza de ventas, retorna la existente sin duplicar.
+    Blindado contra condiciones de carrera concurrentes mediante manejo atómico de IntegrityError.
+    Convierte importes a Córdobas (NIO) si la factura fue emitida en divisa extranjera (USD).
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+    from django.db import IntegrityError, transaction
+    from apps.finance.models import JournalEntry, JournalEntryLine
+
+    existing = invoice.journal_entries.filter(entry_type=JournalEntry.EntryType.SALES).first()
+    if existing:
+        return existing
+
+    if accounts is None:
+        accounts = ensure_default_chart_of_accounts(organization)
+
+    rate = invoice.exchange_rate if invoice.currency_code == 'USD' else Decimal('1.0')
+    net_receivable_nio = (invoice.net_receivable * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    subtotal_nio = (invoice.subtotal * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    tax_total_nio = (invoice.tax_total * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    ir_retention_nio = (invoice.ir_retention_amount * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    imi_retention_nio = (invoice.imi_retention_amount * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    try:
+        with transaction.atomic():
+            existing = invoice.journal_entries.filter(entry_type=JournalEntry.EntryType.SALES).first()
+            if existing:
+                return existing
+
+            entry = JournalEntry.objects.create(
+                organization=organization,
+                date=invoice.issue_date or timezone.now().date(),
+                entry_type=JournalEntry.EntryType.SALES,
+                concept=f"Facturación DGI {invoice.number} - {invoice.account.commercial_name if invoice.account else 'Cliente'}",
+                reference=invoice.number,
+                source_invoice=invoice,
+                created_by=user,
+            )
+
+            # DEBE: Clientes por Cobrar (Neto a cobrar)
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry,
+                account=accounts['1103-01'],
+                concept=f"CxC Factura {invoice.number}",
+                debit=net_receivable_nio,
+                credit=Decimal('0.00'),
+            )
+
+            # DEBE: Retención IR sufrida (si aplica)
+            if ir_retention_nio > Decimal('0.00'):
+                JournalEntryLine.objects.create(
+                    organization=organization,
+                    entry=entry,
+                    account=accounts['1105-01'],
+                    concept=f"Retención IR 1%-2% Sufrida {invoice.number}",
+                    debit=ir_retention_nio,
+                    credit=Decimal('0.00'),
+                )
+
+            # DEBE: Retención IMI sufrida (si aplica)
+            if imi_retention_nio > Decimal('0.00'):
+                JournalEntryLine.objects.create(
+                    organization=organization,
+                    entry=entry,
+                    account=accounts['1105-02'],
+                    concept=f"Retención IMI 1% Sufrida {invoice.number}",
+                    debit=imi_retention_nio,
+                    credit=Decimal('0.00'),
+                )
+
+            # HABER: Ventas / Ingresos (Base Imponible)
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=entry,
+                account=accounts['4101-01'],
+                concept=f"Ingreso Gravado/Exento {invoice.number}",
+                debit=Decimal('0.00'),
+                credit=subtotal_nio,
+            )
+
+            # HABER: IVA Débito Fiscal (si aplica)
+            if tax_total_nio > Decimal('0.00'):
+                JournalEntryLine.objects.create(
+                    organization=organization,
+                    entry=entry,
+                    account=accounts['2102-01'],
+                    concept=f"IVA 15% Débito Fiscal {invoice.number}",
+                    debit=Decimal('0.00'),
+                    credit=tax_total_nio,
+                )
+
+            entry.verify_and_save_balance()
+            return entry
+    except IntegrityError:
+        # Carrera de concurrencia: otro hilo insertó la póliza respetando el constraint único
+        existing = invoice.journal_entries.filter(entry_type=JournalEntry.EntryType.SALES).first()
+        if existing:
+            return existing
+        raise
+
+
+@transaction.atomic
+def record_client_collection(
+    organization,
+    invoice,
+    amount: Decimal,
+    payment_method: str,
+    user,
+    bank_account=None,
+    currency_paid: str = None,
+    reference_number: str = '',
+    notes: str = '',
+    payment_date=None,
+    idempotency_key: str = None,
+):
+    """
+    Orquesta atómicamente el ciclo completo de cobranza:
+    1. Valida pertenencia de la factura y estado cobrable.
+    2. Valida la cuenta bancaria (misma organización y activa si el método es bancario).
+    3. Maneja Idempotencia estricta vía PaymentIdempotencyRecord (token SHA-256 de parámetros).
+    4. Bloquea pesimísticamente la factura y la cuenta bancaria (select_for_update).
+    5. Valida importes y previene cobros excedentes al saldo pendiente.
+    6. Valida unicidad de referencia bancaria por cuenta y organización.
+    7. Emite el Recibo Oficial de Caja (PaymentReceipt).
+    8. Si es bancario, incrementa BankAccount.current_balance y asienta FinancialTransaction.
+    9. Asegura la póliza de ventas (SALES) y genera la póliza de cobranza cuadrada (COLLECTIONS).
+    """
+    import hashlib
+    from decimal import Decimal, ROUND_HALF_UP
+    from django.db import IntegrityError
+    from django.core.exceptions import ValidationError
+    from apps.billing.models import PaymentReceipt, Invoice, PaymentIdempotencyRecord
+    from apps.finance.models import BankAccount, FinancialTransaction, JournalEntry, JournalEntryLine
+
+    if invoice.organization_id != organization.id:
+        raise ValidationError("La factura no pertenece a la organización actual.")
+
+    is_bank_method = payment_method in [
+        PaymentReceipt.PaymentMethod.TRANSFER_BAC,
+        PaymentReceipt.PaymentMethod.TRANSFER_BANPRO,
+        PaymentReceipt.PaymentMethod.TRANSFER_LAFISE,
+        PaymentReceipt.PaymentMethod.TRANSFER_FICOHSA,
+        PaymentReceipt.PaymentMethod.CHECK,
+    ]
+
+    if is_bank_method:
+        if not bank_account:
+            raise ValidationError("Los cobros mediante transferencia bancaria o cheque requieren una cuenta bancaria de destino.")
+        if bank_account.organization_id != organization.id:
+            raise ValidationError("La cuenta bancaria no pertenece a la organización de la factura.")
+        if not bank_account.is_active:
+            raise ValidationError("La cuenta bancaria seleccionada se encuentra inactiva.")
+
+    amt = Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    if amt <= Decimal('0.00'):
+        raise ValidationError("El monto recaudado debe ser estrictamente mayor a 0.00.")
+
+    clean_ref = (reference_number or '').strip()
+    clean_idempotency_key = (idempotency_key or '').strip()
+    curr = (currency_paid or invoice.currency_code).strip().upper()
+    bank_id_str = str(bank_account.pk if bank_account else '')
+
+    # 1. Comprobación y Replay de Idempotencia de Solicitud
+    req_payload_str = f"{organization.id}:{invoice.pk}:{amt}:{curr}:{payment_method}:{bank_id_str}:{clean_ref}"
+    req_hash = hashlib.sha256(req_payload_str.encode('utf-8')).hexdigest()
+
+    if clean_idempotency_key:
+        existing_rec = PaymentIdempotencyRecord.objects.select_for_update().filter(
+            organization=organization,
+            idempotency_key=clean_idempotency_key,
+        ).first()
+        if existing_rec:
+            if existing_rec.request_hash == req_hash:
+                rec_receipt = existing_rec.payment_receipt
+                rec_trx = FinancialTransaction.objects.filter(
+                    organization=organization,
+                    reference_code=rec_receipt.reference_number or rec_receipt.number,
+                ).first() if rec_receipt else None
+                rec_entry = JournalEntry.objects.filter(
+                    organization=organization,
+                    source_payment_receipt=rec_receipt,
+                    entry_type=JournalEntry.EntryType.COLLECTIONS,
+                ).first() if rec_receipt else None
+                return rec_receipt, rec_trx, rec_entry
+            else:
+                raise ValidationError("La clave de idempotencia especificada ya fue utilizada con parámetros de solicitud diferentes.")
+
+    # 2. Bloqueo pesimista de la factura
+    locked_inv = Invoice.objects.select_for_update().get(pk=invoice.pk, organization=organization)
+    if locked_inv.status in [Invoice.Status.PAID, Invoice.Status.VOID]:
+        raise ValidationError(f"No se pueden registrar cobros en una factura con estado {locked_inv.get_status_display()}.")
+
+    # 3. Bloqueo pesimista de la cuenta bancaria
+    locked_bank = None
+    if bank_account:
+        locked_bank = BankAccount.objects.select_for_update().get(pk=bank_account.pk, organization=organization)
+
+    # 4. Conversión bimonetaria a la moneda de la factura
+    if curr == locked_inv.currency_code:
+        applied_to_inv = amt
+    elif curr == 'USD' and locked_inv.currency_code == 'NIO':
+        applied_to_inv = (amt * locked_inv.exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    elif curr == 'NIO' and locked_inv.currency_code == 'USD':
+        applied_to_inv = (amt / locked_inv.exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    else:
+        applied_to_inv = amt
+
+    if applied_to_inv > locked_inv.balance_due:
+        raise ValidationError(
+            f"El monto recaudado ({locked_inv.currency_symbol} {applied_to_inv:,.2f}) excede el saldo pendiente "
+            f"de la factura ({locked_inv.currency_symbol} {locked_inv.balance_due:,.2f})."
+        )
+
+    # 5. Verificación de Unicidad de Referencia Bancaria
+    if clean_ref:
+        if locked_bank:
+            existing_ref = PaymentReceipt.objects.filter(
+                organization=organization,
+                bank_account=locked_bank,
+                reference_number=clean_ref,
+            ).first()
+            if existing_ref:
+                if existing_ref.invoice_id == locked_inv.id:
+                    raise ValidationError(f"La referencia bancaria '{clean_ref}' ya fue registrada previamente para esta factura.")
+                else:
+                    raise ValidationError(
+                        f"La referencia bancaria '{clean_ref}' ya fue utilizada en esta cuenta bancaria para la factura {existing_ref.invoice.number}."
+                    )
+        else:
+            existing_ref = PaymentReceipt.objects.filter(
+                organization=organization,
+                reference_number=clean_ref,
+            ).first()
+            if existing_ref:
+                raise ValidationError(f"La referencia '{clean_ref}' ya fue registrada previamente en la organización.")
+
+    # 6. Emisión del Recibo Oficial de Caja (PaymentReceipt)
+    try:
+        receipt = PaymentReceipt.objects.create(
+            organization=organization,
+            invoice=locked_inv,
+            bank_account=locked_bank,
+            payment_date=payment_date or timezone.now().date(),
+            payment_method=payment_method,
+            reference_number=clean_ref,
+            currency_paid=curr,
+            amount_in_payment_currency=amt,
+            exchange_rate_applied=locked_inv.exchange_rate,
+            amount_applied_to_invoice=applied_to_inv,
+            received_by=user,
+            notes=notes,
+        )
+    except IntegrityError as e:
+        raise ValidationError(f"Conflicto de integridad: La referencia bancaria '{clean_ref}' ya fue registrada concurrentemente.")
+
+    # 7. Movimiento de Tesorería (BankAccount y FinancialTransaction)
+    trx = None
+    if locked_bank:
+        if locked_bank.currency == curr:
+            bank_amt = amt
+        elif locked_bank.currency == 'NIO' and curr == 'USD':
+            bank_amt = (amt * locked_inv.exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        elif locked_bank.currency == 'USD' and curr == 'NIO':
+            bank_amt = (amt / locked_inv.exchange_rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        else:
+            bank_amt = amt
+
+        locked_bank.current_balance += bank_amt
+        locked_bank.save(update_fields=['current_balance', 'updated_at'])
+
+        trx = FinancialTransaction.objects.create(
+            organization=organization,
+            transaction_type=FinancialTransaction.TransactionType.CLIENT_COLLECTION,
+            bank_account=locked_bank,
+            amount=bank_amt,
+            balance_after=locked_bank.current_balance,
+            concept=f"Cobro Recibo {receipt.number} - Factura {locked_inv.number}",
+            reference_code=receipt.reference_number or receipt.number,
+            performed_by=user,
+        )
+
+    # 8. Asiento Contable de Cobranza (COLLECTIONS)
+    accounts = ensure_default_chart_of_accounts(organization)
+
+    # Garantizar que exista el asiento de venta previo
+    record_invoice_sales_journal_entry(organization, locked_inv, user, accounts=accounts)
+
+    rate_nio = locked_inv.exchange_rate if locked_inv.currency_code == 'USD' else Decimal('1.0')
+    amt_nio = (applied_to_inv * rate_nio).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    existing_col = JournalEntry.objects.filter(
+        organization=organization,
+        source_payment_receipt=receipt,
+        entry_type=JournalEntry.EntryType.COLLECTIONS,
+    ).first()
+
+    if existing_col:
+        collection_entry = existing_col
+    else:
+        try:
+            collection_entry = JournalEntry.objects.create(
+                organization=organization,
+                date=receipt.payment_date,
+                entry_type=JournalEntry.EntryType.COLLECTIONS,
+                concept=f"Cobro {receipt.number} Factura {locked_inv.number} - {locked_inv.account.commercial_name if locked_inv.account else 'Cliente'}",
+                reference=receipt.number,
+                source_invoice=locked_inv,
+                source_payment_receipt=receipt,
+                created_by=user,
+            )
+
+            acc_debit = accounts['1102-01'] if locked_bank else accounts['1101-01']
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=collection_entry,
+                account=acc_debit,
+                concept=f"Ingreso {receipt.get_payment_method_display()} {receipt.number}",
+                debit=amt_nio,
+                credit=Decimal('0.00'),
+            )
+            JournalEntryLine.objects.create(
+                organization=organization,
+                entry=collection_entry,
+                account=accounts['1103-01'],
+                concept=f"Abono CxC Factura {locked_inv.number}",
+                debit=Decimal('0.00'),
+                credit=amt_nio,
+            )
+
+            collection_entry.verify_and_save_balance()
+        except IntegrityError:
+            collection_entry = JournalEntry.objects.filter(
+                organization=organization,
+                source_payment_receipt=receipt,
+                entry_type=JournalEntry.EntryType.COLLECTIONS,
+            ).first()
+
+    # 9. Asentar Registro de Idempotencia de Solicitud
+    if clean_idempotency_key:
+        PaymentIdempotencyRecord.objects.create(
+            organization=organization,
+            idempotency_key=clean_idempotency_key,
+            invoice=locked_inv,
+            payment_receipt=receipt,
+            request_hash=req_hash,
+            status='SUCCESS',
+            response_payload={
+                'receipt_id': str(receipt.pk),
+                'receipt_number': receipt.number,
+                'amount_paid': str(receipt.amount_in_payment_currency),
+                'currency': receipt.currency_paid,
+            }
+        )
+
+    return receipt, trx, collection_entry
+
+
 @transaction.atomic
 def sync_commercial_and_purchasing_to_ledger(organization, user):
     """
     Puente de Sincronización Contable Automática:
     Asienta pólizas de diario cuadradas (Debe == Haber) para todas las Facturas
     y Órdenes de Compra no sincronizadas previamente.
+    Conserva la retrocompatibilidad y no duplica pólizas históricas existentes.
     """
     from apps.billing.models import Invoice
     from apps.purchasing.models import PurchaseOrder
@@ -298,73 +659,10 @@ def sync_commercial_and_purchasing_to_ledger(organization, user):
     invoices = Invoice.objects.filter(
         organization=organization,
         status__in=[Invoice.Status.ISSUED, Invoice.Status.PARTIAL, Invoice.Status.PAID],
-    ).exclude(journal_entries__isnull=False)
+    ).exclude(journal_entries__entry_type=JournalEntry.EntryType.SALES)
 
     for inv in invoices:
-        entry = JournalEntry.objects.create(
-            organization=organization,
-            date=inv.issue_date or timezone.now().date(),
-            entry_type=JournalEntry.EntryType.SALES,
-            concept=f"Facturación DGI {inv.number} - {inv.account.commercial_name if inv.account else 'Cliente'}",
-            reference=inv.number,
-            source_invoice=inv,
-            created_by=user,
-        )
-
-        # DEBE: Clientes por Cobrar (Neto a cobrar)
-        JournalEntryLine.objects.create(
-            organization=organization,
-            entry=entry,
-            account=accounts['1103-01'],
-            concept=f"CxC Factura {inv.number}",
-            debit=inv.net_receivable,
-            credit=Decimal('0.00'),
-        )
-
-        # DEBE: Retención IR sufrida (si aplica)
-        if inv.ir_retention_amount > Decimal('0.00'):
-            JournalEntryLine.objects.create(
-                organization=organization,
-                entry=entry,
-                account=accounts['1105-01'],
-                concept=f"Retención IR 1%-2% Sufrida {inv.number}",
-                debit=inv.ir_retention_amount,
-                credit=Decimal('0.00'),
-            )
-
-        # DEBE: Retención IMI sufrida (si aplica)
-        if inv.imi_retention_amount > Decimal('0.00'):
-            JournalEntryLine.objects.create(
-                organization=organization,
-                entry=entry,
-                account=accounts['1105-02'],
-                concept=f"Retención IMI 1% Sufrida {inv.number}",
-                debit=inv.imi_retention_amount,
-                credit=Decimal('0.00'),
-            )
-
-        # HABER: Ventas / Ingresos (Base Imponible)
-        JournalEntryLine.objects.create(
-            organization=organization,
-            entry=entry,
-            account=accounts['4101-01'],
-            concept=f"Ingreso Gravado/Exento {inv.number}",
-            debit=Decimal('0.00'),
-            credit=inv.subtotal,
-        )
-
-        # HABER: IVA Débito Fiscal (si aplica)
-        if inv.tax_total > Decimal('0.00'):
-            JournalEntryLine.objects.create(
-                organization=organization,
-                entry=entry,
-                account=accounts['2102-01'],
-                concept=f"IVA 15% Débito Fiscal {inv.number}",
-                debit=Decimal('0.00'),
-                credit=inv.tax_total,
-            )
-
-        entry.verify_and_save_balance()
+        record_invoice_sales_journal_entry(organization, inv, user, accounts=accounts)
         synced_invoices += 1
 
     # 2. Pólizas de Compras (Órdenes Recibidas / En Cartera)
