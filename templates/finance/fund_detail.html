@@ -1,8 +1,8 @@
 {% extends "layouts/base_erp.html" %}
 
 {% block title %}Arqueo y Detalle de Fondo {{ fund.code }} · Finanzas{% endblock %}
-{% block breadcrumb_section %}FINANZAS & TESORERÍA{% endblock %}
-{% block breadcrumb_page %}ARQUEO DE FONDO FIJO {{ fund.code }}{% endblock %}
+{% block breadcrumb_section %}Finanzas &amp; Tesorería{% endblock %}
+{% block breadcrumb_page %}Arqueo de Fondo Fijo {{ fund.code }}{% endblock %}
 {% block page_title %}{{ fund.name }} · {{ fund.code }}{% endblock %}
 
 {% block page_actions %}
@@ -44,7 +44,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6 max-w-7xl mx-auto" 
+<div class="space-y-6 max-w-7xl mx-auto font-sans" 
      x-data="{
          showExpenseModal: false,
          showReplenishModal: false,
@@ -53,71 +53,71 @@
      @open-fund-expense-modal.window="showExpenseModal = true"
      @open-fund-replenish-modal.window="showReplenishModal = true">
 
-    <!-- Tarjetas de Arqueo Físico y Estado de Caja (Swiss Grid 4 Celdas) -->
+    <!-- Tarjetas de Arqueo Físico y Estado de Caja -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 border border-zinc-200 rounded-[4px] bg-white">
         <!-- Fondo Asignado -->
         <div class="p-4 space-y-2">
             <div class="flex items-center justify-between text-zinc-500">
-                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">FONDO ASIGNADO</span>
-                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
-                    LÍMITE MÁXIMO
+                <span class="text-xs font-medium text-zinc-500">Fondo asignado</span>
+                <span class="text-xs text-zinc-400 bg-zinc-50 border border-zinc-200 px-1.5 py-0.5 rounded-[4px]">
+                    Límite
                 </span>
             </div>
             <div class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight pt-1">
                 C$ {{ fund.allocated_amount|floatformat:2 }}
             </div>
-            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
-                <span>Cupo formal autorizado</span>
-                <span class="font-mono text-[10px] text-zinc-500">{{ fund.currency }}</span>
+            <div class="text-xs text-zinc-400 pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Cupo autorizado</span>
+                <span class="font-mono text-zinc-500">{{ fund.currency }}</span>
             </div>
         </div>
 
         <!-- Efectivo en Custodia -->
         <div class="p-4 space-y-2">
             <div class="flex items-center justify-between text-zinc-500">
-                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">EFECTIVO EN MANO</span>
-                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
-                    DISPONIBLE
+                <span class="text-xs font-medium text-zinc-500">Efectivo en mano</span>
+                <span class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-[4px]">
+                    Disponible
                 </span>
             </div>
             <div class="text-2xl font-semibold font-mono text-emerald-700 tabular-nums tracking-tight pt-1">
                 C$ {{ fund.current_balance|floatformat:2 }}
             </div>
-            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+            <div class="text-xs text-zinc-400 pt-1 border-t border-zinc-100 flex items-center justify-between">
                 <span>Liquidez física inmediata</span>
-                <span class="font-mono text-[10px] text-emerald-700">En Custodia</span>
+                <span class="text-emerald-700 font-medium">En custodia</span>
             </div>
         </div>
 
         <!-- Comprobantes por Reembolsar -->
         <div class="p-4 space-y-2">
             <div class="flex items-center justify-between text-zinc-500">
-                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">GASTOS POR REEMBOLSAR</span>
-                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
-                    {{ unreplenished_expenses|length }} FACTURAS
+                <span class="text-xs font-medium text-zinc-500">Gastos por reembolsar</span>
+                <span class="text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.5 rounded-[4px] font-mono">
+                    {{ unreplenished_expenses|length }} facturas
                 </span>
             </div>
-            <div class="text-2xl font-semibold font-mono text-amber-600 tabular-nums tracking-tight pt-1">
+            <div class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight pt-1">
                 C$ {{ total_pending|floatformat:2 }}
             </div>
-            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
+            <div class="text-xs text-zinc-400 pt-1 border-t border-zinc-100 flex items-center justify-between">
                 <span>Comprobantes acumulados</span>
-                <span class="font-mono text-[10px] text-amber-600">Por Liquidar</span>
+                <span class="text-zinc-500">Por liquidar</span>
             </div>
         </div>
 
         <!-- Ecuación de Arqueo Físico -->
         <div class="p-4 space-y-2 bg-zinc-50/50">
             <div class="flex items-center justify-between text-zinc-500">
-                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">CONCILIACIÓN / ARQUEO</span>
-                <span class="font-mono text-[10px] text-zinc-700 bg-zinc-100 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
-                    AUDITORÍA
+                <span class="text-xs font-medium text-zinc-500">Conciliación / Arqueo</span>
+                <span class="text-xs text-zinc-600 bg-zinc-100 border border-zinc-200 px-1.5 py-0.5 rounded-[4px]">
+                    Auditoría
                 </span>
             </div>
             <div class="text-sm font-semibold font-mono text-zinc-900 tabular-nums tracking-tight pt-1">
                 Efectivo + Facturas = C$ {{ fund.current_balance|add:total_pending|floatformat:2 }}
             </div>
-            <div class="text-[11px] text-zinc-500 font-sans pt-1 border-t border-zinc-200 flex items-center gap-1.5">
+            <div class="text-xs text-zinc-500 pt-1 border-t border-zinc-200 flex items-center gap-1.5">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
                 <span>Fondo cuadrado con saldo asignado</span>
             </div>
@@ -126,40 +126,40 @@
 
     <!-- Metadatos de Custodia y Cuadrilla Operativa -->
     <div class="bg-white border border-zinc-200 rounded-[4px] p-4">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-mono">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
             <div>
-                <span class="text-zinc-400 block text-[10px] uppercase">CUSTODIO RESPONSABLE:</span>
-                <span class="font-medium text-zinc-900 block font-sans">{{ fund.custodian.full_name|default:fund.custodian.email }}</span>
-                <span class="text-zinc-500 block text-[11px]">{{ fund.custodian.email }}</span>
+                <span class="text-zinc-400 block font-medium">Custodio responsable:</span>
+                <span class="font-medium text-zinc-900 block mt-0.5">{{ fund.custodian.full_name|default:fund.custodian.email }}</span>
+                <span class="text-zinc-400 block text-xs">{{ fund.custodian.email }}</span>
             </div>
             <div>
-                <span class="text-zinc-400 block text-[10px] uppercase">CUADRILLA ASOCIADA:</span>
-                <span class="font-medium text-zinc-900 block font-sans">{{ fund.linked_crew.name|default:"Plantel Central / Sin Cuadrilla" }}</span>
+                <span class="text-zinc-400 block font-medium">Cuadrilla asociada:</span>
+                <span class="font-medium text-zinc-900 block mt-0.5">{{ fund.linked_crew.name|default:"Plantel Central / Sin Cuadrilla" }}</span>
                 {% if fund.linked_crew %}
-                <span class="text-zinc-500 block text-[11px]">{{ fund.linked_crew.code }} · Placa {{ fund.linked_crew.vehicle_plate|default:"N/A" }}</span>
+                <span class="text-zinc-400 block text-xs font-mono">{{ fund.linked_crew.code }} · Placa {{ fund.linked_crew.vehicle_plate|default:"N/A" }}</span>
                 {% endif %}
             </div>
             <div>
-                <span class="text-zinc-400 block text-[10px] uppercase">CONSUMO DEL FONDO:</span>
-                <div class="flex items-center gap-2 mt-1">
+                <span class="text-zinc-400 block font-medium">Consumo del fondo:</span>
+                <div class="flex items-center gap-2 mt-1.5">
                     <div class="flex-1 bg-zinc-100 rounded-[2px] h-2 overflow-hidden border border-zinc-200">
                         <div class="bg-zinc-900 h-2" style="width: {{ fund.spent_percentage }}%;"></div>
                     </div>
-                    <span class="font-mono text-zinc-900 font-semibold tabular-nums">{{ fund.spent_percentage }}%</span>
+                    <span class="font-mono text-zinc-900 font-medium tabular-nums">{{ fund.spent_percentage }}%</span>
                 </div>
             </div>
             <div>
-                <span class="text-zinc-400 block text-[10px] uppercase">ESTADO DE OPERACIÓN:</span>
+                <span class="text-zinc-400 block font-medium">Estado de operación:</span>
                 <div class="mt-1">
                     {% if fund.is_active %}
-                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-mono font-medium bg-zinc-50 text-zinc-800 border border-zinc-200">
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                        ACTIVO & OPERACIONAL
+                        Activo &amp; operacional
                     </span>
                     {% else %}
-                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-mono font-medium bg-zinc-50 text-rose-800 border border-rose-200">
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200">
                         <span class="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
-                        FONDO BLOQUEADO
+                        Fondo bloqueado
                     </span>
                     {% endif %}
                 </div>
@@ -173,17 +173,17 @@
             <div class="flex gap-4">
                 <button @click="activeTab = 'unreplenished'"
                         :class="activeTab === 'unreplenished' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
-                        class="py-3 px-1 text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer">
-                    <span>Comprobantes Pendientes de Rendir</span>
-                    <span class="bg-zinc-100 text-zinc-800 text-[10px] font-mono px-1.5 py-0.2 rounded border border-zinc-200">
+                        class="py-3 px-1 text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer">
+                    <span>Comprobantes pendientes de rendir</span>
+                    <span class="bg-zinc-100 text-zinc-700 text-xs font-mono px-1.5 py-0.5 rounded border border-zinc-200">
                         {{ unreplenished_expenses|length }}
                     </span>
                 </button>
                 <button @click="activeTab = 'replenished'"
                         :class="activeTab === 'replenished' ? 'border-zinc-900 text-zinc-900 font-semibold border-b-2' : 'border-transparent text-zinc-500 hover:text-zinc-800'"
-                        class="py-3 px-1 text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer">
-                    <span>Historial de Gastos Reembolsados</span>
-                    <span class="bg-zinc-100 text-zinc-600 text-[10px] font-mono px-1.5 py-0.2 rounded border border-zinc-200">
+                        class="py-3 px-1 text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer">
+                    <span>Historial de gastos reembolsados</span>
+                    <span class="bg-zinc-100 text-zinc-600 text-xs font-mono px-1.5 py-0.5 rounded border border-zinc-200">
                         {{ replenished_expenses|length }}
                     </span>
                 </button>
@@ -192,7 +192,7 @@
             <div class="flex items-center gap-2 py-2">
                 <button type="button" 
                         @click="showExpenseModal = true"
-                        class="h-7 px-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-mono font-medium rounded-[3px] transition-colors flex items-center gap-1 cursor-pointer">
+                        class="h-7 px-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1 cursor-pointer">
                     <svg class="w-3 h-3 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
                     </svg>
@@ -206,60 +206,60 @@
             {% if unreplenished_expenses %}
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                    <tr class="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-mono text-[10px] uppercase tracking-wider">
-                        <th class="py-2.5 px-3 font-semibold">COMPROBANTE</th>
-                        <th class="py-2.5 px-3 font-semibold">FECHA</th>
-                        <th class="py-2.5 px-3 font-semibold">ORDEN DE TRABAJO</th>
-                        <th class="py-2.5 px-3 font-semibold">RUBRO</th>
-                        <th class="py-2.5 px-3 font-semibold">PROVEEDOR / RUC</th>
-                        <th class="py-2.5 px-3 font-semibold">CONCEPTO / DETALLE</th>
-                        <th class="py-2.5 px-3 text-right font-semibold">MONTO (C$)</th>
+                    <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/60 border-b border-zinc-200 font-sans">
+                        <th class="py-3 px-4">Comprobante</th>
+                        <th class="py-3 px-4">Fecha</th>
+                        <th class="py-3 px-4">Orden de Trabajo</th>
+                        <th class="py-3 px-4">Rubro</th>
+                        <th class="py-3 px-4">Proveedor / RUC</th>
+                        <th class="py-3 px-4">Concepto / Detalle</th>
+                        <th class="py-3 px-4 text-right">Monto (C$)</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 font-mono">
+                <tbody class="divide-y divide-zinc-100 text-sm text-zinc-700">
                     {% for expense in unreplenished_expenses %}
                     <tr class="hover:bg-zinc-50/60 transition-colors">
-                        <td class="py-2.5 px-3 font-semibold text-zinc-900">
+                        <td class="py-3 px-4 font-mono font-medium text-zinc-900">
                             {{ expense.voucher_number }}
                         </td>
-                        <td class="py-2.5 px-3 text-zinc-500 text-[11px]">
+                        <td class="py-3 px-4 text-zinc-500 font-mono text-xs">
                             {{ expense.spent_at|date:"d/m/Y" }}
                         </td>
-                        <td class="py-2.5 px-3 font-sans">
+                        <td class="py-3 px-4 font-sans">
                             {% if expense.work_order %}
                             <a href="{% url 'operations:workorder_detail' expense.work_order.pk %}"
-                               class="font-mono text-zinc-900 font-semibold hover:underline">
+                               class="font-mono text-zinc-900 font-medium hover:underline">
                                 {{ expense.work_order.number }}
                             </a>
-                            <span class="block text-[10px] text-zinc-400 truncate max-w-xs">{{ expense.work_order.title }}</span>
+                            <span class="block text-xs text-zinc-400 truncate max-w-xs">{{ expense.work_order.title }}</span>
                             {% else %}
-                            <span class="text-zinc-400 text-[11px]">Gasto Operativo General</span>
+                            <span class="text-zinc-400 text-xs">Gasto Operativo General</span>
                             {% endif %}
                         </td>
-                        <td class="py-2.5 px-3 font-sans text-zinc-700 text-[11px]">
+                        <td class="py-3 px-4 font-sans text-zinc-700 text-xs">
                             {{ expense.get_expense_category_display }}
                         </td>
-                        <td class="py-2.5 px-3 font-sans">
+                        <td class="py-3 px-4 font-sans">
                             <span class="font-medium text-zinc-900">{{ expense.vendor_name }}</span>
                             {% if expense.vendor_tax_id %}
-                            <span class="block text-[10px] font-mono text-zinc-400">{{ expense.vendor_tax_id }}</span>
+                            <span class="block text-xs font-mono text-zinc-400">{{ expense.vendor_tax_id }}</span>
                             {% endif %}
                         </td>
-                        <td class="py-2.5 px-3 max-w-xs font-sans text-zinc-600">
+                        <td class="py-3 px-4 max-w-xs font-sans text-zinc-600">
                             <p class="truncate" title="{{ expense.description }}">{{ expense.description }}</p>
                         </td>
-                        <td class="py-2.5 px-3 text-right font-semibold text-rose-700 tabular-nums">
+                        <td class="py-3 px-4 text-right font-mono font-semibold text-rose-700 tabular-nums">
                             - C$ {{ expense.amount|floatformat:2 }}
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
                 <tfoot>
-                    <tr class="bg-zinc-50 font-semibold border-t border-zinc-200 text-xs font-mono">
-                        <td colspan="6" class="py-2.5 px-3 text-right uppercase text-zinc-600">
-                            Total Pendiente de Reembolso:
+                    <tr class="bg-zinc-50/80 font-medium border-t border-zinc-200 text-xs">
+                        <td colspan="6" class="py-3 px-4 text-right font-sans text-zinc-600">
+                            Total pendiente de reembolso:
                         </td>
-                        <td class="py-2.5 px-3 text-right font-bold text-amber-700 tabular-nums">
+                        <td class="py-3 px-4 text-right font-mono font-semibold text-zinc-900 tabular-nums">
                             C$ {{ total_pending|floatformat:2 }}
                         </td>
                     </tr>
@@ -271,7 +271,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p class="text-xs font-medium text-zinc-700">No hay comprobantes pendientes de rendición.</p>
-                <p class="text-[11px] text-zinc-400 mt-0.5">Todos los gastos reportados han sido reembolsados al fondo.</p>
+                <p class="text-xs text-zinc-400 mt-0.5">Todos los gastos reportados han sido reembolsados al fondo.</p>
             </div>
             {% endif %}
         </div>
@@ -281,43 +281,43 @@
             {% if replenished_expenses %}
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                    <tr class="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-mono text-[10px] uppercase tracking-wider">
-                        <th class="py-2.5 px-3 font-semibold">COMPROBANTE</th>
-                        <th class="py-2.5 px-3 font-semibold">FECHA</th>
-                        <th class="py-2.5 px-3 font-semibold">ARQUEO DE LIQUIDACIÓN</th>
-                        <th class="py-2.5 px-3 font-semibold">RUBRO</th>
-                        <th class="py-2.5 px-3 font-semibold">PROVEEDOR</th>
-                        <th class="py-2.5 px-3 font-semibold">CONCEPTO</th>
-                        <th class="py-2.5 px-3 text-right font-semibold">MONTO (C$)</th>
+                    <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/60 border-b border-zinc-200 font-sans">
+                        <th class="py-3 px-4">Comprobante</th>
+                        <th class="py-3 px-4">Fecha</th>
+                        <th class="py-3 px-4">Arqueo de Liquidación</th>
+                        <th class="py-3 px-4">Rubro</th>
+                        <th class="py-3 px-4">Proveedor</th>
+                        <th class="py-3 px-4">Concepto</th>
+                        <th class="py-3 px-4 text-right">Monto (C$)</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 font-mono">
+                <tbody class="divide-y divide-zinc-100 text-sm text-zinc-700">
                     {% for expense in replenished_expenses %}
                     <tr class="hover:bg-zinc-50/60 transition-colors">
-                        <td class="py-2.5 px-3 font-semibold text-zinc-900">
+                        <td class="py-3 px-4 font-mono font-medium text-zinc-900">
                             {{ expense.voucher_number }}
                         </td>
-                        <td class="py-2.5 px-3 text-zinc-500 text-[11px]">
+                        <td class="py-3 px-4 text-zinc-500 font-mono text-xs">
                             {{ expense.spent_at|date:"d/m/Y" }}
                         </td>
-                        <td class="py-2.5 px-3 font-sans">
+                        <td class="py-3 px-4 font-sans">
                             {% if expense.replenishment %}
                             <span class="font-mono text-zinc-900 font-medium">{{ expense.replenishment.code }}</span>
-                            <span class="block text-[10px] text-emerald-700">Reembolsado</span>
+                            <span class="block text-xs text-emerald-700 font-sans">Reembolsado</span>
                             {% else %}
-                            <span class="text-zinc-400 text-[11px]">Histórico Liquidado</span>
+                            <span class="text-zinc-400 text-xs">Histórico Liquidado</span>
                             {% endif %}
                         </td>
-                        <td class="py-2.5 px-3 font-sans text-zinc-700 text-[11px]">
+                        <td class="py-3 px-4 font-sans text-zinc-700 text-xs">
                             {{ expense.get_expense_category_display }}
                         </td>
-                        <td class="py-2.5 px-3 font-sans text-zinc-800">
+                        <td class="py-3 px-4 font-sans text-zinc-800">
                             {{ expense.vendor_name }}
                         </td>
-                        <td class="py-2.5 px-3 max-w-xs font-sans text-zinc-600 truncate" title="{{ expense.description }}">
+                        <td class="py-3 px-4 max-w-xs font-sans text-zinc-600 truncate" title="{{ expense.description }}">
                             {{ expense.description }}
                         </td>
-                        <td class="py-2.5 px-3 text-right font-semibold text-zinc-900 tabular-nums">
+                        <td class="py-3 px-4 text-right font-mono font-semibold text-zinc-900 tabular-nums">
                             C$ {{ expense.amount|floatformat:2 }}
                         </td>
                     </tr>
@@ -343,12 +343,12 @@
              @click.away="showExpenseModal = false">
             <div class="flex items-center justify-between border-b border-zinc-100 pb-3">
                 <div>
-                    <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-900">
-                        Registrar Comprobante de Gasto &bull; {{ fund.code }}
+                    <h3 class="text-sm font-semibold text-zinc-900">
+                        Registrar comprobante de gasto &bull; {{ fund.code }}
                     </h3>
-                    <p class="text-[11px] text-zinc-500 font-sans">Imputación directa a este fondo de caja chica</p>
+                    <p class="text-xs text-zinc-500">Imputación directa a este fondo de caja chica</p>
                 </div>
-                <button type="button" @click="showExpenseModal = false" class="text-zinc-400 hover:text-zinc-600 p-1">
+                <button type="button" @click="showExpenseModal = false" class="text-zinc-400 hover:text-zinc-600 p-1 cursor-pointer">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -364,12 +364,12 @@
                     <div>
                         <label class="block text-xs font-medium text-zinc-700 mb-1">Monto en Córdobas (C$) <span class="text-red-500">*</span></label>
                         <input type="number" step="0.01" name="amount" required placeholder="0.00"
-                               class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-mono tabular-nums">
+                               class="w-full h-8 px-2.5 text-xs bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-400 transition-colors font-mono tabular-nums">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-zinc-700 mb-1">Rubro de Gasto <span class="text-red-500">*</span></label>
                         <select name="expense_category" required
-                                class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
+                                class="w-full h-8 px-2.5 text-xs bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-400 transition-colors font-sans">
                             <option value="FUEL">Combustible y Lubricantes</option>
                             <option value="PER_DIEM">Viáticos y Alimentación</option>
                             <option value="TOLL_PARKING">Peajes y Estacionamiento</option>
@@ -383,20 +383,20 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-zinc-700 mb-1">Comercio / Proveedor <span class="text-red-500">*</span></label>
-                        <input type="text" name="vendor_name" required placeholder="ej: Gasolinera Puma Tipitapa"
-                               class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
+                        <input type="text" name="vendor_name" required placeholder="ej: Gasolinera Puma"
+                               class="w-full h-8 px-2.5 text-xs bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-400 transition-colors font-sans">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-zinc-700 mb-1">RUC Proveedor (Opcional)</label>
                         <input type="text" name="vendor_tax_id" placeholder="ej: J0310000000000"
-                               class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-mono uppercase">
+                               class="w-full h-8 px-2.5 text-xs bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-400 transition-colors font-mono uppercase">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-zinc-700 mb-1">Orden de Trabajo (Imputación)</label>
-                        <select name="work_order" class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
+                        <select name="work_order" class="w-full h-8 px-2.5 text-xs bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-400 transition-colors font-sans">
                             <option value="">Gasto Operativo General (Sin OT)</option>
                             {% for wo in active_work_orders %}
                             <option value="{{ wo.pk }}">{{ wo.number }} - {{ wo.title|truncatechars:30 }}</option>
@@ -406,7 +406,7 @@
                     <div>
                         <label class="block text-xs font-medium text-zinc-700 mb-1">Nº Factura / Recibo Físico</label>
                         <input type="text" name="invoice_number" placeholder="ej: FACT-98214"
-                               class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-mono">
+                               class="w-full h-8 px-2.5 text-xs bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-400 transition-colors font-mono">
                     </div>
                 </div>
 
@@ -414,22 +414,22 @@
                     <div>
                         <label class="block text-xs font-medium text-zinc-700 mb-1">Fecha del Comprobante</label>
                         <input type="date" name="spent_at" value="{% now 'Y-m-d' %}" required
-                               class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-mono">
+                               class="w-full h-8 px-2.5 text-xs bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-400 transition-colors font-mono">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-zinc-700 mb-1">Justificación Técnica <span class="text-red-500">*</span></label>
                         <input type="text" name="description" required placeholder="Justifique el gasto operacional..."
-                               class="w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans">
+                               class="w-full h-8 px-2.5 text-xs bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-400 transition-colors font-sans">
                     </div>
                 </div>
 
                 <div class="flex justify-end gap-2 pt-3 border-t border-zinc-100">
                     <button type="button" @click="showExpenseModal = false"
-                            class="h-9 px-3 border border-zinc-200 bg-white text-zinc-700 text-xs font-medium rounded-[4px] hover:bg-zinc-50 transition-colors cursor-pointer">
+                            class="h-8 px-3 border border-zinc-200 bg-white text-zinc-700 text-xs font-medium rounded-[4px] hover:bg-zinc-50 transition-colors cursor-pointer">
                         Cancelar
                     </button>
                     <button type="submit"
-                            class="h-9 px-4 bg-zinc-900 text-white text-xs font-medium rounded-[4px] hover:bg-zinc-800 transition-colors cursor-pointer">
+                            class="h-8 px-3.5 bg-zinc-900 text-white text-xs font-medium rounded-[4px] hover:bg-zinc-800 transition-colors cursor-pointer">
                         Registrar Comprobante
                     </button>
                 </div>
@@ -448,27 +448,27 @@
              @click.away="showReplenishModal = false">
             <div class="flex items-center justify-between border-b border-zinc-100 pb-3">
                 <div>
-                    <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-zinc-900">
-                        Arqueo & Solicitud de Reposición &bull; {{ fund.code }}
+                    <h3 class="text-sm font-semibold text-zinc-900">
+                        Arqueo &amp; Solicitud de Reposición &bull; {{ fund.code }}
                     </h3>
-                    <p class="text-[11px] text-zinc-500 font-sans">Liquidación de comprobantes de frente de obra</p>
+                    <p class="text-xs text-zinc-500">Liquidación de comprobantes de frente de obra</p>
                 </div>
-                <button type="button" @click="showReplenishModal = false" class="text-zinc-400 hover:text-zinc-600 p-1">
+                <button type="button" @click="showReplenishModal = false" class="text-zinc-400 hover:text-zinc-600 p-1 cursor-pointer">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
 
-            <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-[4px] text-xs font-mono space-y-1 text-zinc-800">
-                <p class="font-semibold text-zinc-900 uppercase text-[10px]">Resumen del Arqueo a Rendir:</p>
+            <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-[4px] text-xs space-y-1 text-zinc-800">
+                <p class="font-medium text-zinc-900 text-xs">Resumen del arqueo a rendir:</p>
                 <div class="flex justify-between">
                     <span class="text-zinc-500">Comprobantes acumulados:</span>
                     <span class="font-medium text-zinc-900">{{ unreplenished_expenses|length }} recibos</span>
                 </div>
                 <div class="flex justify-between pt-1 border-t border-zinc-200/80">
-                    <span class="text-zinc-500">Monto Total a Reembolsar:</span>
-                    <span class="font-semibold text-zinc-900 tabular-nums">C$ {{ total_pending|floatformat:2 }}</span>
+                    <span class="text-zinc-500">Monto total a reembolsar:</span>
+                    <span class="font-semibold text-zinc-900 font-mono tabular-nums">C$ {{ total_pending|floatformat:2 }}</span>
                 </div>
             </div>
 
@@ -478,18 +478,18 @@
                 <input type="hidden" name="fund" value="{{ fund.pk }}">
 
                 <div>
-                    <label class="block text-xs font-medium text-zinc-700 mb-1">Notas de Rendición y Arqueo</label>
+                    <label class="block text-xs font-medium text-zinc-700 mb-1">Notas de rendición y arqueo</label>
                     <textarea name="notes" rows="3" placeholder="Detalle observaciones sobre los gastos incurridos durante las maniobras..."
-                              class="w-full p-2.5 text-[13px] bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 transition-colors font-sans"></textarea>
+                              class="w-full p-2 text-xs bg-white border border-zinc-200 rounded-[4px] text-zinc-900 focus:outline-none focus:border-zinc-400 transition-colors font-sans"></textarea>
                 </div>
 
                 <div class="flex justify-end gap-2 pt-3 border-t border-zinc-100">
                     <button type="button" @click="showReplenishModal = false"
-                            class="h-9 px-3 border border-zinc-200 bg-white text-zinc-700 text-xs font-medium rounded-[4px] hover:bg-zinc-50 transition-colors cursor-pointer">
+                            class="h-8 px-3 border border-zinc-200 bg-white text-zinc-700 text-xs font-medium rounded-[4px] hover:bg-zinc-50 transition-colors cursor-pointer">
                         Cancelar
                     </button>
                     <button type="submit"
-                            class="h-9 px-4 bg-zinc-900 text-white text-xs font-medium rounded-[4px] hover:bg-zinc-800 transition-colors cursor-pointer">
+                            class="h-8 px-3.5 bg-zinc-900 text-white text-xs font-medium rounded-[4px] hover:bg-zinc-800 transition-colors cursor-pointer">
                         Enviar Solicitud a Coordinación
                     </button>
                 </div>

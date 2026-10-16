@@ -1,9 +1,9 @@
 {% extends "layouts/base_erp.html" %}
 
 {% block title %}Estados Financieros en Tiempo Real (P&L y Balance) | ERP SAS{% endblock %}
-{% block breadcrumb_section %}FINANZAS & CONTABILIDAD{% endblock %}
-{% block breadcrumb_page %}ESTADOS FINANCIEROS (NIIF · DGI){% endblock %}
-{% block page_title %}Estados Financieros & Balanza de Comprobación{% endblock %}
+{% block breadcrumb_section %}Finanzas &amp; Contabilidad{% endblock %}
+{% block breadcrumb_page %}Estados Financieros (NIIF · DGI){% endblock %}
+{% block page_title %}Estados Financieros &amp; Balanza de Comprobación{% endblock %}
 
 {% block page_actions %}
 <div class="flex items-center gap-2">
@@ -31,29 +31,29 @@
     <!-- ===================================================================== -->
     <!-- 1. ENCABEZADO FISCAL & FILTRO DE RANGO TEMPORAL                       -->
     <!-- ===================================================================== -->
-    <div class="bg-white border border-zinc-200 rounded-[4px] p-4 space-y-4">
+    <div class="bg-white border border-zinc-200 rounded-[4px] p-5 space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100">
             <div>
-                <div class="flex items-center gap-2">
-                    <span class="text-[10px] font-mono uppercase tracking-widest text-zinc-400 font-bold">ESTADOS FINANCIEROS AUDITABLES</span>
+                <div class="flex items-center gap-2 text-xs text-zinc-500">
+                    <span>Estados Financieros Auditables</span>
                     <span class="text-zinc-300">/</span>
-                    <span class="text-xs font-mono font-semibold text-zinc-900">NIIF PARA PYMES · PARTIDA DOBLE LEY 822</span>
+                    <span class="text-zinc-700 font-medium">NIIF para PYMES · Partida Doble Ley 822</span>
                 </div>
-                <p class="text-xs text-zinc-500 mt-0.5">
-                    Razón Social: <strong class="text-zinc-900 font-semibold">{{ current_org.legal_name|default:current_org.name }}</strong> &bull; RUC: <span class="font-mono tabular-nums">{{ current_org.tax_id }}</span> &bull; Moneda: <strong class="font-mono text-zinc-800">C$ (NIO)</strong>
+                <p class="text-xs text-zinc-500 mt-1">
+                    Razón Social: <strong class="text-zinc-900 font-medium">{{ current_org.legal_name|default:current_org.name }}</strong> &bull; RUC: <span class="font-mono tabular-nums">{{ current_org.tax_id }}</span> &bull; Moneda: <strong class="font-mono text-zinc-800">C$ (NIO)</strong>
                 </p>
             </div>
             <div>
                 {% if balance.is_balanced and trial.is_balanced %}
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-xs font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 tabular-nums">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
                     <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
                     </svg>
-                    PARTIDA DOBLE CUADRADA · DIFERENCIA C$ 0.00
+                    Partida doble cuadrada · Diferencia C$ 0.00
                 </span>
                 {% else %}
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-xs font-mono font-bold bg-rose-50 text-rose-800 border border-rose-200 tabular-nums">
-                    DESCUADRE EN LIBRO MAYOR (C$ {{ balance.accounting_equation_diff|default:"0.00" }})
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200">
+                    Descuadre en libro mayor (C$ {{ balance.accounting_equation_diff|default:"0.00" }})
                 </span>
                 {% endif %}
             </div>
@@ -65,21 +65,21 @@
             <div class="flex items-center gap-1.5">
                 <span class="text-zinc-500 font-medium">Desde:</span>
                 <input type="date" name="date_from" value="{{ date_from }}" 
-                       class="h-8 px-2.5 bg-white border border-zinc-200 rounded-[4px] text-zinc-900 font-mono text-xs focus:ring-1 focus:ring-zinc-900 focus:border-zinc-900">
+                       class="h-8 px-2.5 bg-white border border-zinc-200 rounded-[4px] text-zinc-900 font-sans text-xs focus:outline-none focus:border-zinc-400">
             </div>
             <div class="flex items-center gap-1.5">
-                <span class="text-zinc-500 font-medium">Hasta / Al Corte:</span>
+                <span class="text-zinc-500 font-medium">Hasta / Al corte:</span>
                 <input type="date" name="date_to" value="{{ date_to }}" 
-                       class="h-8 px-2.5 bg-white border border-zinc-200 rounded-[4px] text-zinc-900 font-mono text-xs focus:ring-1 focus:ring-zinc-900 focus:border-zinc-900">
+                       class="h-8 px-2.5 bg-white border border-zinc-200 rounded-[4px] text-zinc-900 font-sans text-xs focus:outline-none focus:border-zinc-400">
             </div>
             <button type="submit" 
                     class="h-8 px-3.5 bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 text-zinc-800 font-medium rounded-[4px] transition-colors cursor-pointer">
-                Actualizar Corte
+                Actualizar corte
             </button>
             {% if date_from or date_to %}
             <a href="{% url 'finance:statements' %}?tab={{ active_tab }}" 
-               class="h-8 px-2.5 text-zinc-500 hover:text-zinc-800 flex items-center underline">
-                Limpiar Filtros
+               class="h-8 px-2.5 text-zinc-500 hover:text-zinc-800 flex items-center text-xs">
+                Limpiar filtros
             </a>
             {% endif %}
         </form>
@@ -88,65 +88,65 @@
     <!-- ===================================================================== -->
     <!-- 2. RESUMEN EJECUTIVO (METRIC STRIP ALL-LIGHT)                          -->
     <!-- ===================================================================== -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Ingresos Brutos -->
-        <div class="bg-white border border-zinc-200 rounded-[4px] p-3.5 space-y-1">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">VENTAS / INGRESOS TOTALES</span>
-            <div class="text-lg font-bold font-mono text-zinc-900 tabular-nums">
+        <div class="bg-white border border-zinc-200 rounded-[4px] p-4 space-y-1">
+            <span class="text-xs font-medium text-zinc-500 block">Ventas / Ingresos totales</span>
+            <div class="text-xl font-semibold font-mono text-zinc-900 tabular-nums">
                 C$ {{ pnl.total_revenue|floatformat:2 }}
             </div>
-            <span class="text-[11px] text-zinc-500 block">Ingresos Facturados (Clase 4)</span>
+            <span class="text-xs text-zinc-400 block">Ingresos Facturados (Clase 4)</span>
         </div>
 
         <!-- Gastos Operativos Totales -->
-        <div class="bg-white border border-zinc-200 rounded-[4px] p-3.5 space-y-1">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">COSTOS & GASTOS TOTALES</span>
-            <div class="text-lg font-bold font-mono text-zinc-900 tabular-nums">
+        <div class="bg-white border border-zinc-200 rounded-[4px] p-4 space-y-1">
+            <span class="text-xs font-medium text-zinc-500 block">Costos &amp; Gastos totales</span>
+            <div class="text-xl font-semibold font-mono text-zinc-900 tabular-nums">
                 C$ {{ pnl.total_operating_expenses|floatformat:2 }}
             </div>
-            <span class="text-[11px] text-zinc-500 block">Compras, Nómina e Insumos</span>
+            <span class="text-xs text-zinc-400 block">Compras, Nómina e Insumos</span>
         </div>
 
         <!-- Utilidad Neta (P&L) -->
-        <div class="bg-white border border-zinc-200 rounded-[4px] p-3.5 space-y-1">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">UTILIDAD NETA DEL EJERCICIO</span>
-            <div class="text-lg font-bold font-mono tabular-nums {% if pnl.net_income >= 0 %}text-emerald-700{% else %}text-rose-700{% endif %}">
+        <div class="bg-white border border-zinc-200 rounded-[4px] p-4 space-y-1">
+            <span class="text-xs font-medium text-zinc-500 block">Utilidad neta del ejercicio</span>
+            <div class="text-xl font-semibold font-mono tabular-nums {% if pnl.net_income >= 0 %}text-emerald-700{% else %}text-rose-700{% endif %}">
                 C$ {{ pnl.net_income|floatformat:2 }}
             </div>
-            <span class="text-[11px] text-zinc-500 block">Margen Neto: <strong class="font-mono text-zinc-800">{{ pnl.net_margin_pct }}%</strong></span>
+            <span class="text-xs text-zinc-500 block">Margen Neto: <strong class="font-mono text-zinc-800">{{ pnl.net_margin_pct }}%</strong></span>
         </div>
 
         <!-- Activos Totales -->
-        <div class="bg-white border border-zinc-200 rounded-[4px] p-3.5 space-y-1">
-            <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block font-semibold">TOTAL ACTIVOS EN LIBROS</span>
-            <div class="text-lg font-bold font-mono text-zinc-900 tabular-nums">
+        <div class="bg-white border border-zinc-200 rounded-[4px] p-4 space-y-1">
+            <span class="text-xs font-medium text-zinc-500 block">Total activos en libros</span>
+            <div class="text-xl font-semibold font-mono text-zinc-900 tabular-nums">
                 C$ {{ balance.total_assets|floatformat:2 }}
             </div>
-            <span class="text-[11px] text-zinc-500 block">Caja, Bancos, CxC y Créditos</span>
+            <span class="text-xs text-zinc-400 block">Caja, Bancos, CxC y Créditos</span>
         </div>
     </div>
 
     <!-- ===================================================================== -->
     <!-- 3. SELECTOR DE PESTAÑAS TÉCNICAS (SWISS GRID)                         -->
     <!-- ===================================================================== -->
-    <div class="flex items-center gap-1 border-b border-zinc-200">
+    <div class="flex items-center gap-2 border-b border-zinc-200">
         <button type="button"
                 @click="activeTab = 'pnl'"
-                class="px-4 py-2 text-xs font-mono font-medium border-b-2 transition-colors cursor-pointer"
-                :class="activeTab === 'pnl' ? 'border-zinc-900 text-zinc-900 font-bold' : 'border-transparent text-zinc-500 hover:text-zinc-700'">
-            1. ESTADO DE RESULTADOS (P&L)
+                class="px-4 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer"
+                :class="activeTab === 'pnl' ? 'border-zinc-900 text-zinc-900 font-semibold' : 'border-transparent text-zinc-500 hover:text-zinc-700'">
+            1. Estado de Resultados (P&amp;L)
         </button>
         <button type="button"
                 @click="activeTab = 'balance'"
-                class="px-4 py-2 text-xs font-mono font-medium border-b-2 transition-colors cursor-pointer"
-                :class="activeTab === 'balance' ? 'border-zinc-900 text-zinc-900 font-bold' : 'border-transparent text-zinc-500 hover:text-zinc-700'">
-            2. BALANCE GENERAL
+                class="px-4 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer"
+                :class="activeTab === 'balance' ? 'border-zinc-900 text-zinc-900 font-semibold' : 'border-transparent text-zinc-500 hover:text-zinc-700'">
+            2. Balance General
         </button>
         <button type="button"
                 @click="activeTab = 'trial'"
-                class="px-4 py-2 text-xs font-mono font-medium border-b-2 transition-colors cursor-pointer"
-                :class="activeTab === 'trial' ? 'border-zinc-900 text-zinc-900 font-bold' : 'border-transparent text-zinc-500 hover:text-zinc-700'">
-            3. BALANZA DE COMPROBACIÓN
+                class="px-4 py-2 text-xs font-medium border-b-2 transition-colors cursor-pointer"
+                :class="activeTab === 'trial' ? 'border-zinc-900 text-zinc-900 font-semibold' : 'border-transparent text-zinc-500 hover:text-zinc-700'">
+            3. Balanza de Comprobación
         </button>
     </div>
 
@@ -155,112 +155,112 @@
     <!-- ===================================================================== -->
     <div x-show="activeTab === 'pnl'" x-cloak class="space-y-4">
         <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
-            <div class="px-4 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
+            <div class="px-4 py-3 bg-zinc-50/60 border-b border-zinc-200 flex items-center justify-between">
                 <div>
-                    <h3 class="text-xs font-mono font-bold uppercase text-zinc-900">Estado de Resultados Integral (Pérdidas y Ganancias)</h3>
-                    <p class="text-[11px] text-zinc-500">Desglose de Ingresos Operativos vs. Costos de Venta, Nómina y Gastos de Administración</p>
+                    <h3 class="text-xs font-medium text-zinc-900">Estado de Resultados Integral (Pérdidas y Ganancias)</h3>
+                    <p class="text-xs text-zinc-500 mt-0.5">Desglose de Ingresos Operativos vs. Costos de Venta, Nómina y Gastos de Administración</p>
                 </div>
-                <span class="text-[11px] font-mono text-zinc-500">EXPRESADO EN CÓRDOBAS (NIO)</span>
+                <span class="text-xs text-zinc-400 font-mono">Expresado en Córdobas (NIO)</span>
             </div>
 
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                    <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-mono uppercase text-zinc-500 tracking-wider">
-                        <th class="py-2 px-3 font-semibold w-28">Código</th>
-                        <th class="py-2 px-3 font-semibold">Concepto Contable / Rubro</th>
-                        <th class="py-2 px-3 text-right font-semibold w-36">Subtotal (C$)</th>
-                        <th class="py-2 px-3 text-right font-semibold w-40">Monto Neto (C$)</th>
+                    <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/60 border-b border-zinc-200 font-sans">
+                        <th class="py-3 px-4 w-28">Código</th>
+                        <th class="py-3 px-4">Concepto Contable / Rubro</th>
+                        <th class="py-3 px-4 text-right w-36">Subtotal (C$)</th>
+                        <th class="py-3 px-4 text-right w-40">Monto Neto (C$)</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 font-mono">
+                <tbody class="divide-y divide-zinc-100 text-sm text-zinc-700">
                     <!-- SECCIÓN 1: INGRESOS OPERATIVOS -->
-                    <tr class="bg-zinc-50/50 font-bold text-zinc-900">
-                        <td colspan="3" class="py-2 px-3 text-[11px] uppercase tracking-wider">1. INGRESOS OPERATIVOS ORDINARIOS</td>
-                        <td class="py-2 px-3 text-right tabular-nums text-zinc-900">C$ {{ pnl.total_revenue|floatformat:2 }}</td>
+                    <tr class="bg-zinc-50/50 font-medium text-zinc-900 text-xs">
+                        <td colspan="3" class="py-2.5 px-4 font-sans">1. Ingresos operativos ordinarios</td>
+                        <td class="py-2.5 px-4 text-right font-mono tabular-nums text-zinc-900">C$ {{ pnl.total_revenue|floatformat:2 }}</td>
                     </tr>
                     {% for rev in pnl.revenue_items %}
-                    <tr class="hover:bg-zinc-50/80 text-zinc-700">
-                        <td class="py-1.5 px-3 text-zinc-500">{{ rev.code }}</td>
-                        <td class="py-1.5 px-3 font-sans">{{ rev.name }}</td>
-                        <td class="py-1.5 px-3 text-right tabular-nums">C$ {{ rev.amount|floatformat:2 }}</td>
-                        <td class="py-1.5 px-3 text-right tabular-nums text-zinc-400">&mdash;</td>
+                    <tr class="hover:bg-zinc-50/60 text-zinc-700">
+                        <td class="py-2 px-4 font-mono text-zinc-500 text-xs">{{ rev.code }}</td>
+                        <td class="py-2 px-4 font-sans">{{ rev.name }}</td>
+                        <td class="py-2 px-4 text-right font-mono tabular-nums text-zinc-600">C$ {{ rev.amount|floatformat:2 }}</td>
+                        <td class="py-2 px-4 text-right font-mono tabular-nums text-zinc-400">&mdash;</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="py-3 px-3 text-center text-zinc-400 font-sans italic">Sin movimientos registrados en cuentas de ingresos.</td>
+                        <td colspan="4" class="py-4 px-4 text-center text-zinc-400 font-sans italic">Sin movimientos registrados en cuentas de ingresos.</td>
                     </tr>
                     {% endfor %}
 
                     <!-- SECCIÓN 2: COSTOS OPERATIVOS DIRECTOS -->
-                    <tr class="bg-zinc-50/50 font-bold text-zinc-900 border-t border-zinc-200">
-                        <td colspan="3" class="py-2 px-3 text-[11px] uppercase tracking-wider">2. COSTOS DE OPERACIÓN Y VENTAS</td>
-                        <td class="py-2 px-3 text-right tabular-nums text-rose-700">(C$ {{ pnl.total_operational_costs|floatformat:2 }})</td>
+                    <tr class="bg-zinc-50/50 font-medium text-zinc-900 border-t border-zinc-200 text-xs">
+                        <td colspan="3" class="py-2.5 px-4 font-sans">2. Costos de operación y ventas</td>
+                        <td class="py-2.5 px-4 text-right font-mono tabular-nums text-rose-600">(C$ {{ pnl.total_operational_costs|floatformat:2 }})</td>
                     </tr>
                     {% for cost in pnl.cost_items %}
-                    <tr class="hover:bg-zinc-50/80 text-zinc-700">
-                        <td class="py-1.5 px-3 text-zinc-500">{{ cost.code }}</td>
-                        <td class="py-1.5 px-3 font-sans">{{ cost.name }}</td>
-                        <td class="py-1.5 px-3 text-right tabular-nums">C$ {{ cost.amount|floatformat:2 }}</td>
-                        <td class="py-1.5 px-3 text-right tabular-nums text-zinc-400">&mdash;</td>
+                    <tr class="hover:bg-zinc-50/60 text-zinc-700">
+                        <td class="py-2 px-4 font-mono text-zinc-500 text-xs">{{ cost.code }}</td>
+                        <td class="py-2 px-4 font-sans">{{ cost.name }}</td>
+                        <td class="py-2 px-4 text-right font-mono tabular-nums text-zinc-600">C$ {{ cost.amount|floatformat:2 }}</td>
+                        <td class="py-2 px-4 text-right font-mono tabular-nums text-zinc-400">&mdash;</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="py-2 px-3 text-center text-zinc-400 font-sans italic">Sin costos directos registrados.</td>
+                        <td colspan="4" class="py-4 px-4 text-center text-zinc-400 font-sans italic">Sin costos directos registrados.</td>
                     </tr>
                     {% endfor %}
 
                     <!-- SUBTOTAL: UTILIDAD BRUTA -->
-                    <tr class="bg-zinc-100 font-bold border-t border-b border-zinc-200 text-zinc-900">
-                        <td colspan="3" class="py-2.5 px-3 text-xs uppercase tracking-wider font-semibold">(=) UTILIDAD BRUTA OPERATIVA</td>
-                        <td class="py-2.5 px-3 text-right tabular-nums text-zinc-900 font-bold">C$ {{ pnl.gross_profit|floatformat:2 }}</td>
+                    <tr class="bg-zinc-100/70 font-semibold border-t border-b border-zinc-200 text-zinc-900 text-xs">
+                        <td colspan="3" class="py-2.5 px-4 font-sans">(=) Utilidad bruta operativa</td>
+                        <td class="py-2.5 px-4 text-right font-mono tabular-nums text-zinc-900 font-bold">C$ {{ pnl.gross_profit|floatformat:2 }}</td>
                     </tr>
 
                     <!-- SECCIÓN 3: GASTOS DE NÓMINA Y TALENTO (MITRAB/INSS) -->
-                    <tr class="bg-zinc-50/50 font-bold text-zinc-900">
-                        <td colspan="3" class="py-2 px-3 text-[11px] uppercase tracking-wider">3. GASTOS DE PERSONAL, NÓMINA Y CARGAS SOCIALES (LEY 185 / INSS)</td>
-                        <td class="py-2 px-3 text-right tabular-nums text-rose-700">(C$ {{ pnl.total_payroll_expenses|floatformat:2 }})</td>
+                    <tr class="bg-zinc-50/50 font-medium text-zinc-900 text-xs">
+                        <td colspan="3" class="py-2.5 px-4 font-sans">3. Gastos de personal, nómina y cargas sociales (Ley 185 / INSS)</td>
+                        <td class="py-2.5 px-4 text-right font-mono tabular-nums text-rose-600">(C$ {{ pnl.total_payroll_expenses|floatformat:2 }})</td>
                     </tr>
                     {% for pay in pnl.payroll_items %}
-                    <tr class="hover:bg-zinc-50/80 text-zinc-700">
-                        <td class="py-1.5 px-3 text-zinc-500">{{ pay.code }}</td>
-                        <td class="py-1.5 px-3 font-sans">{{ pay.name }}</td>
-                        <td class="py-1.5 px-3 text-right tabular-nums">C$ {{ pay.amount|floatformat:2 }}</td>
-                        <td class="py-1.5 px-3 text-right tabular-nums text-zinc-400">&mdash;</td>
+                    <tr class="hover:bg-zinc-50/60 text-zinc-700">
+                        <td class="py-2 px-4 font-mono text-zinc-500 text-xs">{{ pay.code }}</td>
+                        <td class="py-2 px-4 font-sans">{{ pay.name }}</td>
+                        <td class="py-2 px-4 text-right font-mono tabular-nums text-zinc-600">C$ {{ pay.amount|floatformat:2 }}</td>
+                        <td class="py-2 px-4 text-right font-mono tabular-nums text-zinc-400">&mdash;</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="py-2 px-3 text-center text-zinc-400 font-sans italic">Sin gastos de nómina contabilizados.</td>
+                        <td colspan="4" class="py-4 px-4 text-center text-zinc-400 font-sans italic">Sin gastos de nómina contabilizados.</td>
                     </tr>
                     {% endfor %}
 
                     <!-- SECCIÓN 4: GASTOS GENERALES Y ADMINISTRATIVOS -->
-                    <tr class="bg-zinc-50/50 font-bold text-zinc-900 border-t border-zinc-200">
-                        <td colspan="3" class="py-2 px-3 text-[11px] uppercase tracking-wider">4. GASTOS GENERALES, ADMINISTRATIVOS Y OPERACIONALES</td>
-                        <td class="py-2 px-3 text-right tabular-nums text-rose-700">(C$ {{ pnl.total_general_expenses|floatformat:2 }})</td>
+                    <tr class="bg-zinc-50/50 font-medium text-zinc-900 border-t border-zinc-200 text-xs">
+                        <td colspan="3" class="py-2.5 px-4 font-sans">4. Gastos generales, administrativos y operacionales</td>
+                        <td class="py-2.5 px-4 text-right font-mono tabular-nums text-rose-600">(C$ {{ pnl.total_general_expenses|floatformat:2 }})</td>
                     </tr>
                     {% for gen in pnl.general_expense_items %}
-                    <tr class="hover:bg-zinc-50/80 text-zinc-700">
-                        <td class="py-1.5 px-3 text-zinc-500">{{ gen.code }}</td>
-                        <td class="py-1.5 px-3 font-sans">{{ gen.name }}</td>
-                        <td class="py-1.5 px-3 text-right tabular-nums">C$ {{ gen.amount|floatformat:2 }}</td>
-                        <td class="py-1.5 px-3 text-right tabular-nums text-zinc-400">&mdash;</td>
+                    <tr class="hover:bg-zinc-50/60 text-zinc-700">
+                        <td class="py-2 px-4 font-mono text-zinc-500 text-xs">{{ gen.code }}</td>
+                        <td class="py-2 px-4 font-sans">{{ gen.name }}</td>
+                        <td class="py-2 px-4 text-right font-mono tabular-nums text-zinc-600">C$ {{ gen.amount|floatformat:2 }}</td>
+                        <td class="py-2 px-4 text-right font-mono tabular-nums text-zinc-400">&mdash;</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="py-2 px-3 text-center text-zinc-400 font-sans italic">Sin otros gastos administrativos registrados.</td>
+                        <td colspan="4" class="py-4 px-4 text-center text-zinc-400 font-sans italic">Sin otros gastos administrativos registrados.</td>
                     </tr>
                     {% endfor %}
 
                     <!-- TOTAL GASTOS OPERATIVOS -->
-                    <tr class="bg-zinc-50 text-zinc-700 font-medium border-t border-zinc-200">
-                        <td colspan="3" class="py-2 px-3 text-xs uppercase tracking-wider">(=) TOTAL COSTOS Y GASTOS DE OPERACIÓN</td>
-                        <td class="py-2 px-3 text-right tabular-nums text-rose-700 font-bold">(C$ {{ pnl.total_operating_expenses|floatformat:2 }})</td>
+                    <tr class="bg-zinc-50 text-zinc-700 font-medium border-t border-zinc-200 text-xs">
+                        <td colspan="3" class="py-2.5 px-4 font-sans">(=) Total costos y gastos de operación</td>
+                        <td class="py-2.5 px-4 text-right font-mono tabular-nums text-rose-600 font-semibold">(C$ {{ pnl.total_operating_expenses|floatformat:2 }})</td>
                     </tr>
 
                     <!-- UTILIDAD NETA FINAL -->
-                    <tr class="bg-zinc-900 text-white font-bold border-t-2 border-zinc-900 text-sm">
-                        <td colspan="3" class="py-3 px-3 uppercase tracking-wider font-semibold">(=) UTILIDAD NETA DEL EJERCICIO</td>
-                        <td class="py-3 px-3 text-right tabular-nums font-bold {% if pnl.net_income >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+                    <tr class="bg-zinc-900 text-white font-medium border-t-2 border-zinc-900 text-sm">
+                        <td colspan="3" class="py-3 px-4 font-sans">(=) Utilidad neta del ejercicio</td>
+                        <td class="py-3 px-4 text-right font-mono tabular-nums font-semibold {% if pnl.net_income >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
                             C$ {{ pnl.net_income|floatformat:2 }}
                         </td>
                     </tr>
@@ -276,71 +276,71 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <!-- COLUMNA IZQUIERDA: ACTIVOS -->
             <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
-                <div class="px-4 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
-                    <h3 class="text-xs font-mono font-bold uppercase text-zinc-900">Activos (Clase 1)</h3>
-                    <span class="font-mono text-xs font-bold text-zinc-900 tabular-nums">C$ {{ balance.total_assets|floatformat:2 }}</span>
+                <div class="px-4 py-3 bg-zinc-50/60 border-b border-zinc-200 flex items-center justify-between">
+                    <h3 class="text-xs font-medium text-zinc-900">Activos (Clase 1)</h3>
+                    <span class="font-mono text-xs font-semibold text-zinc-900 tabular-nums">C$ {{ balance.total_assets|floatformat:2 }}</span>
                 </div>
-                <div class="p-3 space-y-4 text-xs font-mono">
+                <div class="p-4 space-y-4 text-xs font-sans">
                     <!-- Caja y Bancos -->
                     <div>
-                        <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold mb-1">Efectivo & Equivalentes de Efectivo</div>
+                        <div class="text-xs font-medium text-zinc-400 mb-1">Efectivo &amp; Equivalentes de Efectivo</div>
                         <ul class="divide-y divide-zinc-100">
                             {% for a in balance.cash_and_banks %}
-                            <li class="py-1.5 flex justify-between items-center text-zinc-700">
-                                <span><strong class="text-zinc-500">{{ a.code }}</strong> · {{ a.name }}</span>
-                                <span class="font-bold tabular-nums">C$ {{ a.balance|floatformat:2 }}</span>
+                            <li class="py-2 flex justify-between items-center text-zinc-700">
+                                <span><strong class="font-mono text-zinc-500 font-normal">{{ a.code }}</strong> · {{ a.name }}</span>
+                                <span class="font-mono font-medium tabular-nums text-zinc-900">C$ {{ a.balance|floatformat:2 }}</span>
                             </li>
                             {% empty %}
-                            <li class="py-1 text-zinc-400 italic font-sans">Sin saldos en cuentas de efectivo.</li>
+                            <li class="py-2 text-zinc-400 italic">Sin saldos en cuentas de efectivo.</li>
                             {% endfor %}
                         </ul>
                     </div>
 
                     <!-- Cuentas por Cobrar -->
-                    <div class="pt-2 border-t border-zinc-100">
-                        <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold mb-1">Cuentas por Cobrar Comerciales (CxC)</div>
+                    <div class="pt-3 border-t border-zinc-100">
+                        <div class="text-xs font-medium text-zinc-400 mb-1">Cuentas por Cobrar Comerciales (CxC)</div>
                         <ul class="divide-y divide-zinc-100">
                             {% for a in balance.receivables %}
-                            <li class="py-1.5 flex justify-between items-center text-zinc-700">
-                                <span><strong class="text-zinc-500">{{ a.code }}</strong> · {{ a.name }}</span>
-                                <span class="font-bold tabular-nums">C$ {{ a.balance|floatformat:2 }}</span>
+                            <li class="py-2 flex justify-between items-center text-zinc-700">
+                                <span><strong class="font-mono text-zinc-500 font-normal">{{ a.code }}</strong> · {{ a.name }}</span>
+                                <span class="font-mono font-medium tabular-nums text-zinc-900">C$ {{ a.balance|floatformat:2 }}</span>
                             </li>
                             {% empty %}
-                            <li class="py-1 text-zinc-400 italic font-sans">Sin saldos pendientes en CxC.</li>
+                            <li class="py-2 text-zinc-400 italic">Sin saldos pendientes en CxC.</li>
                             {% endfor %}
                         </ul>
                     </div>
 
                     <!-- Créditos Fiscales y Anticipos -->
-                    <div class="pt-2 border-t border-zinc-100">
-                        <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold mb-1">Impuestos Acreditables y Anticipos Fiscales</div>
+                    <div class="pt-3 border-t border-zinc-100">
+                        <div class="text-xs font-medium text-zinc-400 mb-1">Impuestos Acreditables y Anticipos Fiscales</div>
                         <ul class="divide-y divide-zinc-100">
                             {% for a in balance.tax_assets %}
-                            <li class="py-1.5 flex justify-between items-center text-zinc-700">
-                                <span><strong class="text-zinc-500">{{ a.code }}</strong> · {{ a.name }}</span>
-                                <span class="font-bold tabular-nums">C$ {{ a.balance|floatformat:2 }}</span>
+                            <li class="py-2 flex justify-between items-center text-zinc-700">
+                                <span><strong class="font-mono text-zinc-500 font-normal">{{ a.code }}</strong> · {{ a.name }}</span>
+                                <span class="font-mono font-medium tabular-nums text-zinc-900">C$ {{ a.balance|floatformat:2 }}</span>
                             </li>
                             {% empty %}
-                            <li class="py-1 text-zinc-400 italic font-sans">Sin créditos fiscales acumulados.</li>
+                            <li class="py-2 text-zinc-400 italic">Sin créditos fiscales acumulados.</li>
                             {% endfor %}
                         </ul>
                     </div>
 
                     <!-- Inventarios y Otros -->
                     {% if balance.inventories or balance.other_assets %}
-                    <div class="pt-2 border-t border-zinc-100">
-                        <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold mb-1">Inventarios & Otros Activos</div>
+                    <div class="pt-3 border-t border-zinc-100">
+                        <div class="text-xs font-medium text-zinc-400 mb-1">Inventarios &amp; Otros Activos</div>
                         <ul class="divide-y divide-zinc-100">
                             {% for a in balance.inventories %}
-                            <li class="py-1.5 flex justify-between items-center text-zinc-700">
-                                <span><strong class="text-zinc-500">{{ a.code }}</strong> · {{ a.name }}</span>
-                                <span class="font-bold tabular-nums">C$ {{ a.balance|floatformat:2 }}</span>
+                            <li class="py-2 flex justify-between items-center text-zinc-700">
+                                <span><strong class="font-mono text-zinc-500 font-normal">{{ a.code }}</strong> · {{ a.name }}</span>
+                                <span class="font-mono font-medium tabular-nums text-zinc-900">C$ {{ a.balance|floatformat:2 }}</span>
                             </li>
                             {% endfor %}
                             {% for a in balance.other_assets %}
-                            <li class="py-1.5 flex justify-between items-center text-zinc-700">
-                                <span><strong class="text-zinc-500">{{ a.code }}</strong> · {{ a.name }}</span>
-                                <span class="font-bold tabular-nums">C$ {{ a.balance|floatformat:2 }}</span>
+                            <li class="py-2 flex justify-between items-center text-zinc-700">
+                                <span><strong class="font-mono text-zinc-500 font-normal">{{ a.code }}</strong> · {{ a.name }}</span>
+                                <span class="font-mono font-medium tabular-nums text-zinc-900">C$ {{ a.balance|floatformat:2 }}</span>
                             </li>
                             {% endfor %}
                         </ul>
@@ -348,9 +348,9 @@
                     {% endif %}
 
                     <!-- Total Activos Foot -->
-                    <div class="pt-3 border-t-2 border-zinc-900 flex justify-between items-center text-xs font-bold text-zinc-900">
-                        <span>TOTAL ACTIVOS</span>
-                        <span class="tabular-nums">C$ {{ balance.total_assets|floatformat:2 }}</span>
+                    <div class="pt-3 border-t-2 border-zinc-900 flex justify-between items-center text-xs font-semibold text-zinc-900">
+                        <span>Total activos</span>
+                        <span class="font-mono tabular-nums">C$ {{ balance.total_assets|floatformat:2 }}</span>
                     </div>
                 </div>
             </div>
@@ -359,98 +359,98 @@
             <div class="space-y-4">
                 <!-- Pasivos -->
                 <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
-                    <div class="px-4 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
-                        <h3 class="text-xs font-mono font-bold uppercase text-zinc-900">Pasivos (Clase 2)</h3>
-                        <span class="font-mono text-xs font-bold text-zinc-900 tabular-nums">C$ {{ balance.total_liabilities|floatformat:2 }}</span>
+                    <div class="px-4 py-3 bg-zinc-50/60 border-b border-zinc-200 flex items-center justify-between">
+                        <h3 class="text-xs font-medium text-zinc-900">Pasivos (Clase 2)</h3>
+                        <span class="font-mono text-xs font-semibold text-zinc-900 tabular-nums">C$ {{ balance.total_liabilities|floatformat:2 }}</span>
                     </div>
-                    <div class="p-3 space-y-4 text-xs font-mono">
+                    <div class="p-4 space-y-4 text-xs font-sans">
                         <!-- Proveedores CxP -->
                         <div>
-                            <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold mb-1">Cuentas por Pagar Comerciales (CxP)</div>
+                            <div class="text-xs font-medium text-zinc-400 mb-1">Cuentas por Pagar Comerciales (CxP)</div>
                             <ul class="divide-y divide-zinc-100">
                                 {% for l in balance.accounts_payable %}
-                                <li class="py-1.5 flex justify-between items-center text-zinc-700">
-                                    <span><strong class="text-zinc-500">{{ l.code }}</strong> · {{ l.name }}</span>
-                                    <span class="font-bold tabular-nums">C$ {{ l.balance|floatformat:2 }}</span>
+                                <li class="py-2 flex justify-between items-center text-zinc-700">
+                                    <span><strong class="font-mono text-zinc-500 font-normal">{{ l.code }}</strong> · {{ l.name }}</span>
+                                    <span class="font-mono font-medium tabular-nums text-zinc-900">C$ {{ l.balance|floatformat:2 }}</span>
                                 </li>
                                 {% empty %}
-                                <li class="py-1 text-zinc-400 italic font-sans">Sin saldos pendientes en CxP.</li>
+                                <li class="py-2 text-zinc-400 italic">Sin saldos pendientes en CxP.</li>
                                 {% endfor %}
                             </ul>
                         </div>
 
                         <!-- Impuestos por Pagar DGI / Alcaldía -->
-                        <div class="pt-2 border-t border-zinc-100">
-                            <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold mb-1">Obligaciones Tributarias (IVA & Retenciones DGI)</div>
+                        <div class="pt-3 border-t border-zinc-100">
+                            <div class="text-xs font-medium text-zinc-400 mb-1">Obligaciones Tributarias (IVA &amp; Retenciones DGI)</div>
                             <ul class="divide-y divide-zinc-100">
                                 {% for l in balance.tax_payables %}
-                                <li class="py-1.5 flex justify-between items-center text-zinc-700">
-                                    <span><strong class="text-zinc-500">{{ l.code }}</strong> · {{ l.name }}</span>
-                                    <span class="font-bold tabular-nums">C$ {{ l.balance|floatformat:2 }}</span>
+                                <li class="py-2 flex justify-between items-center text-zinc-700">
+                                    <span><strong class="font-mono text-zinc-500 font-normal">{{ l.code }}</strong> · {{ l.name }}</span>
+                                    <span class="font-mono font-medium tabular-nums text-zinc-900">C$ {{ l.balance|floatformat:2 }}</span>
                                 </li>
                                 {% empty %}
-                                <li class="py-1 text-zinc-400 italic font-sans">Sin impuestos pendientes de enterar.</li>
+                                <li class="py-2 text-zinc-400 italic">Sin impuestos pendientes de enterar.</li>
                                 {% endfor %}
                             </ul>
                         </div>
 
                         <!-- Pasivos Laborales y Provisiones -->
-                        <div class="pt-2 border-t border-zinc-100">
-                            <div class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold mb-1">Pasivos Laborales, INSS & Provisiones MITRAB</div>
+                        <div class="pt-3 border-t border-zinc-100">
+                            <div class="text-xs font-medium text-zinc-400 mb-1">Pasivos Laborales, INSS &amp; Provisiones MITRAB</div>
                             <ul class="divide-y divide-zinc-100">
                                 {% for l in balance.payroll_payables %}
-                                <li class="py-1.5 flex justify-between items-center text-zinc-700">
-                                    <span><strong class="text-zinc-500">{{ l.code }}</strong> · {{ l.name }}</span>
-                                    <span class="font-bold tabular-nums">C$ {{ l.balance|floatformat:2 }}</span>
+                                <li class="py-2 flex justify-between items-center text-zinc-700">
+                                    <span><strong class="font-mono text-zinc-500 font-normal">{{ l.code }}</strong> · {{ l.name }}</span>
+                                    <span class="font-mono font-medium tabular-nums text-zinc-900">C$ {{ l.balance|floatformat:2 }}</span>
                                 </li>
                                 {% empty %}
-                                <li class="py-1 text-zinc-400 italic font-sans">Sin pasivos laborales acumulados.</li>
+                                <li class="py-2 text-zinc-400 italic">Sin pasivos laborales acumulados.</li>
                                 {% endfor %}
                             </ul>
                         </div>
 
                         <!-- Total Pasivos Foot -->
-                        <div class="pt-3 border-t-2 border-zinc-200 flex justify-between items-center text-xs font-bold text-zinc-900">
-                            <span>TOTAL PASIVOS</span>
-                            <span class="tabular-nums">C$ {{ balance.total_liabilities|floatformat:2 }}</span>
+                        <div class="pt-3 border-t-2 border-zinc-200 flex justify-between items-center text-xs font-semibold text-zinc-900">
+                            <span>Total pasivos</span>
+                            <span class="font-mono tabular-nums">C$ {{ balance.total_liabilities|floatformat:2 }}</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Patrimonio / Capital -->
                 <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
-                    <div class="px-4 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
-                        <h3 class="text-xs font-mono font-bold uppercase text-zinc-900">Patrimonio Neto (Clase 3)</h3>
-                        <span class="font-mono text-xs font-bold text-zinc-900 tabular-nums">C$ {{ balance.total_equity_and_results|floatformat:2 }}</span>
+                    <div class="px-4 py-3 bg-zinc-50/60 border-b border-zinc-200 flex items-center justify-between">
+                        <h3 class="text-xs font-medium text-zinc-900">Patrimonio Neto (Clase 3)</h3>
+                        <span class="font-mono text-xs font-semibold text-zinc-900 tabular-nums">C$ {{ balance.total_equity_and_results|floatformat:2 }}</span>
                     </div>
-                    <div class="p-3 space-y-3 text-xs font-mono">
+                    <div class="p-4 space-y-3 text-xs font-sans">
                         <ul class="divide-y divide-zinc-100">
                             {% for e in balance.equity_items %}
-                            <li class="py-1.5 flex justify-between items-center text-zinc-700">
-                                <span><strong class="text-zinc-500">{{ e.code }}</strong> · {{ e.name }}</span>
-                                <span class="font-bold tabular-nums">C$ {{ e.balance|floatformat:2 }}</span>
+                            <li class="py-2 flex justify-between items-center text-zinc-700">
+                                <span><strong class="font-mono text-zinc-500 font-normal">{{ e.code }}</strong> · {{ e.name }}</span>
+                                <span class="font-mono font-medium tabular-nums text-zinc-900">C$ {{ e.balance|floatformat:2 }}</span>
                             </li>
                             {% endfor %}
                             <!-- Resultado del Ejercicio desde el P&L -->
-                            <li class="py-2 flex justify-between items-center bg-zinc-50 px-2 rounded-[3px]">
-                                <span class="font-bold text-zinc-900">Resultado Acumulado del Ejercicio (P&L)</span>
-                                <span class="font-bold tabular-nums {% if balance.net_income >= 0 %}text-emerald-700{% else %}text-rose-700{% endif %}">
+                            <li class="py-2.5 flex justify-between items-center bg-zinc-50 px-2.5 rounded-[4px]">
+                                <span class="font-medium text-zinc-900">Resultado acumulado del ejercicio (P&amp;L)</span>
+                                <span class="font-mono font-semibold tabular-nums {% if balance.net_income >= 0 %}text-emerald-700{% else %}text-rose-700{% endif %}">
                                     C$ {{ balance.net_income|floatformat:2 }}
                                 </span>
                             </li>
                         </ul>
 
-                        <div class="pt-3 border-t-2 border-zinc-200 flex justify-between items-center text-xs font-bold text-zinc-900">
-                            <span>TOTAL PATRIMONIO NETO</span>
-                            <span class="tabular-nums">C$ {{ balance.total_equity_and_results|floatformat:2 }}</span>
+                        <div class="pt-3 border-t-2 border-zinc-200 flex justify-between items-center text-xs font-semibold text-zinc-900">
+                            <span>Total patrimonio neto</span>
+                            <span class="font-mono tabular-nums">C$ {{ balance.total_equity_and_results|floatformat:2 }}</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Total Pasivo + Patrimonio (Ecuación Patrimonial) -->
-                <div class="bg-zinc-900 text-white rounded-[4px] p-3.5 flex justify-between items-center font-mono text-xs font-bold">
-                    <span>TOTAL PASIVOS + PATRIMONIO NETO</span>
-                    <span class="tabular-nums text-sm">C$ {{ balance.total_liabilities_and_equity|floatformat:2 }}</span>
+                <div class="bg-zinc-900 text-white rounded-[4px] p-4 flex justify-between items-center text-xs font-medium">
+                    <span>Total pasivos + patrimonio neto</span>
+                    <span class="font-mono tabular-nums text-sm font-semibold">C$ {{ balance.total_liabilities_and_equity|floatformat:2 }}</span>
                 </div>
             </div>
         </div>
@@ -461,58 +461,58 @@
     <!-- ===================================================================== -->
     <div x-show="activeTab === 'trial'" x-cloak class="space-y-4">
         <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
-            <div class="px-4 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
+            <div class="px-4 py-3 bg-zinc-50/60 border-b border-zinc-200 flex items-center justify-between">
                 <div>
-                    <h3 class="text-xs font-mono font-bold uppercase text-zinc-900">Balanza de Comprobación de Sumas y Saldos</h3>
-                    <p class="text-[11px] text-zinc-500">Auditoría contable completa de movimientos del Debe y Haber en el período</p>
+                    <h3 class="text-xs font-medium text-zinc-900">Balanza de Comprobación de Sumas y Saldos</h3>
+                    <p class="text-xs text-zinc-500 mt-0.5">Auditoría contable completa de movimientos del Debe y Haber en el período</p>
                 </div>
-                <div class="font-mono text-xs text-zinc-700">
-                    Total Cuentas con Movimiento: <strong class="text-zinc-900 font-bold tabular-nums">{{ trial.accounts|length }}</strong>
+                <div class="text-xs text-zinc-500">
+                    Total cuentas con movimiento: <strong class="text-zinc-900 font-mono tabular-nums">{{ trial.accounts|length }}</strong>
                 </div>
             </div>
 
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                    <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-mono uppercase text-zinc-500 tracking-wider">
-                        <th class="py-2 px-3 font-semibold w-24">Código</th>
-                        <th class="py-2 px-3 font-semibold">Nombre de la Cuenta</th>
-                        <th class="py-2 px-3 font-semibold w-24">Tipo</th>
-                        <th class="py-2 px-3 text-right font-semibold w-32">Total Debe (C$)</th>
-                        <th class="py-2 px-3 text-right font-semibold w-32">Total Haber (C$)</th>
-                        <th class="py-2 px-3 text-right font-semibold w-32">Saldo Deudor</th>
-                        <th class="py-2 px-3 text-right font-semibold w-32">Saldo Acreedor</th>
+                    <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/60 border-b border-zinc-200 font-sans">
+                        <th class="py-3 px-4 w-24">Código</th>
+                        <th class="py-3 px-4">Nombre de la Cuenta</th>
+                        <th class="py-3 px-4 w-24">Tipo</th>
+                        <th class="py-3 px-4 text-right w-32">Total Debe (C$)</th>
+                        <th class="py-3 px-4 text-right w-32">Total Haber (C$)</th>
+                        <th class="py-3 px-4 text-right w-32">Saldo Deudor</th>
+                        <th class="py-3 px-4 text-right w-32">Saldo Acreedor</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 font-mono text-[11px]">
+                <tbody class="divide-y divide-zinc-100 text-sm text-zinc-700">
                     {% for a in trial.accounts %}
-                    <tr class="hover:bg-zinc-50/80">
-                        <td class="py-1.5 px-3 font-bold text-zinc-900">{{ a.code }}</td>
-                        <td class="py-1.5 px-3 font-sans text-zinc-800">{{ a.name }}</td>
-                        <td class="py-1.5 px-3 text-zinc-500 text-[10px]">{{ a.account_type }}</td>
-                        <td class="py-1.5 px-3 text-right tabular-nums text-zinc-700">C$ {{ a.total_debit|floatformat:2 }}</td>
-                        <td class="py-1.5 px-3 text-right tabular-nums text-zinc-700">C$ {{ a.total_credit|floatformat:2 }}</td>
-                        <td class="py-1.5 px-3 text-right tabular-nums font-semibold text-zinc-900">
+                    <tr class="hover:bg-zinc-50/60 transition-colors">
+                        <td class="py-2.5 px-4 font-mono font-medium text-zinc-900">{{ a.code }}</td>
+                        <td class="py-2.5 px-4 font-sans text-zinc-800">{{ a.name }}</td>
+                        <td class="py-2.5 px-4 text-zinc-500 font-sans text-xs">{{ a.account_type }}</td>
+                        <td class="py-2.5 px-4 text-right font-mono tabular-nums text-zinc-600">C$ {{ a.total_debit|floatformat:2 }}</td>
+                        <td class="py-2.5 px-4 text-right font-mono tabular-nums text-zinc-600">C$ {{ a.total_credit|floatformat:2 }}</td>
+                        <td class="py-2.5 px-4 text-right font-mono tabular-nums font-semibold text-zinc-900">
                             {% if a.debit_balance > 0 %}C$ {{ a.debit_balance|floatformat:2 }}{% else %}&mdash;{% endif %}
                         </td>
-                        <td class="py-1.5 px-3 text-right tabular-nums font-semibold text-zinc-900">
+                        <td class="py-2.5 px-4 text-right font-mono tabular-nums font-semibold text-zinc-900">
                             {% if a.credit_balance > 0 %}C$ {{ a.credit_balance|floatformat:2 }}{% else %}&mdash;{% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="py-4 text-center text-zinc-400 font-sans italic">
+                        <td colspan="7" class="py-8 px-4 text-center text-zinc-400 font-sans">
                             No se registran asientos contables asentados en el período seleccionado.
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
                 <tfoot>
-                    <tr class="bg-zinc-100 font-mono font-bold text-xs border-t-2 border-zinc-900 text-zinc-900">
-                        <td colspan="3" class="py-3 px-3 uppercase tracking-wider">SUMAS IGUALES CONSOLIDADAS</td>
-                        <td class="py-3 px-3 text-right tabular-nums">C$ {{ trial.sum_debits|floatformat:2 }}</td>
-                        <td class="py-3 px-3 text-right tabular-nums">C$ {{ trial.sum_credits|floatformat:2 }}</td>
-                        <td class="py-3 px-3 text-right tabular-nums">C$ {{ trial.sum_debit_balance|floatformat:2 }}</td>
-                        <td class="py-3 px-3 text-right tabular-nums">C$ {{ trial.sum_credit_balance|floatformat:2 }}</td>
+                    <tr class="bg-zinc-50/80 font-mono text-xs border-t-2 border-zinc-900 text-zinc-900">
+                        <td colspan="3" class="py-3 px-4 uppercase font-sans font-medium">Sumas iguales consolidadas</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ trial.sum_debits|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ trial.sum_credits|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ trial.sum_debit_balance|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ trial.sum_credit_balance|floatformat:2 }}</td>
                     </tr>
                 </tfoot>
             </table>

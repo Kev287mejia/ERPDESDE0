@@ -1,16 +1,16 @@
 {% extends "layouts/base_erp.html" %}
 
 {% block title %}Centro Tributario VET-DGI Nicaragua · Ley 822{% endblock %}
-{% block breadcrumb_section %}FINANZAS &amp; FISCAL{% endblock %}
-{% block breadcrumb_page %}CENTRO TRIBUTARIO VET-DGI{% endblock %}
+{% block breadcrumb_section %}Finanzas &amp; Fiscal{% endblock %}
+{% block breadcrumb_page %}Centro Tributario VET-DGI{% endblock %}
 {% block page_title %}Centro de Reportería Fiscal VET-DGI &amp; Alcaldía de Managua (Ley 822){% endblock %}
 
 {% block page_actions %}
 <div class="flex flex-wrap items-center gap-2">
-    <a href="{% url 'billing:cash_session_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+    <a href="{% url 'billing:cash_session_list' %}" class="h-8 px-3 border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-medium rounded-[4px] transition-colors flex items-center">
         Arqueo de Caja Z
     </a>
-    <a href="{% url 'billing:invoice_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
+    <a href="{% url 'billing:invoice_list' %}" class="h-8 px-3 border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-medium rounded-[4px] transition-colors flex items-center">
         Facturación &amp; Cartera
     </a>
 
@@ -20,7 +20,7 @@
         {% csrf_token %}
         <button type="submit" 
                 onclick="return confirm('¿Desea generar los asientos de partida doble para todas las facturas y compras que aún no están en contabilidad?');"
-                class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded transition-colors flex items-center gap-1.5">
+                class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5 cursor-pointer">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3"/>
             </svg>
@@ -32,28 +32,28 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6 max-w-7xl mx-auto">
+<div class="space-y-6 max-w-7xl mx-auto font-sans">
 
     <!-- Filtro de Período Fiscal y Acciones de Exportación VET -->
-    <div class="bg-white border border-slate-200 rounded p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+    <div class="bg-white border border-zinc-200 rounded-[4px] p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
         <form method="GET" class="flex flex-wrap items-center gap-2">
-            <span class="font-mono text-[11px] font-semibold text-slate-500 uppercase">PERÍODO FISCAL:</span>
-            <select name="year" class="h-8 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:outline-none focus:border-slate-500">
+            <span class="text-xs font-medium text-zinc-500">Período fiscal:</span>
+            <select name="year" class="h-8 px-2 text-xs font-sans bg-white border border-zinc-200 rounded-[4px] focus:outline-none focus:border-zinc-400">
                 {% for y in available_years %}
-                <option value="{{ y }}" {% if selected_year == y|stringformat:"i" %}selected{% endif %}>AÑO {{ y }}</option>
+                <option value="{{ y }}" {% if selected_year == y|stringformat:"i" %}selected{% endif %}>Año {{ y }}</option>
                 {% endfor %}
             </select>
-            <select name="month" class="h-8 px-2 text-xs font-mono bg-white border border-slate-300 rounded focus:outline-none focus:border-slate-500">
-                <option value="">TODOS LOS MESES (ACUMULADO)</option>
+            <select name="month" class="h-8 px-2 text-xs font-sans bg-white border border-zinc-200 rounded-[4px] focus:outline-none focus:border-zinc-400">
+                <option value="">Todos los meses (acumulado)</option>
                 {% for m_val, m_label in months_choices %}
                 <option value="{{ m_val }}" {% if selected_month == m_val %}selected{% endif %}>{{ m_label }}</option>
                 {% endfor %}
             </select>
-            <button type="submit" class="h-8 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-medium rounded transition-colors font-mono">
+            <button type="submit" class="h-8 px-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-medium rounded-[4px] transition-colors cursor-pointer">
                 Filtrar
             </button>
             {% if selected_month %}
-            <a href="?year={{ selected_year }}" class="h-8 px-2 flex items-center text-slate-500 hover:text-slate-800 text-[11px] font-mono">
+            <a href="?year={{ selected_year }}" class="h-8 px-2 flex items-center text-zinc-500 hover:text-zinc-800 text-xs">
                 Limpiar mes
             </a>
             {% endif %}
@@ -62,19 +62,19 @@
         <!-- Botones de Descarga CSV para VET-DGI -->
         {% if can_export_and_sync %}
         <div class="flex flex-wrap items-center gap-1.5">
-            <span class="font-mono text-[10px] text-slate-400 uppercase tracking-tight mr-1">EXPORTAR VET:</span>
+            <span class="text-xs text-zinc-400 mr-1">Exportar VET:</span>
             <a href="{% url 'billing:vet_dgi_export_csv' 'retentions' %}?year={{ selected_year }}&month={{ selected_month }}" 
-               class="h-8 px-2.5 py-1 text-[11px] font-mono border border-slate-300 hover:bg-slate-50 rounded text-slate-700 transition-colors flex items-center gap-1"
+               class="h-8 px-2.5 py-1 text-xs border border-zinc-200 hover:bg-zinc-50 rounded-[4px] text-zinc-700 transition-colors flex items-center gap-1"
                title="Exportar Anexo de Retenciones practicadas en compras (IR/IMI)">
                 <span>Retenciones CSV</span>
             </a>
             <a href="{% url 'billing:vet_dgi_export_csv' 'purchases_iva' %}?year={{ selected_year }}&month={{ selected_month }}" 
-               class="h-8 px-2.5 py-1 text-[11px] font-mono border border-slate-300 hover:bg-slate-50 rounded text-slate-700 transition-colors flex items-center gap-1"
+               class="h-8 px-2.5 py-1 text-xs border border-zinc-200 hover:bg-zinc-50 rounded-[4px] text-zinc-700 transition-colors flex items-center gap-1"
                title="Exportar Libro de Compras con IVA Crédito Fiscal 15%">
                 <span>Compras IVA CSV</span>
             </a>
             <a href="{% url 'billing:vet_dgi_export_csv' 'sales_dgi' %}?year={{ selected_year }}&month={{ selected_month }}" 
-               class="h-8 px-2.5 py-1 text-[11px] font-mono border border-slate-300 hover:bg-slate-50 rounded text-slate-700 transition-colors flex items-center gap-1"
+               class="h-8 px-2.5 py-1 text-xs border border-zinc-200 hover:bg-zinc-50 rounded-[4px] text-zinc-700 transition-colors flex items-center gap-1"
                title="Exportar Libro de Ventas DGI con IVA Débito y Exenciones Ley 822">
                 <span>Ventas DGI CSV</span>
             </a>
@@ -85,75 +85,75 @@
     <!-- ============================================================== -->
     <!-- CUADRO DE LIQUIDACIÓN MENSUAL DGI (CONSOLIDADO EJECUTIVO)       -->
     <!-- ============================================================== -->
-    <div class="bg-white border border-slate-200 rounded p-4 space-y-4">
-        <div class="border-b border-slate-200 pb-2.5 flex items-center justify-between">
+    <div class="bg-white border border-zinc-200 rounded-[4px] p-5 space-y-4">
+        <div class="border-b border-zinc-200 pb-3 flex items-center justify-between">
             <div>
-                <h2 class="text-sm font-bold text-slate-900 font-sans uppercase tracking-tight">
+                <h2 class="text-sm font-semibold text-zinc-900">
                     Cuadro de Liquidación Fiscal DGI &amp; Alcaldía de Managua (Ley 822)
                 </h2>
-                <p class="text-[11px] text-slate-500 font-sans">
+                <p class="text-xs text-zinc-500 mt-0.5">
                     Cálculo automático de obligaciones fiscales basado en operaciones emitidas y recibidas.
                 </p>
             </div>
-            <div class="font-mono text-xs text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded">
-                RUC: <strong class="text-slate-900">{{ current_org.tax_id|default:"N/D" }}</strong>
+            <div class="text-xs text-zinc-600 bg-zinc-50 border border-zinc-200 px-2.5 py-1 rounded-[4px]">
+                RUC: <strong class="text-zinc-900 font-mono">{{ current_org.tax_id|default:"N/D" }}</strong>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
             <!-- 1. IVA Débito Fiscal -->
-            <div class="p-3 bg-slate-50 border border-slate-200 rounded">
-                <div class="text-[10px] text-slate-500 uppercase tracking-tight font-sans">1. IVA Débito Fiscal (Ventas 15%)</div>
-                <div class="text-base font-bold text-slate-900 tabular-nums mt-1">
+            <div class="p-3.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <div class="text-xs text-zinc-500 font-medium">1. IVA Débito fiscal (Ventas 15%)</div>
+                <div class="text-base font-semibold text-zinc-900 font-mono tabular-nums mt-1">
                     C$ {{ tot_sales_iva|floatformat:2 }}
                 </div>
-                <div class="text-[10px] text-slate-500 font-sans mt-0.5">Trasladado a clientes</div>
+                <div class="text-xs text-zinc-400 mt-0.5">Trasladado a clientes</div>
             </div>
 
             <!-- 2. IVA Crédito Fiscal -->
-            <div class="p-3 bg-slate-50 border border-slate-200 rounded">
-                <div class="text-[10px] text-slate-500 uppercase tracking-tight font-sans">2. IVA Crédito Fiscal (Compras 15%)</div>
-                <div class="text-base font-bold text-blue-700 tabular-nums mt-1">
+            <div class="p-3.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <div class="text-xs text-zinc-500 font-medium">2. IVA Crédito fiscal (Compras 15%)</div>
+                <div class="text-base font-semibold text-zinc-900 font-mono tabular-nums mt-1">
                     C$ {{ tot_purchases_iva|floatformat:2 }}
                 </div>
-                <div class="text-[10px] text-blue-600 font-sans mt-0.5">Acreditable según Ley 822</div>
+                <div class="text-xs text-zinc-400 mt-0.5">Acreditable según Ley 822</div>
             </div>
 
             <!-- 3. Liquidación Neta IVA -->
-            <div class="p-3 bg-slate-100 border border-slate-300 rounded">
-                <div class="text-[10px] text-slate-700 uppercase tracking-tight font-sans font-semibold">3. Saldo Neto IVA DGI</div>
+            <div class="p-3.5 bg-zinc-100/70 border border-zinc-200 rounded-[4px]">
+                <div class="text-xs text-zinc-700 font-medium">3. Saldo neto IVA DGI</div>
                 {% if is_iva_payable %}
-                <div class="text-base font-bold text-rose-700 tabular-nums mt-1">
+                <div class="text-base font-semibold text-rose-700 font-mono tabular-nums mt-1">
                     C$ {{ iva_payable_amount|floatformat:2 }}
                 </div>
-                <div class="text-[10px] text-rose-700 font-sans mt-0.5 font-medium">IVA Neto por Pagar a la DGI</div>
+                <div class="text-xs text-rose-600 mt-0.5 font-medium">IVA neto por pagar a la DGI</div>
                 {% else %}
-                <div class="text-base font-bold text-emerald-700 tabular-nums mt-1">
+                <div class="text-base font-semibold text-emerald-700 font-mono tabular-nums mt-1">
                     C$ {{ iva_favor_amount|floatformat:2 }}
                 </div>
-                <div class="text-[10px] text-emerald-700 font-sans mt-0.5 font-medium">Saldo a Favor DGI (Próximo Mes)</div>
+                <div class="text-xs text-emerald-600 mt-0.5 font-medium">Saldo a favor DGI (próximo mes)</div>
                 {% endif %}
             </div>
 
             <!-- 4. Retenciones en la Fuente por Enterar -->
-            <div class="p-3 bg-amber-50/60 border border-amber-200 rounded">
-                <div class="text-[10px] text-amber-800 uppercase tracking-tight font-sans font-semibold">4. Retenciones Practicadas (Compras)</div>
-                <div class="text-base font-bold text-amber-900 tabular-nums mt-1">
+            <div class="p-3.5 bg-zinc-50 border border-zinc-200 rounded-[4px]">
+                <div class="text-xs text-zinc-700 font-medium">4. Retenciones practicadas (Compras)</div>
+                <div class="text-base font-semibold text-zinc-900 font-mono tabular-nums mt-1">
                     C$ {{ total_retenciones_a_enterar|floatformat:2 }}
                 </div>
-                <div class="text-[10px] text-amber-800 font-sans mt-0.5">
+                <div class="text-xs text-zinc-500 mt-0.5">
                     IR: C$ {{ tot_ret_ir|floatformat:2 }} | IMI: C$ {{ tot_ret_imi|floatformat:2 }}
                 </div>
             </div>
         </div>
 
-        <div class="p-2.5 bg-slate-50 border border-slate-200 rounded flex flex-wrap items-center justify-between text-xs font-mono">
-            <div class="text-slate-700">
-                <span>Retenciones Sufridas en Facturación (Anticipo Anual IR): </span>
-                <strong class="text-slate-900">C$ {{ total_retenciones_sufridas|floatformat:2 }}</strong>
-                <span class="text-slate-500 font-sans"> (Retenidas por clientes agentes autorizados)</span>
+        <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-[4px] flex flex-wrap items-center justify-between text-xs">
+            <div class="text-zinc-700">
+                <span>Retenciones sufridas en facturación (Anticipo Anual IR): </span>
+                <strong class="text-zinc-900 font-mono">C$ {{ total_retenciones_sufridas|floatformat:2 }}</strong>
+                <span class="text-zinc-400"> (Retenidas por clientes agentes autorizados)</span>
             </div>
-            <div class="text-[11px] text-slate-500 font-sans">
+            <div class="text-xs text-zinc-400">
                 Fórmula DGI: Débito Fiscal Ventas - Crédito Fiscal Compras = Saldo Neto IVA
             </div>
         </div>
@@ -162,17 +162,17 @@
     <!-- ============================================================== -->
     <!-- PANEL 1: ANEXO DE RETENCIONES EN LA FUENTE PRACTICADAS          -->
     <!-- ============================================================== -->
-    <div class="bg-white border border-slate-200 rounded overflow-hidden">
-        <div class="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+    <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="p-4 bg-zinc-50/60 border-b border-zinc-200 flex flex-wrap items-center justify-between gap-2">
             <div>
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
-                    PANEL 1 — ANEXO DE RETENCIONES EN LA FUENTE PRACTICADAS (IR / IMI COMPRAS)
+                <h3 class="text-xs font-medium text-zinc-900">
+                    Anexo de retenciones en la fuente practicadas (IR / IMI compras)
                 </h3>
-                <p class="text-[11px] text-slate-500 font-sans">
+                <p class="text-xs text-zinc-500 mt-0.5">
                     Retenciones efectuadas a proveedores (Agente Retenedor Ley 822 y Plan de Arbitrios Managua).
                 </p>
             </div>
-            <span class="text-[11px] font-mono text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
+            <span class="text-xs font-mono text-zinc-500">
                 {{ retentions_list|length }} compras con retención
             </span>
         </div>
@@ -180,54 +180,54 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                    <tr class="border-b border-slate-200 bg-slate-100/50 text-[11px] font-mono text-slate-600">
-                        <th class="p-2.5 font-semibold">RUC PROVEEDOR</th>
-                        <th class="p-2.5 font-semibold">RAZÓN SOCIAL</th>
-                        <th class="p-2.5 font-semibold">FACTURA PROVEEDOR</th>
-                        <th class="p-2.5 font-semibold">FECHA</th>
-                        <th class="p-2.5 font-semibold text-right">BASE IMPONIBLE</th>
-                        <th class="p-2.5 font-semibold text-right">RET. IR (1%-2%)</th>
-                        <th class="p-2.5 font-semibold text-right">RET. IMI (1%)</th>
-                        <th class="p-2.5 font-semibold">N° CONSTANCIA RET</th>
+                    <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/60 border-b border-zinc-200 font-sans">
+                        <th class="py-3 px-4">RUC Proveedor</th>
+                        <th class="py-3 px-4">Razón Social</th>
+                        <th class="py-3 px-4">Factura Proveedor</th>
+                        <th class="py-3 px-4">Fecha</th>
+                        <th class="py-3 px-4 text-right">Base Imponible</th>
+                        <th class="py-3 px-4 text-right">Ret. IR (1%-2%)</th>
+                        <th class="py-3 px-4 text-right">Ret. IMI (1%)</th>
+                        <th class="py-3 px-4">N° Constancia Ret</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-200 font-mono text-[11px]">
+                <tbody class="divide-y divide-zinc-100 text-sm text-zinc-700">
                     {% for po in retentions_list %}
-                    <tr class="hover:bg-slate-50/70 transition-colors">
-                        <td class="p-2.5 font-bold text-slate-800">
+                    <tr class="hover:bg-zinc-50/60 transition-colors">
+                        <td class="py-3 px-4 font-mono font-medium text-zinc-800">
                             {{ po.supplier.tax_id|default:"N/D" }}
                         </td>
-                        <td class="p-2.5 text-slate-900 font-sans">
+                        <td class="py-3 px-4 text-zinc-900 font-sans">
                             {{ po.supplier.commercial_name|default:po.supplier.legal_name }}
                         </td>
-                        <td class="p-2.5 text-slate-700">
+                        <td class="py-3 px-4 text-zinc-700 font-mono text-xs">
                             {{ po.supplier_invoice_number|default:po.number }}
                         </td>
-                        <td class="p-2.5 text-slate-600">
+                        <td class="py-3 px-4 text-zinc-600 font-mono text-xs">
                             {{ po.issue_date|date:"d/m/Y" }}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-slate-900">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-900 font-mono">
                             C$ {{ po.subtotal|floatformat:2 }}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-amber-800 font-medium">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-700 font-mono">
                             C$ {{ po.ir_withheld_amount|floatformat:2 }}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-amber-800 font-medium">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-700 font-mono">
                             C$ {{ po.imi_withheld_amount|floatformat:2 }}
                         </td>
-                        <td class="p-2.5">
+                        <td class="py-3 px-4">
                             {% if po.withholding_certificate_number %}
-                            <span class="inline-block px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-mono">
+                            <span class="inline-block px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-800 border border-zinc-200 text-xs font-mono">
                                 {{ po.withholding_certificate_number }}
                             </span>
                             {% else %}
-                            <span class="text-slate-400 text-[10px]">PENDIENTE</span>
+                            <span class="text-zinc-400 text-xs">Pendiente</span>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="p-6 text-center text-slate-500 font-sans">
+                        <td colspan="8" class="py-8 px-4 text-center text-zinc-400 font-sans">
                             No se registran compras con retenciones aplicadas en este período.
                         </td>
                     </tr>
@@ -235,12 +235,12 @@
                 </tbody>
                 {% if retentions_list %}
                 <tfoot>
-                    <tr class="bg-slate-50 font-mono font-bold text-[11px] text-slate-900 border-t-2 border-slate-300">
-                        <td colspan="4" class="p-2.5 text-right uppercase">TOTALES ANEXO RETENCIONES:</td>
-                        <td class="p-2.5 text-right tabular-nums">C$ {{ tot_ret_base|floatformat:2 }}</td>
-                        <td class="p-2.5 text-right tabular-nums text-amber-800">C$ {{ tot_ret_ir|floatformat:2 }}</td>
-                        <td class="p-2.5 text-right tabular-nums text-amber-800">C$ {{ tot_ret_imi|floatformat:2 }}</td>
-                        <td class="p-2.5 tabular-nums text-amber-900 font-bold">TOTAL: C$ {{ tot_ret_practiced|floatformat:2 }}</td>
+                    <tr class="bg-zinc-50/80 font-mono text-xs text-zinc-900 border-t border-zinc-200">
+                        <td colspan="4" class="py-3 px-4 text-right font-sans font-medium">Totales anexo retenciones:</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_ret_base|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_ret_ir|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_ret_imi|floatformat:2 }}</td>
+                        <td class="py-3 px-4 tabular-nums font-bold">Total: C$ {{ tot_ret_practiced|floatformat:2 }}</td>
                     </tr>
                 </tfoot>
                 {% endif %}
@@ -251,17 +251,17 @@
     <!-- ============================================================== -->
     <!-- PANEL 2: LIBRO DE COMPRAS E IVA CRÉDITO FISCAL                 -->
     <!-- ============================================================== -->
-    <div class="bg-white border border-slate-200 rounded overflow-hidden">
-        <div class="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+    <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="p-4 bg-zinc-50/60 border-b border-zinc-200 flex flex-wrap items-center justify-between gap-2">
             <div>
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
-                    PANEL 2 — LIBRO DE COMPRAS E IVA CRÉDITO FISCAL (15%)
+                <h3 class="text-xs font-medium text-zinc-900">
+                    Libro de compras e IVA crédito fiscal (15%)
                 </h3>
-                <p class="text-[11px] text-slate-500 font-sans">
+                <p class="text-xs text-zinc-500 mt-0.5">
                     Registro de compras recibidas con discriminación de base gravada, base exenta e IVA acreditable.
                 </p>
             </div>
-            <span class="text-[11px] font-mono text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
+            <span class="text-xs font-mono text-zinc-500">
                 {{ purchases_list|length }} compras registradas
             </span>
         </div>
@@ -269,52 +269,52 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                    <tr class="border-b border-slate-200 bg-slate-100/50 text-[11px] font-mono text-slate-600">
-                        <th class="p-2.5 font-semibold">N° OC</th>
-                        <th class="p-2.5 font-semibold">RUC PROVEEDOR</th>
-                        <th class="p-2.5 font-semibold">PROVEEDOR</th>
-                        <th class="p-2.5 font-semibold">FACTURA PROV.</th>
-                        <th class="p-2.5 font-semibold">FECHA</th>
-                        <th class="p-2.5 font-semibold text-right">BASE GRAVADA</th>
-                        <th class="p-2.5 font-semibold text-right">BASE EXENTA</th>
-                        <th class="p-2.5 font-semibold text-right">IVA CRÉDITO (15%)</th>
-                        <th class="p-2.5 font-semibold text-right">TOTAL FACTURADO</th>
+                    <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/60 border-b border-zinc-200 font-sans">
+                        <th class="py-3 px-4">N° OC</th>
+                        <th class="py-3 px-4">RUC Proveedor</th>
+                        <th class="py-3 px-4">Proveedor</th>
+                        <th class="py-3 px-4">Factura Prov.</th>
+                        <th class="py-3 px-4">Fecha</th>
+                        <th class="py-3 px-4 text-right">Base Gravada</th>
+                        <th class="py-3 px-4 text-right">Base Exenta</th>
+                        <th class="py-3 px-4 text-right">IVA Crédito (15%)</th>
+                        <th class="py-3 px-4 text-right">Total Facturado</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-200 font-mono text-[11px]">
+                <tbody class="divide-y divide-zinc-100 text-sm text-zinc-700">
                     {% for po in purchases_list %}
-                    <tr class="hover:bg-slate-50/70 transition-colors">
-                        <td class="p-2.5 font-bold text-slate-900">
+                    <tr class="hover:bg-zinc-50/60 transition-colors">
+                        <td class="py-3 px-4 font-mono font-medium text-zinc-900">
                             {{ po.number }}
                         </td>
-                        <td class="p-2.5 text-slate-700">
+                        <td class="py-3 px-4 text-zinc-700 font-mono text-xs">
                             {{ po.supplier.tax_id|default:"N/D" }}
                         </td>
-                        <td class="p-2.5 text-slate-800 font-sans">
+                        <td class="py-3 px-4 text-zinc-800 font-sans">
                             {{ po.supplier.commercial_name }}
                         </td>
-                        <td class="p-2.5 text-slate-700">
+                        <td class="py-3 px-4 text-zinc-700 font-mono text-xs">
                             {{ po.supplier_invoice_number|default:po.number }}
                         </td>
-                        <td class="p-2.5 text-slate-600">
+                        <td class="py-3 px-4 text-zinc-600 font-mono text-xs">
                             {{ po.issue_date|date:"d/m/Y" }}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-slate-900">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-900 font-mono">
                             {% if po.tax_total > 0 %}C$ {{ po.subtotal|floatformat:2 }}{% else %}C$ 0.00{% endif %}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-slate-600">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-600 font-mono">
                             {% if po.tax_total == 0 %}C$ {{ po.subtotal|floatformat:2 }}{% else %}C$ 0.00{% endif %}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-blue-700 font-medium">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-900 font-mono">
                             C$ {{ po.tax_total|floatformat:2 }}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-slate-900 font-semibold">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-900 font-semibold font-mono">
                             C$ {{ po.gross_total|floatformat:2 }}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="p-6 text-center text-slate-500 font-sans">
+                        <td colspan="9" class="py-8 px-4 text-center text-zinc-400 font-sans">
                             No se registran compras recibidas en este período fiscal.
                         </td>
                     </tr>
@@ -322,12 +322,12 @@
                 </tbody>
                 {% if purchases_list %}
                 <tfoot>
-                    <tr class="bg-slate-50 font-mono font-bold text-[11px] text-slate-900 border-t-2 border-slate-300">
-                        <td colspan="5" class="p-2.5 text-right uppercase">TOTALES LIBRO COMPRAS:</td>
-                        <td class="p-2.5 text-right tabular-nums">C$ {{ tot_purchases_taxable|floatformat:2 }}</td>
-                        <td class="p-2.5 text-right tabular-nums">C$ {{ tot_purchases_exempt|floatformat:2 }}</td>
-                        <td class="p-2.5 text-right tabular-nums text-blue-700">C$ {{ tot_purchases_iva|floatformat:2 }}</td>
-                        <td class="p-2.5 text-right tabular-nums">C$ {{ tot_purchases_gross|floatformat:2 }}</td>
+                    <tr class="bg-zinc-50/80 font-mono text-xs text-zinc-900 border-t border-zinc-200">
+                        <td colspan="5" class="py-3 px-4 text-right font-sans font-medium">Totales libro compras:</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_purchases_taxable|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_purchases_exempt|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_purchases_iva|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_purchases_gross|floatformat:2 }}</td>
                     </tr>
                 </tfoot>
                 {% endif %}
@@ -338,17 +338,17 @@
     <!-- ============================================================== -->
     <!-- PANEL 3: LIBRO DE VENTAS, IVA DÉBITO Y EXENCIONES              -->
     <!-- ============================================================== -->
-    <div class="bg-white border border-slate-200 rounded overflow-hidden">
-        <div class="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+    <div class="bg-white border border-zinc-200 rounded-[4px] overflow-hidden">
+        <div class="p-4 bg-zinc-50/60 border-b border-zinc-200 flex flex-wrap items-center justify-between gap-2">
             <div>
-                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
-                    PANEL 3 — LIBRO DE VENTAS, IVA DÉBITO FISCAL Y EXENCIONES (LEY 822)
+                <h3 class="text-xs font-medium text-zinc-900">
+                    Libro de ventas, IVA débito fiscal y exenciones (Ley 822)
                 </h3>
-                <p class="text-[11px] text-slate-500 font-sans">
+                <p class="text-xs text-zinc-500 mt-0.5">
                     Facturas fiscales emitidas con desglose de ventas gravadas (15%), exentas (0%), IVA débito y retenciones sufridas.
                 </p>
             </div>
-            <span class="text-[11px] font-mono text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded">
+            <span class="text-xs font-mono text-zinc-500">
                 {{ sales_list|length }} facturas emitidas
             </span>
         </div>
@@ -356,62 +356,62 @@
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                    <tr class="border-b border-slate-200 bg-slate-100/50 text-[11px] font-mono text-slate-600">
-                        <th class="p-2.5 font-semibold">N° FACTURA</th>
-                        <th class="p-2.5 font-semibold">FECHA</th>
-                        <th class="p-2.5 font-semibold">RUC CLIENTE</th>
-                        <th class="p-2.5 font-semibold">RAZÓN SOCIAL</th>
-                        <th class="p-2.5 font-semibold text-right">GRAVADA (15%)</th>
-                        <th class="p-2.5 font-semibold text-right">EXENTA (0%)</th>
-                        <th class="p-2.5 font-semibold text-right">IVA DÉBITO</th>
-                        <th class="p-2.5 font-semibold text-right">RET. IR</th>
-                        <th class="p-2.5 font-semibold text-right">RET. IMI</th>
-                        <th class="p-2.5 font-semibold text-right">TOTAL BRUTO</th>
-                        <th class="p-2.5 font-semibold text-right">NETO COBRADO</th>
+                    <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/60 border-b border-zinc-200 font-sans">
+                        <th class="py-3 px-4">N° Factura</th>
+                        <th class="py-3 px-4">Fecha</th>
+                        <th class="py-3 px-4">RUC Cliente</th>
+                        <th class="py-3 px-4">Razón Social</th>
+                        <th class="py-3 px-4 text-right">Gravada (15%)</th>
+                        <th class="py-3 px-4 text-right">Exenta (0%)</th>
+                        <th class="py-3 px-4 text-right">IVA Débito</th>
+                        <th class="py-3 px-4 text-right">Ret. IR</th>
+                        <th class="py-3 px-4 text-right">Ret. IMI</th>
+                        <th class="py-3 px-4 text-right">Total Bruto</th>
+                        <th class="py-3 px-4 text-right">Neto Cobrado</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-200 font-mono text-[11px]">
+                <tbody class="divide-y divide-zinc-100 text-sm text-zinc-700">
                     {% for inv in sales_list %}
-                    <tr class="hover:bg-slate-50/70 transition-colors">
-                        <td class="p-2.5 font-bold text-slate-900">
+                    <tr class="hover:bg-zinc-50/60 transition-colors">
+                        <td class="py-3 px-4 font-mono font-medium text-zinc-900">
                             <a href="{% url 'billing:invoice_detail' inv.pk %}" class="hover:underline">
                                 {{ inv.number }}
                             </a>
                         </td>
-                        <td class="p-2.5 text-slate-600">
+                        <td class="py-3 px-4 text-zinc-600 font-mono text-xs">
                             {{ inv.issue_date|date:"d/m/Y" }}
                         </td>
-                        <td class="p-2.5 text-slate-700">
+                        <td class="py-3 px-4 text-zinc-700 font-mono text-xs">
                             {{ inv.account.tax_id|default:"FINAL" }}
                         </td>
-                        <td class="p-2.5 text-slate-800 font-sans">
+                        <td class="py-3 px-4 text-zinc-800 font-sans">
                             {{ inv.account.commercial_name }}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-slate-900">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-900 font-mono">
                             {% if inv.tax_total > 0 %}C$ {{ inv.subtotal|floatformat:2 }}{% else %}C$ 0.00{% endif %}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-slate-600">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-600 font-mono">
                             {% if inv.tax_total == 0 %}C$ {{ inv.subtotal|floatformat:2 }}{% else %}C$ 0.00{% endif %}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-slate-900 font-medium">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-900 font-mono">
                             C$ {{ inv.tax_total|floatformat:2 }}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-amber-700">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-700 font-mono">
                             C$ {{ inv.ir_retention_amount|floatformat:2 }}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-amber-700">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-700 font-mono">
                             C$ {{ inv.imi_retention_amount|floatformat:2 }}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-slate-900 font-semibold">
+                        <td class="py-3 px-4 text-right tabular-nums text-zinc-900 font-semibold font-mono">
                             C$ {{ inv.gross_total|floatformat:2 }}
                         </td>
-                        <td class="p-2.5 text-right tabular-nums text-emerald-800 font-bold">
+                        <td class="py-3 px-4 text-right tabular-nums text-emerald-800 font-semibold font-mono">
                             C$ {{ inv.net_receivable|floatformat:2 }}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="11" class="p-6 text-center text-slate-500 font-sans">
+                        <td colspan="11" class="py-8 px-4 text-center text-zinc-400 font-sans">
                             No se registran ventas emitidas en este período fiscal.
                         </td>
                     </tr>
@@ -419,15 +419,15 @@
                 </tbody>
                 {% if sales_list %}
                 <tfoot>
-                    <tr class="bg-slate-50 font-mono font-bold text-[11px] text-slate-900 border-t-2 border-slate-300">
-                        <td colspan="4" class="p-2.5 text-right uppercase">TOTALES LIBRO VENTAS:</td>
-                        <td class="p-2.5 text-right tabular-nums">C$ {{ tot_sales_taxable|floatformat:2 }}</td>
-                        <td class="p-2.5 text-right tabular-nums">C$ {{ tot_sales_exempt|floatformat:2 }}</td>
-                        <td class="p-2.5 text-right tabular-nums">C$ {{ tot_sales_iva|floatformat:2 }}</td>
-                        <td class="p-2.5 text-right tabular-nums text-amber-800">C$ {{ tot_sales_ir_withheld|floatformat:2 }}</td>
-                        <td class="p-2.5 text-right tabular-nums text-amber-800">C$ {{ tot_sales_imi_withheld|floatformat:2 }}</td>
-                        <td class="p-2.5 text-right tabular-nums">C$ {{ tot_sales_gross|floatformat:2 }}</td>
-                        <td class="p-2.5 text-right tabular-nums text-emerald-800">C$ {{ tot_sales_net|floatformat:2 }}</td>
+                    <tr class="bg-zinc-50/80 font-mono text-xs text-zinc-900 border-t border-zinc-200">
+                        <td colspan="4" class="py-3 px-4 text-right font-sans font-medium">Totales libro ventas:</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_sales_taxable|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_sales_exempt|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_sales_iva|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_sales_ir_withheld|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_sales_imi_withheld|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold">C$ {{ tot_sales_gross|floatformat:2 }}</td>
+                        <td class="py-3 px-4 text-right tabular-nums font-semibold text-emerald-800">C$ {{ tot_sales_net|floatformat:2 }}</td>
                     </tr>
                 </tfoot>
                 {% endif %}

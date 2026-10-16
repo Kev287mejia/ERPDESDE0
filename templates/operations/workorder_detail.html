@@ -1,36 +1,36 @@
 {% extends "layouts/base_erp.html" %}
 
 {% block title %}{{ work_order.number }} · {{ work_order.title }}{% endblock %}
-{% block breadcrumb_section %}INGENIERÍA & CAMPO{% endblock %}
-{% block breadcrumb_page %}CONSOLA DE ORDEN DE TRABAJO{% endblock %}
+{% block breadcrumb_section %}Operaciones{% endblock %}
+{% block breadcrumb_page %}Detalle de OT{% endblock %}
 {% block page_title %}{{ work_order.number }} · {{ work_order.title }}{% endblock %}
 
 {% block page_actions %}
 <div class="flex items-center gap-2">
-    <a href="{% url 'operations:workorder_list' %}" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors">
-        Volver a Órdenes
+    <a href="{% url 'operations:workorder_list' %}" class="h-8 px-3 border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-medium rounded-md transition-colors flex items-center">
+        Volver a órdenes
     </a>
 
-    <a href="{% url 'operations:workorder_print' pk=work_order.pk %}" target="_blank" class="px-3 py-1.5 border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium rounded transition-colors flex items-center gap-1.5 shadow-none">
-        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <a href="{% url 'operations:workorder_print' pk=work_order.pk %}" target="_blank" class="h-8 px-3 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24-3.411 1.76-6.195 4.53-6.195 2.77 0 4.77 2.784 4.53 6.195H6.72zM3 13.5v6.75A2.25 2.25 0 005.25 22.5h13.5A2.25 2.25 0 0021 20.25V13.5m-18 0h18M6.75 3.75h10.5M9 7.5h6"/>
         </svg>
-        <span>Imprimir / PDF Oficial</span>
+        <span>Imprimir PDF</span>
     </a>
 
-    <!-- Acciones de Cierre Definitivo (Exclusivo Coordinador Nivel 80+) -->
+    <!-- Acciones de Cierre Definitivo -->
     {% if can_close_ot and work_order.phase != 'COMPLETED' and work_order.phase != 'CANCELLED' %}
     <form method="POST" action="{% url 'operations:workorder_phase_transition' pk=work_order.pk %}" class="inline-flex">
         {% csrf_token %}
         <input type="hidden" name="phase" value="COMPLETED">
         <input type="hidden" name="notes" value="Cierre formal de obra y entrega técnica autorizada por Coordinación de Operaciones.">
         <button type="submit" 
-                onclick="return confirm('¿Autorizar el CIERRE DEFINITIVO (COMPLETED) de esta Orden de Trabajo?');"
-                class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded transition-colors flex items-center gap-1.5 shadow-none">
+                onclick="return confirm('¿Autorizar el cierre definitivo de esta Orden de Trabajo?');"
+                class="h-8 px-3 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 cursor-pointer">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
             </svg>
-            <span>Cierre Técnico Definitivo</span>
+            <span>Cierre técnico definitivo</span>
         </button>
     </form>
     {% endif %}
@@ -39,12 +39,12 @@
     <form method="POST" action="{% url 'billing:from_workorder' wo_pk=work_order.pk %}" class="inline-flex">
         {% csrf_token %}
         <button type="submit" 
-                onclick="return confirm('¿Emitir Factura Fiscal oficial para esta Orden de Trabajo? Se computarán las partidas ejecutadas y la cotización vinculada.');"
-                class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold rounded transition-colors flex items-center gap-1.5 shadow-none">
+                onclick="return confirm('¿Emitir factura fiscal para esta Orden de Trabajo?');"
+                class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 cursor-pointer">
             <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
             </svg>
-            <span>Facturar Orden de Trabajo</span>
+            <span>Facturar OT</span>
         </button>
     </form>
     {% endif %}
@@ -54,20 +54,20 @@
 {% block content %}
 <div class="space-y-6 max-w-7xl mx-auto" x-data="{ showItemModal: false, showEvidenceModal: false, executeItemModal: false, currentItem: {}, showChecklistModal: false }">
 
-    <!-- Indicador de Estado de Red y Sincronización Offline (PWA Field Mode) -->
-    <div id="offline-status-bar" class="hidden border border-amber-300 bg-amber-50 p-2.5 rounded text-xs font-mono text-amber-900 flex items-center justify-between shadow-none">
+    <!-- Indicador de Estado de Red y Sincronización Offline -->
+    <div id="offline-status-bar" class="hidden border border-amber-200 bg-amber-50 p-2.5 rounded-md text-xs font-sans text-amber-900 flex items-center justify-between">
         <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-            <span class="font-bold">MODO CAMPO SIN CONEXIÓN · GUARDADO LOCAL ACTIVO</span>
+            <span class="font-medium">Modo sin conexión · Guardado local activo</span>
         </div>
-        <span id="offline-queue-count" class="text-[11px] text-amber-800">0 envíos en cola</span>
+        <span id="offline-queue-count" class="text-xs text-amber-800">0 envíos en cola</span>
     </div>
-    <div id="online-synced-bar" class="hidden border border-emerald-300 bg-emerald-50 p-2.5 rounded text-xs font-mono text-emerald-900 flex items-center justify-between shadow-none">
+    <div id="online-synced-bar" class="hidden border border-emerald-200 bg-emerald-50 p-2.5 rounded-md text-xs font-sans text-emerald-900 flex items-center justify-between">
         <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span class="font-bold">CONEXIÓN RESTABLECIDA · DATOS SINCRONIZADOS</span>
+            <span class="font-medium">Conexión restablecida · Datos sincronizados</span>
         </div>
-        <span id="sync-summary-text" class="text-[11px] text-emerald-800 font-bold"></span>
+        <span id="sync-summary-text" class="text-xs text-emerald-800 font-medium"></span>
     </div>
 
     <!-- ================================================================= -->

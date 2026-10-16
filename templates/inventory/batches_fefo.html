@@ -7,30 +7,22 @@
     showNewBatchModal: false,
     statusFilter: 'ALL'
 }">
-    <!-- Header Técnico Swiss Grid -->
+    <!-- Header Limpio -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-zinc-200 pb-4 gap-3 bg-white">
         <div>
-            <div class="flex items-center space-x-2 text-[11px] text-zinc-500 font-mono mb-1">
-                <span>INVENTARIO & ALMACÉN</span>
-                <span>/</span>
-                <span class="text-zinc-700 font-semibold">NORMATIVA SANITARIA & FEFO</span>
-            </div>
-            <h1 class="text-xl font-bold tracking-tight text-zinc-900">
-                Control de Lotes &amp; Vencimientos (FEFO)
+            <h1 class="text-xl font-semibold tracking-tight text-zinc-900 font-sans">
+                Lotes y vencimientos (FEFO)
             </h1>
-            <p class="text-xs text-zinc-500 mt-0.5">
-                Regla sanitaria <span class="font-mono font-medium">First Expired, First Out</span>: trazabilidad farmacéutica, lotes MINSA y bloqueo estricto de caducados.
-            </p>
         </div>
 
         <!-- Botonera de Acciones -->
         <div class="flex items-center gap-2">
-            <a href="{% url 'inventory:dashboard' %}" class="inline-flex items-center px-3 py-1.5 text-xs font-mono text-zinc-700 bg-white border border-zinc-200 rounded-[4px] hover:bg-zinc-50 transition-colors">
-                &larr; Volver a Bodegas
+            <a href="{% url 'inventory:dashboard' %}" class="h-8 px-3 text-xs font-sans text-zinc-700 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors flex items-center">
+                &larr; Volver a bodegas
             </a>
             {% if current_role_level >= 50 %}
-            <button type="button" @click="showNewBatchModal = true" class="inline-flex items-center px-3.5 py-1.5 text-xs font-semibold text-white bg-zinc-900 border border-zinc-900 rounded-[4px] hover:bg-zinc-800 transition-colors">
-                + Registrar Nuevo Lote
+            <button type="button" @click="showNewBatchModal = true" class="h-8 px-3 text-xs font-medium text-white bg-zinc-900 rounded-md hover:bg-zinc-800 transition-colors cursor-pointer">
+                Registrar nuevo lote
             </button>
             {% endif %}
         </div>
@@ -38,23 +30,22 @@
 
     <!-- KPIs de Control Sanitario FEFO -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- 1. Lotes Óptimos (> 90 días) -->
-        <div class="p-4 bg-white border border-zinc-200 rounded-[4px]">
+        <!-- 1. Lotes Vigentes -->
+        <div class="p-4 bg-white border border-zinc-200 rounded-lg">
             <div class="flex items-center justify-between">
-                <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500">LOTES VIGENTES</span>
+                <span class="text-xs font-medium text-zinc-500 font-sans">Lotes vigentes</span>
                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
             </div>
             <div class="mt-2 flex items-baseline gap-2">
-                <span class="text-2xl font-bold font-mono tabular-nums text-zinc-900">{{ optimal_count }}</span>
-                <span class="text-[11px] font-mono text-zinc-400">&gt; 90 días</span>
+                <span class="text-2xl font-semibold font-sans tabular-nums text-zinc-900">{{ optimal_count }}</span>
+                <span class="text-xs text-zinc-400 font-sans">&gt; 90 días</span>
             </div>
-            <p class="text-[11px] text-zinc-500 mt-1">Conformidad sanitaria plena para despacho</p>
         </div>
 
         <!-- 2. Próximos a Vencer (<= 90 días) -->
-        <div class="p-4 bg-white border border-zinc-200 rounded-[4px]">
+        <div class="p-4 bg-white border border-zinc-200 rounded-lg">
             <div class="flex items-center justify-between">
-                <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500">ALERTA FEFO (&le;90 DÍAS)</span>
+                <span class="text-xs font-medium text-zinc-500 font-sans">Alerta FEFO (&le;90 días)</span>
                 <span class="w-2 h-2 rounded-full bg-amber-500"></span>
             </div>
             <div class="mt-2 flex items-baseline gap-2">

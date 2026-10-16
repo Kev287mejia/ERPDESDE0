@@ -1,18 +1,18 @@
 {% extends "layouts/base_erp.html" %}
 
-{% block title %}Cotizaciones ({{ current_country.primary_currency_symbol }}) · CRM{% endblock %}
-{% block breadcrumb_section %}COMERCIAL & CRM{% endblock %}
-{% block breadcrumb_page %}COTIZACIONES B2B{% endblock %}
-{% block page_title %}Consola de Cotizaciones & Presupuestos Formales{% endblock %}
+{% block title %}Cotizaciones · CRM{% endblock %}
+{% block breadcrumb_section %}Comercial{% endblock %}
+{% block breadcrumb_page %}Cotizaciones{% endblock %}
+{% block page_title %}Cotizaciones{% endblock %}
 
 {% block page_actions %}
 {% if nav_access.can_manage_crm %}
 <a href="{% url 'crm:quote_create' %}" 
-   class="px-3.5 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 shadow-xs">
-    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+   class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 cursor-pointer">
+    <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
     </svg>
-    <span>Nueva Cotización</span>
+    <span>Nueva cotización</span>
 </a>
 {% endif %}
 {% endblock %}
@@ -20,54 +20,54 @@
 {% block content %}
 <div class="space-y-5 max-w-7xl mx-auto">
 
-    <!-- KPI Counters -->
+    <!-- Tarjetas de Métricas -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-        <div class="p-3.5 bg-white border border-slate-200/90 rounded-xl shadow-xs border-t-2 border-t-slate-800">
-            <span class="text-[10px] font-mono uppercase text-slate-400 block tracking-wider font-semibold">TOTAL EMITIDAS</span>
-            <span class="text-xl font-mono font-bold text-slate-900 tabular-nums mt-0.5 block">{{ total_count }}</span>
+        <div class="p-4 bg-white border border-zinc-200 rounded-lg">
+            <span class="text-xs font-medium text-zinc-500 font-sans block">Total emitidas</span>
+            <span class="text-2xl font-semibold text-zinc-900 tracking-tight tabular-nums font-sans mt-1 block">{{ total_count }}</span>
         </div>
-        <div class="p-3.5 bg-white border border-slate-200/90 rounded-xl shadow-xs border-t-2 border-t-slate-400">
-            <span class="text-[10px] font-mono uppercase text-slate-500 block tracking-wider font-semibold">BORRADORES</span>
-            <span class="text-xl font-mono font-bold text-slate-700 tabular-nums mt-0.5 block">{{ draft_count }}</span>
+        <div class="p-4 bg-white border border-zinc-200 rounded-lg">
+            <span class="text-xs font-medium text-zinc-500 font-sans block">Borradores</span>
+            <span class="text-2xl font-semibold text-zinc-600 tracking-tight tabular-nums font-sans mt-1 block">{{ draft_count }}</span>
         </div>
-        <div class="p-3.5 bg-white border border-slate-200/90 rounded-xl shadow-xs border-t-2 border-t-blue-500">
-            <span class="text-[10px] font-mono uppercase text-blue-600 block tracking-wider font-semibold">ENVIADAS A CLIENTE</span>
-            <span class="text-xl font-mono font-bold text-blue-700 tabular-nums mt-0.5 block">{{ sent_count }}</span>
+        <div class="p-4 bg-white border border-zinc-200 rounded-lg">
+            <span class="text-xs font-medium text-zinc-500 font-sans block">Enviadas</span>
+            <span class="text-2xl font-semibold text-blue-700 tracking-tight tabular-nums font-sans mt-1 block">{{ sent_count }}</span>
         </div>
-        <div class="p-3.5 bg-white border border-slate-200/90 rounded-xl shadow-xs border-t-2 border-t-emerald-500">
-            <span class="text-[10px] font-mono uppercase text-emerald-600 block tracking-wider font-semibold">APROBADAS (LISTAS OT)</span>
-            <span class="text-xl font-mono font-bold text-emerald-700 tabular-nums mt-0.5 block">{{ approved_count }}</span>
+        <div class="p-4 bg-white border border-zinc-200 rounded-lg">
+            <span class="text-xs font-medium text-zinc-500 font-sans block">Aprobadas</span>
+            <span class="text-2xl font-semibold text-emerald-700 tracking-tight tabular-nums font-sans mt-1 block">{{ approved_count }}</span>
         </div>
     </div>
 
-    <!-- Filters & Search -->
-    <div class="bg-white border border-slate-200/90 rounded-xl p-3.5 shadow-subtle">
+    <!-- Filtros y Búsqueda -->
+    <div class="bg-white border border-zinc-200 rounded-lg p-3">
         <form method="GET" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
             <div class="relative flex-1">
-                <svg class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <svg class="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
                 </svg>
                 <input type="text" 
                        name="q" 
                        value="{{ search_query }}"
-                       placeholder="Buscar por folio COT, referencia, cliente o RUC..."
-                       class="w-full text-xs pl-8 pr-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600 font-sans text-slate-800 placeholder-slate-400 shadow-xs transition-colors">
+                       placeholder="Buscar por folio, cliente, título o RUC..."
+                       class="w-full text-xs pl-8 pr-3 py-1.5 border border-zinc-200 rounded-md bg-zinc-50/50 focus:bg-white focus:outline-none focus:border-zinc-900 font-sans text-zinc-800 placeholder-zinc-400">
             </div>
 
             <div class="flex items-center gap-2">
-                <select name="status" class="text-xs py-2 px-2.5 border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono shadow-xs">
-                    <option value="">— Todos los Estados —</option>
+                <select name="status" class="text-xs py-1.5 px-2.5 border border-zinc-200 rounded-md bg-white text-zinc-700 focus:outline-none focus:border-zinc-900 font-sans">
+                    <option value="">Todos los estados</option>
                     {% for code, label in status_choices %}
                     <option value="{{ code }}" {% if current_status == code %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
 
-                <button type="submit" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs">
+                <button type="submit" class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-md transition-colors cursor-pointer">
                     Filtrar
                 </button>
 
                 {% if search_query or current_status %}
-                <a href="{% url 'crm:quote_list' %}" class="px-3 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs rounded-lg transition-colors">
+                <a href="{% url 'crm:quote_list' %}" class="h-8 px-2.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 text-xs font-medium rounded-md transition-colors flex items-center">
                     Limpiar
                 </a>
                 {% endif %}
@@ -75,103 +75,97 @@
         </form>
     </div>
 
-    <!-- Quotes Table -->
-    <div class="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-subtle">
+    <!-- Tabla de Cotizaciones -->
+    <div class="bg-white border border-zinc-200 rounded-lg overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                    <tr class="bg-slate-50/75 border-b border-slate-200/80 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
-                        <th class="py-2.5 px-3.5 font-semibold">Folio</th>
-                        <th class="py-2.5 px-3.5 font-semibold">Cliente / Cuenta</th>
-                        <th class="py-2.5 px-3.5 font-semibold">Alcance / Referencia</th>
-                        <th class="py-2.5 px-3.5 font-semibold text-center">Estado</th>
-                        <th class="py-2.5 px-3.5 text-right font-semibold">Subtotal</th>
-                        <th class="py-2.5 px-3.5 text-right font-semibold">{{ current_country.tax_name|default:"IVA" }}</th>
-                        <th class="py-2.5 px-3.5 text-right font-semibold">Total General</th>
-                        <th class="py-2.5 px-3.5 font-semibold">Elaborado</th>
-                        <th class="py-2.5 px-3.5 text-right font-semibold">Acciones</th>
+                    <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/60 border-b border-zinc-200 font-sans">
+                        <th class="py-3 px-4">Folio</th>
+                        <th class="py-3 px-4">Cliente</th>
+                        <th class="py-3 px-4">Título / Referencia</th>
+                        <th class="py-3 px-4 text-center">Estado</th>
+                        <th class="py-3 px-4 text-right">Subtotal</th>
+                        <th class="py-3 px-4 text-right">{{ current_country.tax_name|default:"IVA" }}</th>
+                        <th class="py-3 px-4 text-right">Total</th>
+                        <th class="py-3 px-4">Fecha</th>
+                        <th class="py-3 px-4 text-right">Acción</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody class="divide-y divide-zinc-100">
                     {% for quote in quotes %}
-                    <tr class="hover:bg-slate-50/80 transition-colors">
-                        <td class="py-2.5 px-3.5 font-mono font-bold text-blue-700 tabular-nums whitespace-nowrap">
+                    <tr class="hover:bg-zinc-50/60 transition-colors">
+                        <td class="py-3 px-4 font-mono font-medium text-zinc-900 tabular-nums whitespace-nowrap">
                             <a href="{% url 'crm:quote_detail' pk=quote.pk %}" class="hover:underline">
                                 {{ quote.number }}
                             </a>
                         </td>
-                        <td class="py-2.5 px-3.5">
-                            <a href="{% url 'crm:account_detail' pk=quote.account.pk %}" class="font-semibold text-slate-900 hover:underline">
+                        <td class="py-3 px-4">
+                            <a href="{% url 'crm:account_detail' pk=quote.account.pk %}" class="font-medium text-zinc-900 font-sans hover:underline">
                                 {{ quote.account.commercial_name }}
                             </a>
-                            <div class="text-[10px] font-mono text-slate-400 tabular-nums mt-0.5">
+                            <div class="text-xs text-zinc-400 font-mono tabular-nums">
                                 {{ quote.account.tax_id|default:"Sin RUC" }}
                             </div>
                         </td>
-                        <td class="py-2.5 px-3.5 text-slate-700">
-                            <div class="truncate max-w-xs font-medium">{{ quote.title }}</div>
+                        <td class="py-3 px-4 text-zinc-700 font-sans">
+                            <div class="truncate max-w-xs font-medium text-zinc-800">{{ quote.title }}</div>
                             {% if quote.opportunity %}
-                            <div class="text-[10px] font-mono text-slate-400 mt-0.5">Op: {{ quote.opportunity.code }}</div>
+                            <div class="text-xs text-zinc-400 font-mono mt-0.5">{{ quote.opportunity.code }}</div>
                             {% endif %}
                         </td>
-                        <td class="py-2.5 px-3.5 text-center whitespace-nowrap">
+                        <td class="py-3 px-4 text-center whitespace-nowrap">
                             {% if quote.status == 'APPROVED' %}
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium font-sans bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                APROBADA
+                                Aprobada
                             </span>
                             {% elif quote.status == 'SENT' %}
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200/70">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium font-sans bg-blue-50 text-blue-700 border border-blue-200">
                                 <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                ENVIADA
+                                Enviada
                             </span>
                             {% elif quote.status == 'DRAFT' %}
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200/80">
-                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                BORRADOR
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium font-sans bg-zinc-100 text-zinc-700">
+                                <span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>
+                                Borrador
                             </span>
                             {% elif quote.status == 'REJECTED' %}
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200/70">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium font-sans bg-rose-50 text-rose-700 border border-rose-200">
                                 <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                RECHAZADA
+                                Rechazada
                             </span>
                             {% else %}
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200/70">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium font-sans bg-amber-50 text-amber-700 border border-amber-200">
                                 <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                VENCIDA
+                                En revisión
                             </span>
                             {% endif %}
                         </td>
-                        <td class="py-2.5 px-3.5 text-right font-mono text-slate-700 tabular-nums whitespace-nowrap">
+                        <td class="py-3 px-4 text-right font-mono text-zinc-600 tabular-nums whitespace-nowrap">
                             {{ quote.currency_symbol }} {{ quote.subtotal|floatformat:2 }}
                         </td>
-                        <td class="py-2.5 px-3.5 text-right font-mono text-slate-600 tabular-nums whitespace-nowrap">
-                            {{ quote.currency_symbol }} {{ quote.tax_total|floatformat:2 }}
+                        <td class="py-3 px-4 text-right font-mono text-zinc-600 tabular-nums whitespace-nowrap">
+                            {{ quote.currency_symbol }} {{ quote.tax_amount|floatformat:2 }}
                         </td>
-                        <td class="py-2.5 px-3.5 text-right font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap">
+                        <td class="py-3 px-4 text-right font-mono font-medium text-zinc-900 tabular-nums whitespace-nowrap">
                             {{ quote.currency_symbol }} {{ quote.grand_total|floatformat:2 }}
                         </td>
-                        <td class="py-2.5 px-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                        <td class="py-3 px-4 text-zinc-500 font-mono text-xs tabular-nums whitespace-nowrap">
                             {{ quote.created_at|date:"d/m/Y" }}
                         </td>
-                        <td class="py-2.5 px-3.5 text-right space-x-1 whitespace-nowrap">
+                        <td class="py-3 px-4 text-right whitespace-nowrap">
                             <a href="{% url 'crm:quote_detail' pk=quote.pk %}" 
-                               class="px-2.5 py-1 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 rounded-md text-xs font-medium transition-colors inline-block shadow-xs">
-                                Consola
-                            </a>
-                            <a href="{% url 'crm:quote_print' pk=quote.pk %}" 
-                                target="_blank"
-                                class="px-2.5 py-1 bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-md text-xs font-mono transition-colors inline-block shadow-xs"
-                                title="Imprimir formato formal DGI">
-                                PDF
+                               class="text-xs text-zinc-600 hover:text-zinc-900 hover:underline font-sans font-medium">
+                                Ver detalle &rarr;
                             </a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="py-12 text-center text-slate-400">
-                            <p class="font-semibold text-slate-700 text-xs">No hay cotizaciones registradas.</p>
-                            <p class="text-[11px] text-slate-400 mt-1">Elabore una nueva cotización formal vinculada a un cliente.</p>
+                        <td colspan="9" class="py-12 text-center text-zinc-400 font-sans">
+                            <p class="text-sm font-medium text-zinc-600">No se encontraron cotizaciones registradas.</p>
+                            <p class="text-xs text-zinc-400 mt-1">Cree una nueva cotización o ajuste los filtros de búsqueda.</p>
                         </td>
                     </tr>
                     {% endfor %}

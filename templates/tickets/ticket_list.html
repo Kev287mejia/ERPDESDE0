@@ -1,101 +1,77 @@
 {% extends "layouts/base_erp.html" %}
 
-{% block title %}Mesa de Ayuda Interna & SLA | {{ current_org.name }}{% endblock %}
+{% block title %}Mesa de Ayuda | {{ current_org.name }} | ERP SAS{% endblock %}
+{% block breadcrumb_section %}Soporte{% endblock %}
+{% block breadcrumb_page %}Mesa de Ayuda{% endblock %}
+{% block page_title %}Mesa de Ayuda{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center gap-2 font-sans">
+    <button type="button" @click="showTicketModal = true" class="h-8 px-3.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        <span>Nuevo Ticket</span>
+    </button>
+</div>
+{% endblock %}
 
 {% block content %}
-<div class="space-y-6" x-data="{ showTicketModal: false }">
-    <!-- Header Técnico de Mesa de Ayuda -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4 gap-3">
-        <div>
-            <div class="flex items-center space-x-2 text-xs text-slate-500 font-mono mb-1">
-                <span>OPERACIONES & SOPORTE</span>
-                <span>/</span>
-                <span class="text-slate-700 font-semibold">MESA DE AYUDA INTERNA & SLA</span>
-            </div>
-            <h1 class="text-xl font-bold tracking-tight text-slate-900">
-                Mesa de Ayuda y Soporte Técnico Operativo
-            </h1>
-            <p class="text-xs text-slate-500 mt-0.5">
-                Gestión de fallas vehiculares, equipos, incidentes SST y requerimientos con control estricto de tiempos de respuesta (SLA).
-            </p>
-        </div>
+<div class="space-y-6 max-w-7xl mx-auto font-sans" x-data="{ showTicketModal: false }">
 
-        <!-- Botón Apertura de Ticket -->
-        <div class="flex flex-wrap items-center gap-2">
-            <button type="button" @click="showTicketModal = true" class="inline-flex items-center px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 transition">
-                <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                Aperturar Ticket
-            </button>
-        </div>
-    </div>
-
-    <!-- Banner de Aislamiento para Personal de Campo -->
-    {% if is_field_staff %}
-    <div class="bg-slate-50 border border-slate-200 rounded-md px-3.5 py-2.5 flex items-center justify-between text-xs text-slate-600">
-        <div class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <span>Bandeja Técnica Individual: Mostrando exclusivamente incidentes reportados por usted o asignados a su persona.</span>
-        </div>
-        <span class="font-mono text-[11px] text-slate-500 font-medium">Nivel {{ request.role_level }}</span>
-    </div>
-    {% endif %}
-
-    <!-- 4 Tarjetas KPI de Mesa de Ayuda -->
+    <!-- KPI Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white border border-slate-200 rounded-md p-4">
-            <div class="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-medium">Tickets Abiertos</div>
+        <div class="bg-white border border-zinc-200 rounded-md p-4">
+            <div class="text-xs font-medium text-zinc-500">Tickets abiertos</div>
             <div class="mt-1 flex items-baseline justify-between">
-                <div class="text-2xl font-bold font-mono tabular-nums text-slate-900">{{ kpi_open }}</div>
-                <span class="text-[10px] text-slate-500 font-mono">En gestión</span>
+                <div class="text-2xl font-bold font-mono tabular-nums text-zinc-900">{{ kpi_open }}</div>
+                <span class="text-[11px] text-zinc-400">En gestión</span>
             </div>
         </div>
 
-        <div class="bg-white border border-rose-200 rounded-md p-4">
-            <div class="text-[11px] font-mono uppercase tracking-wider text-rose-700 font-medium">Críticos en Curso</div>
+        <div class="bg-white border border-zinc-200 rounded-md p-4">
+            <div class="text-xs font-medium text-zinc-500">Críticos en curso</div>
             <div class="mt-1 flex items-baseline justify-between">
-                <div class="text-2xl font-bold font-mono tabular-nums text-rose-700">{{ kpi_critical }}</div>
-                <span class="text-[10px] text-rose-600 font-mono">SLA 4 Horas</span>
+                <div class="text-2xl font-bold font-mono tabular-nums text-rose-600">{{ kpi_critical }}</div>
+                <span class="text-[11px] text-zinc-400">SLA 4h</span>
             </div>
         </div>
 
-        <div class="bg-white border border-amber-200 rounded-md p-4">
-            <div class="text-[11px] font-mono uppercase tracking-wider text-amber-700 font-medium">SLA Vencido / Desvío</div>
+        <div class="bg-white border border-zinc-200 rounded-md p-4">
+            <div class="text-xs font-medium text-zinc-500">SLA fuera de plazo</div>
             <div class="mt-1 flex items-baseline justify-between">
                 <div class="text-2xl font-bold font-mono tabular-nums text-amber-700">{{ kpi_breached }}</div>
-                <span class="text-[10px] text-amber-600 font-mono">Fuera de Plazo</span>
+                <span class="text-[11px] text-zinc-400">Vencidos</span>
             </div>
         </div>
 
-        <div class="bg-white border border-emerald-200 rounded-md p-4">
-            <div class="text-[11px] font-mono uppercase tracking-wider text-emerald-700 font-medium">Resueltos / Cerrados</div>
+        <div class="bg-white border border-zinc-200 rounded-md p-4">
+            <div class="text-xs font-medium text-zinc-500">Resueltos y cerrados</div>
             <div class="mt-1 flex items-baseline justify-between">
                 <div class="text-2xl font-bold font-mono tabular-nums text-emerald-700">{{ kpi_resolved }}</div>
-                <span class="text-[10px] text-emerald-600 font-mono">Histórico Org</span>
+                <span class="text-[11px] text-zinc-400">Histórico</span>
             </div>
         </div>
     </div>
 
-    <!-- Barra de Filtros Sobria -->
-    <div class="bg-white border border-slate-200 rounded-md p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+    <!-- Barra de Filtros -->
+    <div class="bg-white border border-zinc-200 rounded-md p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
         <form method="get" class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2">
-                <span class="text-slate-500 font-medium">Filtrar por:</span>
-                <select name="status" onchange="this.form.submit()" class="text-xs bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-slate-800">
-                    <option value="">Todos los Estados</option>
+                <span class="text-zinc-500 font-medium">Estado:</span>
+                <select name="status" onchange="this.form.submit()" class="text-xs bg-zinc-50 border border-zinc-200 rounded-md px-2.5 py-1 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-900 font-sans">
+                    <option value="">Todos los estados</option>
                     <option value="OPEN" {% if selected_status == 'OPEN' %}selected{% endif %}>Abierto</option>
-                    <option value="IN_PROGRESS" {% if selected_status == 'IN_PROGRESS' %}selected{% endif %}>En Atención</option>
+                    <option value="IN_PROGRESS" {% if selected_status == 'IN_PROGRESS' %}selected{% endif %}>En atención</option>
                     <option value="RESOLVED" {% if selected_status == 'RESOLVED' %}selected{% endif %}>Resuelto</option>
                     <option value="CLOSED" {% if selected_status == 'CLOSED' %}selected{% endif %}>Cerrado</option>
                 </select>
             </div>
 
-            <div>
-                <select name="priority" onchange="this.form.submit()" class="text-xs bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-slate-800">
-                    <option value="">Todas las Prioridades</option>
+            <div class="flex items-center gap-2">
+                <span class="text-zinc-500 font-medium">Prioridad:</span>
+                <select name="priority" onchange="this.form.submit()" class="text-xs bg-zinc-50 border border-zinc-200 rounded-md px-2.5 py-1 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-900 font-sans">
+                    <option value="">Todas las prioridades</option>
                     <option value="CRITICAL" {% if selected_priority == 'CRITICAL' %}selected{% endif %}>Crítica (SLA 4h)</option>
                     <option value="HIGH" {% if selected_priority == 'HIGH' %}selected{% endif %}>Alta (SLA 12h)</option>
                     <option value="NORMAL" {% if selected_priority == 'NORMAL' %}selected{% endif %}>Normal (SLA 24h)</option>
@@ -103,9 +79,10 @@
                 </select>
             </div>
 
-            <div>
-                <select name="category" onchange="this.form.submit()" class="text-xs bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-slate-800">
-                    <option value="">Todas las Categorías</option>
+            <div class="flex items-center gap-2">
+                <span class="text-zinc-500 font-medium">Categoría:</span>
+                <select name="category" onchange="this.form.submit()" class="text-xs bg-zinc-50 border border-zinc-200 rounded-md px-2.5 py-1 text-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-900 font-sans">
+                    <option value="">Todas las categorías</option>
                     <option value="VEHICLE_FLEET" {% if selected_category == 'VEHICLE_FLEET' %}selected{% endif %}>Flota / Vehículos</option>
                     <option value="TOOL_EQUIPMENT" {% if selected_category == 'TOOL_EQUIPMENT' %}selected{% endif %}>Herramientas / Equipos</option>
                     <option value="IT_SYSTEM" {% if selected_category == 'IT_SYSTEM' %}selected{% endif %}>Sistemas / TI</option>
@@ -115,109 +92,108 @@
             </div>
 
             {% if selected_status or selected_priority or selected_category %}
-            <a href="{% url 'tickets:ticket_list' %}" class="text-xs text-slate-500 hover:text-slate-800 underline">
-                Limpiar Filtros
+            <a href="{% url 'tickets:ticket_list' %}" class="text-xs text-zinc-500 hover:text-zinc-800 underline">
+                Limpiar filtros
             </a>
             {% endif %}
         </form>
 
-        <span class="font-mono text-[11px] text-slate-500 tabular-nums">
-            {{ total_tickets_count }} tickets listados
+        <span class="text-xs text-zinc-400 tabular-nums">
+            {{ total_tickets_count }} tickets
         </span>
     </div>
 
-    <!-- Tabla Principal de Tickets con Semáforo Técnico de SLA -->
-    <div class="bg-white border border-slate-200 rounded-md overflow-hidden">
+    <!-- Tabla Principal de Tickets -->
+    <div class="bg-white border border-zinc-200 rounded-md overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
-                        <th class="py-2.5 px-3">Número</th>
-                        <th class="py-2.5 px-3">Asunto & Categoría</th>
-                        <th class="py-2.5 px-3">Prioridad & SLA</th>
-                        <th class="py-2.5 px-3">Semáforo de SLA</th>
-                        <th class="py-2.5 px-3">OT Vinculada</th>
-                        <th class="py-2.5 px-3">Reportado Por</th>
-                        <th class="py-2.5 px-3">Asignado</th>
-                        <th class="py-2.5 px-3">Estado</th>
-                        <th class="py-2.5 px-3 text-right">Acción</th>
+                    <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/60 border-b border-zinc-200 font-sans">
+                        <th class="py-3 px-4">Número</th>
+                        <th class="py-3 px-4">Asunto y categoría</th>
+                        <th class="py-3 px-4">Prioridad</th>
+                        <th class="py-3 px-4">Estado SLA</th>
+                        <th class="py-3 px-4">OT vinculada</th>
+                        <th class="py-3 px-4">Reportado por</th>
+                        <th class="py-3 px-4">Asignado</th>
+                        <th class="py-3 px-4">Estado</th>
+                        <th class="py-3 px-4 text-right">Acción</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody class="divide-y divide-zinc-100">
                     {% for tck in tickets %}
-                    <tr class="hover:bg-slate-50 transition">
-                        <td class="py-2.5 px-3 font-mono font-semibold text-slate-900 whitespace-nowrap">
+                    <tr class="hover:bg-zinc-50/70 transition-colors">
+                        <td class="py-3 px-4 font-mono font-medium text-zinc-900 whitespace-nowrap tabular-nums">
                             <a href="{% url 'tickets:ticket_detail' tck.pk %}" class="hover:underline">
                                 {{ tck.number }}
                             </a>
                         </td>
-                        <td class="py-2.5 px-3">
-                            <div class="font-medium text-slate-900">{{ tck.title }}</div>
-                            <div class="text-[11px] text-slate-500">{{ tck.get_category_display }}</div>
+                        <td class="py-3 px-4">
+                            <div class="font-medium text-zinc-900">{{ tck.title }}</div>
+                            <div class="text-[11px] text-zinc-400">{{ tck.get_category_display }}</div>
                         </td>
-                        <td class="py-2.5 px-3 whitespace-nowrap">
-                            <span class="font-mono text-[11px] font-medium 
-                                {% if tck.priority == 'CRITICAL' %}text-rose-700 bg-rose-50 border border-rose-200
-                                {% elif tck.priority == 'HIGH' %}text-amber-700 bg-amber-50 border border-amber-200
-                                {% else %}text-slate-700 bg-slate-100 border border-slate-200{% endif %} 
-                                px-2 py-0.5 rounded">
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full
+                                {% if tck.priority == 'CRITICAL' %}text-rose-700 bg-rose-50
+                                {% elif tck.priority == 'HIGH' %}text-amber-800 bg-amber-50
+                                {% else %}text-zinc-700 bg-zinc-100{% endif %}">
                                 {{ tck.get_priority_display }}
                             </span>
                         </td>
-                        <td class="py-2.5 px-3 whitespace-nowrap">
+                        <td class="py-3 px-4 whitespace-nowrap">
                             {% if tck.sla_status == 'COMPLETED' %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                RESUELTO
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                                Resuelto
                             </span>
                             {% elif tck.sla_status == 'BREACHED' %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-rose-50 text-rose-700 border border-rose-300">
-                                SLA VENCIDO
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-700">
+                                Fuera de plazo
                             </span>
                             {% else %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-slate-100 text-slate-800 border border-slate-200">
-                                EN PLAZO ({{ tck.sla_hours }}h)
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700 font-mono tabular-nums">
+                                En plazo ({{ tck.sla_hours }}h)
                             </span>
                             {% endif %}
                         </td>
-                        <td class="py-2.5 px-3 whitespace-nowrap">
+                        <td class="py-3 px-4 whitespace-nowrap">
                             {% if tck.related_work_order %}
-                            <a href="{% url 'operations:workorder_detail' tck.related_work_order.pk %}" class="font-mono text-blue-600 hover:underline">
+                            <a href="{% url 'operations:workorder_detail' tck.related_work_order.pk %}" class="font-mono text-zinc-900 hover:underline">
                                 {{ tck.related_work_order.code }}
                             </a>
                             {% else %}
-                            <span class="text-slate-400 font-mono text-[11px]">—</span>
+                            <span class="text-zinc-400 font-mono text-[11px]">—</span>
                             {% endif %}
                         </td>
-                        <td class="py-2.5 px-3 whitespace-nowrap">
-                            <div class="text-slate-800">{{ tck.reported_by.get_full_name|default:tck.reported_by.email }}</div>
-                            <div class="font-mono text-[10px] text-slate-400 tabular-nums">{{ tck.created_at|date:"d/m/Y H:i" }}</div>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <div class="text-zinc-800">{{ tck.reported_by.get_full_name|default:tck.reported_by.email }}</div>
+                            <div class="font-mono text-[11px] text-zinc-400 tabular-nums">{{ tck.created_at|date:"d/m/Y H:i" }}</div>
                         </td>
-                        <td class="py-2.5 px-3 whitespace-nowrap">
+                        <td class="py-3 px-4 whitespace-nowrap">
                             {% if tck.assigned_to %}
-                            <span class="text-slate-800">{{ tck.assigned_to.get_full_name|default:tck.assigned_to.email }}</span>
+                            <span class="text-zinc-800">{{ tck.assigned_to.get_full_name|default:tck.assigned_to.email }}</span>
                             {% else %}
-                            <span class="text-slate-400 text-[11px]">Sin asignar</span>
+                            <span class="text-zinc-400 text-xs">Sin asignar</span>
                             {% endif %}
                         </td>
-                        <td class="py-2.5 px-3 whitespace-nowrap">
-                            <span class="font-medium text-[11px]
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <span class="font-medium text-xs
                                 {% if tck.status == 'OPEN' %}text-blue-700
-                                {% elif tck.status == 'IN_PROGRESS' %}text-amber-700
+                                {% elif tck.status == 'IN_PROGRESS' %}text-amber-800
                                 {% elif tck.status == 'RESOLVED' %}text-emerald-700
-                                {% else %}text-slate-600{% endif %}">
+                                {% else %}text-zinc-600{% endif %}">
                                 {{ tck.get_status_display }}
                             </span>
                         </td>
-                        <td class="py-2.5 px-3 text-right whitespace-nowrap">
-                            <a href="{% url 'tickets:ticket_detail' tck.pk %}" class="inline-flex items-center px-2.5 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-50 transition">
-                                Ver Detalle
+                        <td class="py-3 px-4 text-right whitespace-nowrap">
+                            <a href="{% url 'tickets:ticket_detail' tck.pk %}" class="inline-flex items-center px-2.5 py-1 text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded transition-colors">
+                                Ver detalle
                             </a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="py-8 text-center text-slate-400 text-xs">
-                            No se encontraron tickets registrados según los filtros aplicados.
+                        <td colspan="9" class="py-12 text-center text-zinc-400 text-xs">
+                            No se encontraron tickets registrados.
                         </td>
                     </tr>
                     {% endfor %}
@@ -226,69 +202,60 @@
         </div>
     </div>
 
-    <!-- Modal Aperturar Ticket -->
+    <!-- Modal Apertura de Ticket -->
     <div x-show="showTicketModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 transition-opacity bg-slate-900 bg-opacity-40" @click="showTicketModal = false"></div>
+            <div class="fixed inset-0 transition-opacity bg-zinc-900/40 backdrop-blur-xs" @click="showTicketModal = false"></div>
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            <div class="inline-block align-bottom bg-white rounded-md text-left overflow-hidden shadow-sm transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full border border-slate-200">
-                <form action="{% url 'tickets:ticket_create' %}" method="post" class="p-6 space-y-4">
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-sm transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full border border-zinc-200">
+                <form action="{% url 'tickets:ticket_create' %}" method="post" class="p-6 space-y-4 text-xs font-sans">
                     {% csrf_token %}
-                    <div class="border-b border-slate-100 pb-3">
-                        <h3 class="text-sm font-bold text-slate-900">Aperturar Ticket de Incidente / Mesa de Ayuda</h3>
-                        <p class="text-xs text-slate-500 mt-0.5">El compromiso SLA se computará automáticamente según la prioridad seleccionada.</p>
+                    <div class="border-b border-zinc-100 pb-3 flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-semibold text-zinc-900">Aperturar Ticket de Incidente</h3>
+                            <p class="text-xs text-zinc-500 mt-0.5">El compromiso SLA se computará automáticamente según la prioridad.</p>
+                        </div>
+                        <button type="button" @click="showTicketModal = false" class="text-zinc-400 hover:text-zinc-600 text-base leading-none">&times;</button>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-medium text-slate-700 mb-1">Título / Asunto del Incidente *</label>
-                        {{ ticket_form.title }}
+                        <label class="block font-medium text-zinc-700 mb-1">Título del incidente</label>
+                        {{ form.title }}
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">Categoría del Incidente</label>
-                            {{ ticket_form.category }}
+                            <label class="block font-medium text-zinc-700 mb-1">Categoría</label>
+                            {{ form.category }}
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">Prioridad y Compromiso SLA *</label>
-                            {{ ticket_form.priority }}
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">Orden de Trabajo (Opcional)</label>
-                            {{ ticket_form.related_work_order }}
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">Especialista Asignado (Opcional)</label>
-                            {{ ticket_form.assigned_to }}
+                            <label class="block font-medium text-zinc-700 mb-1">Prioridad</label>
+                            {{ form.priority }}
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-medium text-slate-700 mb-1">Descripción Detallada del Requerimiento / Falla *</label>
-                        {{ ticket_form.description }}
+                        <label class="block font-medium text-zinc-700 mb-1">Orden de trabajo relacionada (Opcional)</label>
+                        {{ form.related_work_order }}
                     </div>
 
-                    <!-- Cuadro informativo SLA -->
-                    <div class="bg-slate-50 p-3 rounded border border-slate-200 text-[11px] text-slate-600 space-y-0.5">
-                        <div class="font-medium text-slate-800">Compromisos de Nivel de Servicio (SLA):</div>
-                        <div>• <span class="font-semibold text-rose-700">Crítica:</span> 4 horas (Emergencias operativas / paralización)</div>
-                        <div>• <span class="font-semibold text-amber-700">Alta:</span> 12 horas | <span class="font-semibold text-slate-700">Normal:</span> 24 horas | <span class="font-semibold text-slate-700">Baja:</span> 72 horas</div>
+                    <div>
+                        <label class="block font-medium text-zinc-700 mb-1">Descripción detallada</label>
+                        {{ form.description }}
                     </div>
 
-                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                        <button type="button" @click="showTicketModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-50">
+                    <div class="flex justify-end gap-2 pt-2 border-t border-zinc-100">
+                        <button type="button" @click="showTicketModal = false" class="px-3 py-1.5 border border-zinc-200 text-zinc-600 rounded-md hover:bg-zinc-50 transition-colors">
                             Cancelar
                         </button>
-                        <button type="submit" class="px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800">
-                            Crear y Encolar Ticket
+                        <button type="submit" class="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-md transition-colors cursor-pointer">
+                            Crear Ticket
                         </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+
 </div>
 {% endblock %}

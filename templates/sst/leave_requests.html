@@ -1,165 +1,142 @@
 {% extends "layouts/base_erp.html" %}
 
-{% block title %}Permisos Laborales & Reposos Médicos | {{ current_org.name }}{% endblock %}
+{% block title %}Permisos y Reposos Médicos | {{ current_org.name }} | ERP SAS{% endblock %}
+{% block breadcrumb_section %}Seguridad y Salud{% endblock %}
+{% block breadcrumb_page %}Permisos Laborales{% endblock %}
+{% block page_title %}{% if is_field_tech %}Mis Solicitudes de Permiso y Reposo{% else %}Permisos Laborales y Reposos Médicos{% endif %}{% endblock %}
+
+{% block page_actions %}
+<div class="flex items-center space-x-2 font-sans">
+    <button type="button" @click="showLeaveModal = true" class="h-8 px-3.5 text-xs font-medium text-white bg-zinc-900 rounded-md hover:bg-zinc-800 transition-colors flex items-center gap-1.5 cursor-pointer">
+        <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        </svg>
+        <span>Solicitar Permiso</span>
+    </button>
+</div>
+{% endblock %}
 
 {% block content %}
-<div class="space-y-6" x-data="{ showLeaveModal: false, showResolutionModal: false, currentLeaveId: null, currentAction: 'approve', currentLeaveNumber: '' }">
-    <!-- Header Técnico -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4 gap-3">
-        <div>
-            <div class="flex items-center space-x-2 text-xs text-slate-500 font-mono mb-1">
-                <span>SEGURIDAD LABORAL (SST)</span>
-                <span>/</span>
-                <span class="text-slate-700 font-semibold">GOBERNANZA LABORAL</span>
-            </div>
-            <h1 class="text-xl font-bold tracking-tight text-slate-900">
-                {% if is_field_tech %}
-                Mis Solicitudes de Permiso y Reposo
-                {% else %}
-                Flujo de Permisos Laborales & Reposos Médicos
-                {% endif %}
-            </h1>
-            <p class="text-xs text-slate-500 mt-0.5">
-                Control de ausencias justificadas, reposos médicos INSS y vacaciones bajo regla anti-inversión de mando.
-            </p>
-        </div>
+<div class="space-y-6 max-w-7xl mx-auto font-sans" x-data="{ showLeaveModal: false }">
 
-        <div class="flex items-center space-x-2">
-            <button type="button" @click="showLeaveModal = true" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
-                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"></path>
-                </svg>
-                Solicitar Permiso
-            </button>
-        </div>
-    </div>
-
-    <!-- KPIs de Permisos -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div class="bg-white border border-slate-200 rounded p-4">
-            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-500 block">Pendientes de Aprobación</span>
-            <span class="text-2xl font-bold {% if total_pending > 0 %}text-amber-700{% else %}text-slate-900{% endif %} font-mono tabular-nums block mt-1">
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white border border-zinc-200 rounded-md p-4">
+            <span class="text-xs font-medium text-zinc-500 block">Pendientes de aprobación</span>
+            <span class="text-2xl font-bold {% if total_pending > 0 %}text-amber-700{% else %}text-zinc-900{% endif %} font-mono tabular-nums block mt-1">
                 {{ total_pending }}
             </span>
-            <span class="text-[11px] text-slate-500 mt-0.5 block">En espera de resolución</span>
+            <span class="text-[11px] text-zinc-400 mt-1 block">En espera de resolución</span>
         </div>
-        <div class="bg-white border border-slate-200 rounded p-4">
-            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-500 block">Permisos Autorizados</span>
+        <div class="bg-white border border-zinc-200 rounded-md p-4">
+            <span class="text-xs font-medium text-zinc-500 block">Permisos autorizados</span>
             <span class="text-2xl font-bold text-emerald-700 font-mono tabular-nums block mt-1">
                 {{ total_approved }}
             </span>
-            <span class="text-[11px] text-slate-500 mt-0.5 block">Histórico aprobado en el tenant</span>
+            <span class="text-[11px] text-zinc-400 mt-1 block">Histórico aprobado</span>
         </div>
-        <div class="bg-white border border-slate-200 rounded p-4">
-            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-500 block">Mis Solicitudes Activas</span>
-            <span class="text-2xl font-bold text-slate-900 font-mono tabular-nums block mt-1">
+        <div class="bg-white border border-zinc-200 rounded-md p-4">
+            <span class="text-xs font-medium text-zinc-500 block">Mis solicitudes activas</span>
+            <span class="text-2xl font-bold text-zinc-900 font-mono tabular-nums block mt-1">
                 {{ user_pending }}
             </span>
-            <span class="text-[11px] text-slate-500 mt-0.5 block font-mono">En revisión</span>
+            <span class="text-[11px] text-zinc-400 mt-1 block">En revisión</span>
         </div>
-        <div class="bg-white border border-slate-200 rounded p-4">
-            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-500 block">Gobernanza RBAC</span>
-            <span class="text-xs font-semibold text-slate-800 block mt-2">Anti-Inversión de Mando</span>
-            <span class="text-[11px] text-slate-500 block font-mono">approver_level &gt; requester_level</span>
+        <div class="bg-white border border-zinc-200 rounded-md p-4">
+            <span class="text-xs font-medium text-zinc-500 block">Criterio de aprobación</span>
+            <span class="text-sm font-medium text-zinc-800 block mt-1">Jerarquía Superior</span>
+            <span class="text-[11px] text-zinc-400 mt-1 block">Nivel superior al solicitante</span>
         </div>
     </div>
 
     <!-- Tabla Principal de Solicitudes -->
-    <div class="bg-white border border-slate-200 rounded overflow-hidden">
-        <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
-            <span class="font-mono font-semibold text-slate-700 uppercase tracking-wider">
-                Solicitudes de Permiso Registradas
-            </span>
-            <span class="text-[11px] text-slate-500 font-mono">Trazabilidad de Resoluciones SST / Dirección</span>
-        </div>
-
+    <div class="bg-white border border-zinc-200 rounded-md overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                    <tr class="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-mono text-[10px] uppercase tracking-wider">
-                        <th class="py-2.5 px-3">Folio</th>
-                        <th class="py-2.5 px-3">Colaborador Solicitante</th>
-                        <th class="py-2.5 px-3">Tipo de Permiso</th>
-                        <th class="py-2.5 px-3 font-mono">Vigencia (Inicio &ndash; Fin)</th>
-                        <th class="py-2.5 px-3 text-center font-mono">Días</th>
-                        <th class="py-2.5 px-3">Motivo / Justificación</th>
-                        <th class="py-2.5 px-3">Estado</th>
-                        <th class="py-2.5 px-3 text-right">Acción de Mando</th>
+                    <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/60 border-b border-zinc-200 font-sans">
+                        <th class="py-3 px-4">Folio</th>
+                        <th class="py-3 px-4">Colaborador solicitante</th>
+                        <th class="py-3 px-4">Tipo de permiso</th>
+                        <th class="py-3 px-4">Vigencia</th>
+                        <th class="py-3 px-4 text-center">Días</th>
+                        <th class="py-3 px-4">Motivo / Justificación</th>
+                        <th class="py-3 px-4">Estado</th>
+                        <th class="py-3 px-4 text-right">Acción</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody class="divide-y divide-zinc-100">
                     {% for item in leaves_data %}
                     {% with leave=item.leave can_review=item.can_review %}
-                    <tr class="hover:bg-slate-50/70 transition">
-                        <td class="py-2.5 px-3 font-mono font-bold text-slate-900">
+                    <tr class="hover:bg-zinc-50/70 transition-colors">
+                        <td class="py-3 px-4 font-mono font-medium text-zinc-900 tabular-nums whitespace-nowrap">
                             {{ leave.number }}
                         </td>
-                        <td class="py-2.5 px-3">
-                            <span class="font-medium text-slate-900 block">{{ leave.requester.full_name|default:leave.requester.email }}</span>
-                            <span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                NIVEL {{ leave.requester_role_level }}
+                        <td class="py-3 px-4">
+                            <span class="font-medium text-zinc-900 block">{{ leave.requester.full_name|default:leave.requester.email }}</span>
+                            <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] bg-zinc-100 text-zinc-600 font-sans">
+                                Nivel {{ leave.requester_role_level }}
                             </span>
                         </td>
-                        <td class="py-2.5 px-3 text-[11px] text-slate-700 font-medium">
+                        <td class="py-3 px-4 text-zinc-700">
                             {{ leave.get_leave_type_display }}
                         </td>
-                        <td class="py-2.5 px-3 font-mono text-[11px] text-slate-700">
-                            {{ leave.start_date|date:"d/m/Y" }} &rarr; {{ leave.end_date|date:"d/m/Y" }}
+                        <td class="py-3 px-4 font-mono text-zinc-600 tabular-nums whitespace-nowrap">
+                            {{ leave.start_date|date:"d/m/Y" }} al {{ leave.end_date|date:"d/m/Y" }}
                         </td>
-                        <td class="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
+                        <td class="py-3 px-4 text-center font-mono font-medium text-zinc-900 tabular-nums">
                             {{ leave.days_requested }}
                         </td>
-                        <td class="py-2.5 px-3 text-slate-600 text-[11px] max-w-[200px] truncate" title="{{ leave.reason }}">
+                        <td class="py-3 px-4 text-zinc-600 max-w-[200px] truncate" title="{{ leave.reason }}">
                             {{ leave.reason }}
                         </td>
-                        <td class="py-2.5 px-3">
+                        <td class="py-3 px-4 whitespace-nowrap">
                             {% if leave.status == 'APPROVED' %}
-                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                AUTORIZADO
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                                Autorizado
                             </span>
                             {% elif leave.status == 'REJECTED' %}
-                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-50 text-rose-800 border border-rose-200">
-                                RECHAZADO
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-700">
+                                Rechazado
                             </span>
                             {% else %}
-                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                PENDIENTE
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800">
+                                Pendiente
                             </span>
                             {% endif %}
                         </td>
-                        <td class="py-2.5 px-3 text-right">
+                        <td class="py-3 px-4 text-right whitespace-nowrap">
                             {% if leave.status == 'PENDING' %}
                                 {% if can_review %}
                                 <div class="inline-flex items-center space-x-1">
                                     <form method="POST" action="{% url 'sst:leave_review' leave.pk %}">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="approve">
-                                        <button type="submit" class="px-2 py-1 text-[10px] font-mono font-bold bg-emerald-700 hover:bg-emerald-800 text-white rounded transition shadow-none" title="Autorizar permiso">
+                                        <button type="submit" class="px-2.5 py-1 text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-white rounded transition-colors cursor-pointer" title="Autorizar permiso">
                                             Autorizar
                                         </button>
                                     </form>
                                     <form method="POST" action="{% url 'sst:leave_review' leave.pk %}">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="reject">
-                                        <button type="submit" class="px-2 py-1 text-[10px] font-mono font-bold bg-rose-700 hover:bg-rose-800 text-white rounded transition shadow-none" title="Rechazar permiso">
+                                        <button type="submit" class="px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 border border-rose-200 rounded transition-colors cursor-pointer" title="Rechazar permiso">
                                             Rechazar
                                         </button>
                                     </form>
                                 </div>
                                 {% else %}
                                     {% if request.user.id == leave.requester_id %}
-                                    <span class="text-[10px] text-slate-400 font-mono italic">Propia (En espera)</span>
+                                    <span class="text-xs text-zinc-400">En espera</span>
                                     {% else %}
-                                    <span class="text-[10px] text-amber-700 font-mono" title="Se requiere un rol superior al del solicitante">
-                                        Jerarquía Insuficiente
+                                    <span class="text-xs text-amber-800" title="Requiere rol superior al del solicitante">
+                                        Nivel insuficiente
                                     </span>
                                     {% endif %}
                                 {% endif %}
                             {% else %}
-                            <div class="text-[10px] font-mono text-slate-500">
+                            <div class="text-xs text-zinc-400">
                                 {% if leave.reviewed_by %}
                                 <span>Por {{ leave.reviewed_by.full_name|default:leave.reviewed_by.email|truncatechars:14 }}</span>
-                                <span class="block text-slate-400 text-[9px]">{{ leave.reviewed_at|date:"d/m/Y" }}</span>
                                 {% else %}
                                 —
                                 {% endif %}
@@ -170,7 +147,7 @@
                     {% endwith %}
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="py-8 text-center text-xs text-slate-400">
+                        <td colspan="8" class="py-12 text-center text-xs text-zinc-400">
                             No hay solicitudes de permiso registradas.
                         </td>
                     </tr>
@@ -181,54 +158,54 @@
     </div>
 
     <!-- MODAL: CREAR SOLICITUD DE PERMISO -->
-    <div x-show="showLeaveModal" x-cloak class="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
-        <div class="bg-white border border-slate-200 rounded max-w-lg w-full p-6 space-y-4 shadow-none" @click.outside="showLeaveModal = false">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+    <div x-show="showLeaveModal" x-cloak class="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white border border-zinc-200 rounded-lg max-w-lg w-full p-6 space-y-4 shadow-sm" @click.outside="showLeaveModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-zinc-100">
                 <div>
-                    <h3 class="text-xs font-mono uppercase tracking-wider font-bold text-slate-900">
-                        Presentar Solicitud de Permiso / Ausencia
+                    <h3 class="text-sm font-semibold text-zinc-900">
+                        Presentar Solicitud de Permiso
                     </h3>
-                    <p class="text-[11px] text-slate-500">Registro formal sujeto a autorización de la jerarquía correspondiente.</p>
+                    <p class="text-xs text-zinc-500 mt-0.5">Registro sujeto a aprobación de jerarquía superior.</p>
                 </div>
-                <button type="button" @click="showLeaveModal = false" class="text-slate-400 hover:text-slate-600">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <button type="button" @click="showLeaveModal = false" class="text-zinc-400 hover:text-zinc-600 text-base leading-none">
+                    &times;
                 </button>
             </div>
 
-            <form method="POST" action="{% url 'sst:leave_create' %}" class="space-y-4">
+            <form method="POST" action="{% url 'sst:leave_create' %}" class="space-y-4 text-xs font-sans">
                 {% csrf_token %}
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Tipo de Permiso <span class="text-rose-500">*</span></label>
+                    <label class="block font-medium text-zinc-700 mb-1">Tipo de Permiso *</label>
                     {{ leave_form.leave_type }}
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-medium text-slate-700 mb-1">Fecha de Inicio <span class="text-rose-500">*</span></label>
+                        <label class="block font-medium text-zinc-700 mb-1">Fecha de Inicio *</label>
                         {{ leave_form.start_date }}
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-700 mb-1">Fecha de Conclusión <span class="text-rose-500">*</span></label>
+                        <label class="block font-medium text-zinc-700 mb-1">Fecha de Conclusión *</label>
                         {{ leave_form.end_date }}
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Total de Días Solicitados <span class="text-rose-500">*</span></label>
+                    <label class="block font-medium text-zinc-700 mb-1">Total de Días Solicitados *</label>
                     {{ leave_form.days_requested }}
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Motivo y Justificación <span class="text-rose-500">*</span></label>
+                    <label class="block font-medium text-zinc-700 mb-1">Motivo y Justificación *</label>
                     {{ leave_form.reason }}
                 </div>
 
-                <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
-                    <button type="button" @click="showLeaveModal = false" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition">
+                <div class="pt-3 border-t border-zinc-100 flex items-center justify-end space-x-2">
+                    <button type="button" @click="showLeaveModal = false" class="px-3 py-1.5 text-xs font-medium text-zinc-700 bg-white border border-zinc-200 rounded-md hover:bg-zinc-50 transition-colors">
                         Cancelar
                     </button>
-                    <button type="submit" class="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded hover:bg-slate-800 transition">
+                    <button type="submit" class="px-4 py-1.5 text-xs font-medium text-white bg-zinc-900 rounded-md hover:bg-zinc-800 transition-colors cursor-pointer">
                         Presentar Solicitud
                     </button>
                 </div>
