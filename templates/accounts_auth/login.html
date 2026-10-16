@@ -1,171 +1,87 @@
 {% extends "layouts/base_auth.html" %}
 
-{% block title %}Iniciar Sesión{% endblock %}
+{% block title %}Iniciar sesión{% endblock %}
 
 {% block content %}
-<div class="w-full max-w-sm mx-auto" x-data="{
-    fillDemo(email, pass) {
-        const emailInput = document.getElementById('id_email');
-        const passInput = document.getElementById('id_password');
-        if (emailInput) {
-            emailInput.value = email;
-            emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        if (passInput) {
-            passInput.value = pass;
-            passInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-    }
-}">
-    <!-- Contenedor Principal Suizo: Borde Fino 1px, Cero Sombras, Blanco Puro -->
-    <div class="bg-white border border-zinc-200 rounded-[4px]">
-        
-        <!-- Cabecera del Panel -->
-        <div class="p-6 border-b border-zinc-200 bg-white">
-            <div class="flex items-center justify-between mb-2">
-                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-mono uppercase tracking-wider font-semibold bg-zinc-50 text-zinc-700 border border-zinc-200">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                    AUTENTICACIÓN B2B
-                </span>
-                <span class="text-[10px] font-mono text-zinc-400">SEC-01</span>
-            </div>
-            <h1 class="text-base font-semibold text-zinc-900 tracking-tight">Acceso a la Plataforma</h1>
-            <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                Ingrese sus credenciales operativas autorizadas para acceder a su espacio de trabajo.
-            </p>
+<div class="w-full">
+    <!-- Encabezado simple: Logo discreto + título -->
+    <div class="mb-6 text-center">
+        <div class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-zinc-900 text-white font-semibold text-sm mb-3">
+            E
         </div>
+        <h1 class="text-xl font-semibold text-zinc-900 tracking-tight">Iniciar sesión</h1>
+    </div>
 
-        <!-- Errores Globales -->
-        {% if form.non_field_errors %}
-        <div class="p-3 mx-6 mt-4 border border-red-200 bg-red-50/50 rounded-[4px] text-xs font-mono text-red-700 space-y-1">
-            {% for error in form.non_field_errors %}
-            <div class="flex items-start gap-1.5">
-                <span class="font-bold text-red-600">&bull;</span>
-                <span class="font-sans text-[12px] leading-tight">{{ error }}</span>
-            </div>
-            {% endfor %}
+    <!-- Errores Globales -->
+    {% if form.non_field_errors %}
+    <div class="p-3 mb-4 border border-red-200 bg-red-50/50 rounded-md text-xs font-sans text-red-700 space-y-1">
+        {% for error in form.non_field_errors %}
+        <div class="flex items-start gap-1.5">
+            <span class="font-bold text-red-600">&bull;</span>
+            <span class="leading-tight">{{ error }}</span>
         </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Formulario de Acceso -->
+    <form method="POST" action="{% url 'accounts_auth:login' %}" class="space-y-4">
+        {% csrf_token %}
+        {% if next %}
+        <input type="hidden" name="next" value="{{ next }}">
         {% endif %}
 
-        <!-- Formulario de Acceso -->
-        <form method="POST" action="{% url 'accounts_auth:login' %}" class="p-6 space-y-4">
-            {% csrf_token %}
-            {% if next %}
-            <input type="hidden" name="next" value="{{ next }}">
-            {% endif %}
-
-            <!-- Correo Electrónico -->
-            <div>
-                <label for="id_email" class="block text-xs font-medium text-zinc-700 mb-1.5">
-                    Correo Corporativo <span class="text-red-500">*</span>
-                </label>
-                {{ form.email }}
-                {% if form.email.errors %}
-                <p class="text-[11px] font-mono text-red-600 mt-1">
-                    {{ form.email.errors.0 }}
-                </p>
-                {% endif %}
-            </div>
-
-            <!-- Contraseña -->
-            <div>
-                <div class="flex items-center justify-between mb-1.5">
-                    <label for="id_password" class="block text-xs font-medium text-zinc-700">
-                        Contraseña de Acceso <span class="text-red-500">*</span>
-                    </label>
-                </div>
-                {{ form.password }}
-                {% if form.password.errors %}
-                <p class="text-[11px] font-mono text-red-600 mt-1">
-                    {{ form.password.errors.0 }}
-                </p>
-                {% endif %}
-            </div>
-
-            <!-- Botón de Envío -->
-            <div class="pt-2">
-                <button type="submit"
-                        class="w-full h-9 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
-                    <span>Iniciar Sesión</span>
-                    <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
-                    </svg>
-                </button>
-            </div>
-
-            <div class="pt-2 text-center">
-                <span class="text-xs text-zinc-600">
-                    ¿Nuevo evaluador o empresa?
-                    <a href="{% url 'accounts_auth:register' %}" class="font-medium text-zinc-900 hover:underline ml-1">
-                        Crear cuenta corporativa &rarr;
-                    </a>
-                </span>
-            </div>
-        </form>
-
-        <!-- Separador Técnico: Modo Evaluación de Producto & UX -->
-        <div class="px-6 py-4 border-t border-zinc-200 bg-zinc-50/50">
-            <div class="flex items-center justify-between mb-2.5">
-                <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-semibold">
-                    MODO EVALUACIÓN DE PRODUCTO &amp; UX
-                </span>
-                <span class="text-[10px] font-mono text-zinc-400">DEMO-LIVE</span>
-            </div>
-            <form method="POST" action="{% url 'accounts_auth:sandbox_login' %}">
-                {% csrf_token %}
-                <button type="submit"
-                        class="w-full h-9 bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 text-xs font-medium rounded-[4px] transition-colors flex items-center justify-center gap-2 cursor-pointer">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                    <span>Ingresar al Sandbox Industrial (1-Clic Demo)</span>
-                </button>
-            </form>
-            <p class="text-[10px] font-mono text-zinc-400 mt-2 text-center">
-                Acceso directo con privilegios Root (100) y datos operativos precargados
+        <div>
+            <label for="id_email" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                Correo electrónico
+            </label>
+            {{ form.email }}
+            {% if form.email.errors %}
+            <p class="text-xs text-red-600 mt-1 font-sans">
+                {{ form.email.errors.0 }}
             </p>
+            {% endif %}
         </div>
 
-        <!-- Selector Rápido de Roles para Simulación / Pruebas -->
-        <div class="bg-zinc-50 border-t border-zinc-200 p-4 rounded-b-[4px]">
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-mono font-medium uppercase tracking-wider text-zinc-500">
-                    Cuentas de Demostración RBAC
-                </span>
-                <span class="text-[10px] font-mono text-zinc-400 font-semibold">1-CLICK</span>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <button type="button"
-                        @click="fillDemo('owner@vector.com', 'Vector2026!')"
-                        class="text-left px-2.5 py-1.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-[4px] transition-colors group">
-                    <div class="text-[11px] font-medium text-zinc-900">Owner (100)</div>
-                    <div class="text-[10px] font-mono text-zinc-500 truncate">owner@vector.com</div>
-                </button>
-
-                <button type="button"
-                        @click="fillDemo('coord@vector.com', 'Vector2026!')"
-                        class="text-left px-2.5 py-1.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-[4px] transition-colors group">
-                    <div class="text-[11px] font-medium text-zinc-900">Operaciones (80)</div>
-                    <div class="text-[10px] font-mono text-zinc-500 truncate">coord@vector.com</div>
-                </button>
-
-                <button type="button"
-                        @click="fillDemo('sst@vector.com', 'Vector2026!')"
-                        class="text-left px-2.5 py-1.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-[4px] transition-colors group">
-                    <div class="text-[11px] font-medium text-zinc-900">Oficial SST (70)</div>
-                    <div class="text-[10px] font-mono text-zinc-500 truncate">sst@vector.com</div>
-                </button>
-
-                <button type="button"
-                        @click="fillDemo('engineer@vector.com', 'Vector2026!')"
-                        class="text-left px-2.5 py-1.5 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-[4px] transition-colors group">
-                    <div class="text-[11px] font-medium text-zinc-900">Ing. Residente (50)</div>
-                    <div class="text-[10px] font-mono text-zinc-500 truncate">engineer@vector.com</div>
-                </button>
-            </div>
-            <div class="mt-2.5 text-center">
-                <span class="text-[10px] font-mono text-zinc-400">Contraseña Demo: <strong class="text-zinc-700 font-medium">Vector2026!</strong></span>
-            </div>
+        <div>
+            <label for="id_password" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                Contraseña
+            </label>
+            {{ form.password }}
+            {% if form.password.errors %}
+            <p class="text-xs text-red-600 mt-1 font-sans">
+                {{ form.password.errors.0 }}
+            </p>
+            {% endif %}
         </div>
 
+        <div class="pt-2">
+            <button type="submit"
+                    class="w-full h-10 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
+                <span>Continuar</span>
+            </button>
+        </div>
+
+        <div class="pt-1 text-center">
+            <span class="text-xs text-zinc-500 font-sans">
+                ¿No tienes una cuenta?
+                <a href="{% url 'accounts_auth:register' %}" class="font-medium text-zinc-900 hover:underline ml-1">
+                    Crear cuenta
+                </a>
+            </span>
+        </div>
+    </form>
+
+    <!-- Acceso Demo Simplificado -->
+    <div class="border-t border-zinc-100 pt-5 mt-6">
+        <form method="POST" action="{% url 'accounts_auth:sandbox_login' %}">
+            {% csrf_token %}
+            <button type="submit"
+                    class="w-full h-9 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-200/80 text-xs font-medium rounded-md flex items-center justify-center gap-2 cursor-pointer transition-colors">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                <span>Explorar entorno de demostración</span>
+            </button>
+        </form>
     </div>
 </div>
 {% endblock %}

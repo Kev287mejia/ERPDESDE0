@@ -715,9 +715,8 @@ class BusinessVerticalArchitectureTestCase(TestCase):
         response = self.client.get(reverse('tenancy:dashboard'))
         self.assertEqual(response.status_code, 200)
 
-        # Debe mostrar la etiqueta estática
-        self.assertContains(response, 'GIRO:')
-        self.assertContains(response, 'INGENIERÍA')
+        # Debe mostrar la etiqueta estática limpia
+        self.assertContains(response, 'Ingeniería')
 
         # NO debe contener el formulario interactivo para cambiar de giro
         self.assertNotContains(response, 'name="business_vertical"')
@@ -769,14 +768,14 @@ class BusinessVerticalArchitectureTestCase(TestCase):
         self.client.post(reverse('tenancy:switch_org_post'), {'org_id': str(self.org_eng.id)}, follow=True)
         response = self.client.get(reverse('tenancy:dashboard'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'INGENIERÍA')
+        self.assertContains(response, 'Ingeniería')
         self.assertContains(response, 'Órdenes de Trabajo')
 
         # 2. Conmutar a Farmacia Santa Lucía: Operaciones y SST quedan apagados en el menú
         self.client.post(reverse('tenancy:switch_org_post'), {'org_id': str(self.org_pharmacy.id)}, follow=True)
         response = self.client.get(reverse('tenancy:dashboard'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'FARMACIA MINSA')
+        self.assertContains(response, 'Farmacia')
         self.assertNotContains(response, 'Órdenes de Trabajo')
 
 

@@ -102,27 +102,24 @@
     <!-- ===================================================================== -->
     <header class="h-12 bg-white border-b border-zinc-200 flex items-center justify-between px-4 flex-shrink-0 z-30">
         
-        <!-- Izquierda: Marca ERP SAS + Selector de Organización + Píldora Fiscal -->
+        <!-- Izquierda: Marca + Selector de Organización + Giro sutil -->
         <div class="flex items-center gap-3">
-            <!-- Glifo Técnico Minimalista -->
             <div class="flex items-center gap-2">
-                <div class="w-5 h-5 bg-zinc-900 text-white font-mono text-[11px] font-bold rounded-[3px] flex items-center justify-center">
+                <div class="w-6 h-6 bg-zinc-900 text-white font-semibold text-xs rounded flex items-center justify-center">
                     E
                 </div>
-                <div class="hidden sm:block">
-                    <span class="text-xs font-semibold tracking-tight text-zinc-900 uppercase">ERP SAS</span>
-                </div>
+                <span class="text-xs font-semibold tracking-tight text-zinc-900 uppercase hidden sm:inline">ERP</span>
             </div>
 
             <span class="text-zinc-300">/</span>
 
-            <!-- Selector de Organización Estilo Comando -->
+            <!-- Selector de Organización Limpio -->
             <div class="flex items-center gap-2" x-data="{ open: false }">
                 <div class="relative">
                     <button type="button" 
                             @click="open = !open" 
-                            class="flex items-center gap-1.5 px-2 py-1 text-zinc-900 hover:bg-zinc-100 rounded-[4px] transition-colors border border-transparent hover:border-zinc-200 group">
-                        <span class="text-xs font-medium tracking-tight truncate max-w-[180px] md:max-w-[240px]" title="{{ current_org.name }}">
+                            class="flex items-center gap-1.5 px-2 py-1 font-sans text-sm font-medium text-zinc-900 hover:bg-zinc-100 rounded-md transition-colors group">
+                        <span class="truncate max-w-[180px] md:max-w-[240px]" title="{{ current_org.name }}">
                             {{ current_org.name|default:"Organización" }}
                         </span>
                         <svg class="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-700 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -134,23 +131,23 @@
                     <div x-show="open" 
                          @click.away="open = false" 
                          x-cloak
-                         class="absolute left-0 top-full mt-1 w-72 bg-white border border-zinc-200 rounded-[4px] z-50 p-1 text-xs">
-                        <div class="px-2 py-1 text-[10px] font-mono text-zinc-400 uppercase tracking-wider border-b border-zinc-100 mb-1 flex items-center justify-between">
-                            <span>ESPACIOS DE TRABAJO</span>
-                            <span class="text-[10px] text-zinc-600 font-bold tabular-nums">{{ user_memberships|length }} DISPONIBLES</span>
+                         class="absolute left-0 top-full mt-1 w-72 bg-white border border-zinc-200 rounded-md shadow-sm z-50 p-1 text-xs">
+                        <div class="px-2 py-1 text-[11px] font-sans text-zinc-400 font-medium border-b border-zinc-100 mb-1 flex items-center justify-between">
+                            <span>Espacios de trabajo</span>
+                            <span class="tabular-nums">{{ user_memberships|length }}</span>
                         </div>
                         {% for m in user_memberships %}
                         <form method="POST" action="{% url 'tenancy:switch_org_post' %}">
                             {% csrf_token %}
                             <input type="hidden" name="org_id" value="{{ m.organization.id }}">
                             <button type="submit" 
-                                    class="w-full text-left px-2 py-1.5 rounded-[3px] flex items-center justify-between hover:bg-zinc-100 transition-colors {% if m.organization.id == current_org.id %}bg-zinc-100 text-zinc-900 font-medium{% else %}text-zinc-600{% endif %}">
+                                    class="w-full text-left px-2 py-1.5 rounded flex items-center justify-between hover:bg-zinc-100 transition-colors {% if m.organization.id == current_org.id %}bg-zinc-100 text-zinc-900 font-medium{% else %}text-zinc-600{% endif %}">
                                 <div class="flex items-center gap-2 truncate">
                                     <span class="fi fi-{{ m.organization.country.code|lower }} border border-zinc-200 rounded-[2px]"></span>
                                     <span class="truncate text-xs">{{ m.organization.name }}</span>
                                 </div>
                                 {% if m.organization.id == current_org.id %}
-                                <span class="text-[9px] font-mono font-semibold text-zinc-700 bg-zinc-200 px-1.5 py-0.2 rounded-[2px]">ACTIVO</span>
+                                <span class="text-[10px] text-zinc-600 bg-zinc-200 px-1.5 py-0.5 rounded">Activo</span>
                                 {% endif %}
                             </button>
                         </form>
@@ -158,71 +155,52 @@
 
                         <div class="mt-1 pt-1 border-t border-zinc-100">
                             <a href="{% url 'tenancy:onboarding' %}" 
-                               class="w-full text-left px-2 py-1.5 rounded-[3px] flex items-center gap-2 text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 transition-colors font-medium text-xs">
+                               class="w-full text-left px-2 py-1.5 rounded flex items-center gap-2 text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 transition-colors font-medium text-xs">
                                 <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
                                 </svg>
-                                <span>+ Registrar Nueva Empresa</span>
+                                <span>+ Registrar nueva empresa</span>
                             </a>
                         </div>
                     </div>
                 </div>
 
-                <!-- Píldora Técnica de País y Moneda -->
-                {% if current_country %}
-                <div class="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] bg-zinc-50 border border-zinc-200 text-[11px] font-mono text-zinc-700">
-                    <span class="fi fi-{{ current_country.code|lower }} border border-zinc-200 rounded-[2px]"></span>
-                    <span class="font-medium text-zinc-900">{{ current_country.code }}</span>
-                    <span class="text-zinc-300">/</span>
-                    <span class="tabular-nums text-zinc-600">{% if nav_access.can_view_financials %}{{ current_org.currency_symbol|default:current_country.primary_currency_symbol }} {% endif %}{{ current_org.currency|default:current_country.primary_currency_code }}</span>
-                </div>
-                {% endif %}
-
-                <!-- Píldora Técnica de Giro de Negocio Inmutable -->
-                <div class="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] bg-zinc-50 border border-zinc-200 text-[11px] font-mono text-zinc-700" title="Giro de negocio establecido para {{ current_org.name }}">
-                    <span class="text-[10px] font-semibold text-zinc-400 uppercase tracking-tight">GIRO:</span>
-                    <span class="font-medium text-zinc-900 uppercase">
-                        {% if current_org.business_vertical == 'HARDWARE' %}FERRETERÍA
-                        {% elif current_org.business_vertical == 'PHARMACY' %}FARMACIA MINSA
-                        {% elif current_org.business_vertical == 'SME_RETAIL' %}PYME COMERCIAL
-                        {% else %}INGENIERÍA{% endif %}
-                    </span>
-                </div>
+                <!-- Giro sutil sin GIRO: ni cajas pesadas -->
+                <span class="text-xs text-zinc-400 font-sans hidden sm:inline">
+                    · {% if current_org.business_vertical == 'HARDWARE' %}Ferretería{% elif current_org.business_vertical == 'PHARMACY' %}Farmacia{% elif current_org.business_vertical == 'SME_RETAIL' %}PYME{% else %}Ingeniería{% endif %}
+                </span>
             </div>
         </div>
 
-        <!-- Centro: Buscador Rápido de 32px (Abre OmniSearch Ctrl+K) -->
+        <!-- Centro: Buscador limpio Buscar... (Ctrl+K) -->
         <div class="flex-1 max-w-sm mx-6 hidden md:block">
             <button type="button"
                     @click="openOmniSearch = true; $nextTick(() => $refs.omniInput?.focus())"
-                    class="w-full h-8 text-xs px-2.5 bg-zinc-50 hover:bg-zinc-100/70 border border-zinc-200 rounded-[4px] text-zinc-400 flex items-center justify-between font-sans transition-colors cursor-pointer text-left group">
+                    class="w-full h-8 text-xs px-3 bg-zinc-50 hover:bg-zinc-100/70 border border-zinc-200 rounded-md text-zinc-400 flex items-center justify-between font-sans transition-colors cursor-pointer text-left group">
                 <div class="flex items-center gap-2">
                     <svg class="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
                     </svg>
-                    <span class="text-zinc-500">Buscar OTs, clientes, documentos...</span>
+                    <span>Buscar...</span>
                 </div>
-                <kbd class="font-mono text-[10px] text-zinc-400 bg-white border border-zinc-200 rounded px-1.5 py-0.2">Ctrl K</kbd>
+                <kbd class="font-sans text-[10px] text-zinc-400 bg-white border border-zinc-200 rounded px-1.5 py-0.5">Ctrl+K</kbd>
             </button>
         </div>
 
-        <!-- Derecha: Simulador RBAC, Nivel Jerárquico, Usuario y Logout -->
-        <div class="flex items-center gap-2">
+        <!-- Derecha: Selector de vista de rol discreto, Alertas, Perfil y Logout -->
+        <div class="flex items-center gap-2.5">
             
             {% if real_role_level == 100 %}
-            <!-- Simulador de Rol Jerárquico Ultra Limpio (Exclusivo Nivel 100) -->
+            <!-- Selector de vista de rol discreto -->
             <form method="POST" action="{% url 'tenancy:simulate_role' %}" class="inline-flex items-center">
                 {% csrf_token %}
-                <div class="flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 rounded-[4px] px-2 py-0.5">
-                    <svg class="w-3 h-3 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
-                    </svg>
+                <div class="flex items-center gap-1.5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-md px-2.5 py-1 transition-colors">
                     <select name="role_level" 
                             onchange="this.form.submit()" 
-                            title="Simular permisos subordinados en tiempo real"
-                            class="h-6 text-[11px] font-mono bg-transparent text-zinc-700 focus:outline-none cursor-pointer">
+                            title="Cambiar vista de rol"
+                            class="text-xs font-sans bg-transparent text-zinc-700 focus:outline-none cursor-pointer">
                         {% for val, label in role_choices_desc %}
-                        <option value="{{ val }}" {% if current_role_level == val %}selected{% endif %}>LVL-{{ val }} · {{ label|upper }}</option>
+                        <option value="{{ val }}" {% if current_role_level == val %}selected{% endif %}>Vista: {{ label }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -231,77 +209,71 @@
 
             {% if is_simulating_role %}
             <!-- Indicador Activo de Simulación -->
-            <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[11px] font-mono bg-zinc-50 border border-zinc-200 text-zinc-700">
+            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-sans bg-amber-50 border border-amber-200 text-amber-800">
                 <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                <span class="font-medium">SIMULANDO</span>
+                <span>Simulando</span>
                 <form method="POST" action="{% url 'tenancy:simulate_role' %}" class="inline">
                     {% csrf_token %}
                     <input type="hidden" name="role_level" value="100">
-                    <button type="submit" class="text-zinc-900 font-semibold underline hover:text-zinc-600 ml-0.5">Restaurar Nivel 100</button>
+                    <button type="submit" class="text-amber-900 font-medium underline hover:text-amber-700 ml-1">Restablecer</button>
                 </form>
             </div>
             {% endif %}
 
-            <!-- Badge de Nivel Jerárquico de la Sesión -->
-            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[11px] font-mono bg-zinc-50 border border-zinc-200 text-zinc-700">
-                <span class="w-1.5 h-1.5 rounded-full {% if current_role_level >= 100 %}bg-emerald-600{% elif current_role_level >= 80 %}bg-zinc-800{% elif current_role_level >= 70 %}bg-amber-500{% else %}bg-zinc-400{% endif %}"></span>
-                <span class="font-medium tabular-nums">LVL-{{ current_role_level }}</span>
-            </span>
-
-            <!-- Campana Interactiva de Alertas Proactivas Multi-Giro (HTMX + Alpine.js) -->
+            <!-- Campana de Alertas -->
             <div class="relative" x-data="{ openAlerts: false }">
                 <button type="button"
                         @click="openAlerts = !openAlerts"
                         hx-get="{% url 'alerts_dropdown_partial' %}"
                         hx-trigger="click once"
                         hx-target="#topbar-alerts-container"
-                        class="relative p-1.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-[3px] transition-colors border border-transparent hover:border-zinc-200 cursor-pointer"
-                        title="Radar de Alertas y Notificaciones">
+                        class="relative p-1.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-md transition-colors cursor-pointer"
+                        title="Alertas y Notificaciones">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                     </svg>
                     {% if active_alerts_count > 0 %}
-                    <span class="absolute -top-1 -right-1 font-mono text-[9px] font-bold tabular-nums px-1 py-0.2 rounded leading-none {% if critical_alerts_count > 0 %}bg-rose-600 text-white{% else %}bg-amber-500 text-white{% endif %}">
+                    <span class="absolute -top-0.5 -right-0.5 text-[9px] font-medium tabular-nums px-1 py-0.2 rounded-full leading-none {% if critical_alerts_count > 0 %}bg-rose-600 text-white{% else %}bg-amber-500 text-white{% endif %}">
                         {{ active_alerts_count }}
                     </span>
                     {% endif %}
                 </button>
 
-                <!-- Menú Desplegable HTMX Swiss Grid -->
+                <!-- Menú Desplegable HTMX -->
                 <div x-show="openAlerts"
                      @click.away="openAlerts = false"
                      x-cloak
-                     class="absolute right-0 top-full mt-1.5 w-96 bg-white border border-zinc-200 rounded-[4px] shadow-sm z-50 overflow-hidden">
+                     class="absolute right-0 top-full mt-1.5 w-80 bg-white border border-zinc-200 rounded-md shadow-sm z-50 overflow-hidden">
                     <div id="topbar-alerts-container">
-                        <div class="p-4 text-center text-xs font-mono text-zinc-400">
-                            <span class="inline-block animate-pulse">Escaneando radar multi-giro...</span>
+                        <div class="p-4 text-center text-xs font-sans text-zinc-400">
+                            Cargando notificaciones...
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Perfil del Colaborador -->
-            <div class="flex items-center gap-2 pl-2 border-l border-zinc-200 text-xs">
-                <div class="w-6 h-6 rounded-[3px] bg-zinc-900 text-white flex items-center justify-center font-mono font-semibold text-[10px]">
+            <div class="flex items-center gap-2 pl-2 border-l border-zinc-200 text-xs font-sans">
+                <div class="w-7 h-7 rounded-md bg-zinc-900 text-white flex items-center justify-center font-medium text-xs">
                     {{ request.user.full_name|default:request.user.email|slice:":2"|upper }}
                 </div>
                 <div class="hidden xl:block text-left">
                     <span class="block font-medium text-zinc-900 leading-tight truncate max-w-[130px]">
                         {{ request.user.full_name|default:request.user.email }}
                     </span>
-                    <span class="block text-[10px] font-mono text-zinc-400 leading-none truncate max-w-[130px]">
+                    <span class="block text-[11px] text-zinc-400 leading-none truncate max-w-[130px]">
                         {{ current_membership.job_title|default:"Colaborador" }}
                     </span>
                 </div>
             </div>
 
-            <!-- Cierre de Sesión Seguro -->
+            <!-- Cierre de Sesión Limpio -->
             <form method="POST" action="{% url 'accounts_auth:logout' %}" class="inline">
                 {% csrf_token %}
                 <button type="submit"
-                        title="Cerrar Sesión Activa"
-                        class="p-1.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-[3px] transition-colors">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        title="Cerrar sesión"
+                        class="p-1.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-md transition-colors cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
                     </svg>
                 </button>
@@ -320,39 +292,27 @@
         <aside class="w-60 bg-zinc-50/70 border-r border-zinc-200 text-zinc-600 flex flex-col flex-shrink-0 select-none">
             
             <!-- Resumen de Organización Activa -->
-            <div class="p-3 border-b border-zinc-200 bg-white">
-                <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-mono text-zinc-400 uppercase tracking-wider font-medium">EMPRESA ACTIVA</span>
-                    <a href="{% url 'tenancy:onboarding' %}" 
-                       title="Registrar o dar de alta una nueva empresa"
-                       class="text-[10px] font-mono text-zinc-900 font-semibold hover:underline">
-                        + NUEVA
-                    </a>
-                </div>
-                <div class="text-xs font-semibold text-zinc-900 truncate mt-1 tracking-tight" title="{{ current_org.name }}">
+            <div class="px-4 py-3 border-b border-zinc-200 bg-white">
+                <div class="text-xs font-semibold text-zinc-900 truncate" title="{{ current_org.name }}">
                     {{ current_org.name }}
                 </div>
-                <div class="text-[11px] font-mono text-zinc-500 mt-0.5 tabular-nums flex items-center justify-between">
-                    <span>{{ current_country.tax_id_label|default:"RUC" }}: {{ current_org.tax_id }}</span>
-                </div>
-                <div class="text-[10px] font-mono text-zinc-400 mt-1.5 flex items-center justify-between border-t border-zinc-100 pt-1">
-                    <span class="truncate max-w-[140px] text-zinc-500">{{ current_org.get_industry_display|default:"Servicios" }}</span>
-                    <span class="text-zinc-700 font-semibold tabular-nums">{{ current_org.currency }}</span>
+                <div class="text-[11px] text-zinc-400 font-sans mt-0.5 truncate">
+                    {{ current_country.tax_id_label|default:"RUC" }}: <span class="tabular-nums font-mono">{{ current_org.tax_id }}</span> · {{ current_org.currency }}
                 </div>
             </div>
 
             <!-- Navegación por Módulos y Roles -->
             <nav class="flex-1 overflow-y-auto p-2.5 space-y-3.5 text-xs font-sans">
                 
-                <!-- Centro de Control y Gobernanza -->
+                <!-- General -->
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium">
-                        GOBERNANZA & CONTROL
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        General
                     </div>
                     <ul class="space-y-0.5">
                         <li>
                             <a href="{% url 'tenancy:dashboard' %}"
-                               class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if request.path == '/' or request.path == '/dashboard/' %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                               class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if request.path == '/' or request.path == '/dashboard/' %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/>
                                 </svg>
@@ -361,7 +321,7 @@
                         </li>
                         <li>
                             <a href="{% url 'alerts_radar' %}"
-                               class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center justify-between transition-colors {% if 'alerts-radar' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                               class="h-8 px-3 rounded-md text-[13px] flex items-center justify-between transition-colors font-sans {% if 'alerts-radar' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <div class="flex items-center gap-2.5">
                                     <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
@@ -369,7 +329,7 @@
                                     <span>Radar de Alertas</span>
                                 </div>
                                 {% if active_alerts_count > 0 %}
-                                <span class="font-mono text-[10px] px-1.5 py-0.2 rounded font-bold tabular-nums {% if critical_alerts_count > 0 %}bg-rose-100 text-rose-700 border border-rose-200{% else %}bg-amber-100 text-amber-800 border border-amber-200{% endif %}">
+                                <span class="text-[10px] px-1.5 py-0.2 rounded font-medium tabular-nums {% if critical_alerts_count > 0 %}bg-rose-100 text-rose-700{% else %}bg-amber-100 text-amber-800{% endif %}">
                                     {{ active_alerts_count }}
                                 </span>
                                 {% endif %}
@@ -377,55 +337,54 @@
                         </li>
                         <li>
                             <a href="{% url 'corporate_agenda' %}"
-                               class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'agenda' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                               class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'agenda' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
                                 </svg>
-                                <span>Agenda &amp; Calendario DGI</span>
+                                <span>Agenda & Calendario DGI</span>
                             </a>
                         </li>
                     </ul>
                 </div>
 
                 {% if vertical_features.enable_pos %}
-                <!-- Punto de Venta de Mostrador (POS) -->
+                <!-- Punto de Venta -->
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium flex items-center justify-between">
-                        <span>VENTAS & MOSTRADOR</span>
-                        <span class="text-[9px] font-mono text-zinc-700 bg-zinc-200 px-1.5 py-0.2 rounded-[2px] font-bold">POS</span>
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Punto de venta
                     </div>
                     <ul class="space-y-0.5">
                         <li>
                             <a href="{% url 'billing:pos_terminal' %}"
-                               class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if request.resolver_match.url_name == 'pos_terminal' %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                               class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if request.resolver_match.url_name == 'pos_terminal' %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
                                 </svg>
-                                <span class="font-medium text-zinc-900">Punto de Venta (POS)</span>
+                                <span>Punto de Venta (POS)</span>
                             </a>
                         </li>
                         <li>
                             <a href="{% url 'billing:pos_shifts' %}"
-                               class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'pos/shifts' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                               class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'pos/shifts' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                <span>Turnos &amp; Corte Z (POS)</span>
+                                <span>Turnos y corte Z</span>
                             </a>
                         </li>
                     </ul>
                 </div>
                 {% endif %}
 
-                <!-- 1. Comercial & Cotizaciones (MOD-CRM) -->
+                <!-- Comercial -->
                 {% if nav_access.can_view_crm %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium">
-                        COMERCIAL & LICITACIONES
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Comercial
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'crm:account_list' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'crm/accounts' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'crm:account_list' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'crm/accounts' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21"/>
                                 </svg>
@@ -433,7 +392,7 @@
                             </a>
                         </li>
                         <li>
-                            <a href="{% url 'crm:opportunity_kanban' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'crm/pipeline' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'crm:opportunity_kanban' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'crm/pipeline' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z"/>
                                 </svg>
@@ -441,35 +400,35 @@
                             </a>
                         </li>
                         <li>
-                            <a href="{% url 'crm:quote_list' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'crm/quotes' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'crm:quote_list' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'crm/quotes' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
                                 </svg>
-                                <span>Cotizaciones{% if nav_access.can_view_financials %} ({{ current_country.primary_currency_symbol }}){% endif %}</span>
+                                <span>Cotizaciones</span>
                             </a>
                         </li>
                     </ul>
                 </div>
                 {% endif %}
 
-                <!-- 2. Ingeniería, Frentes de Obra & Cuadrillas (MOD-OPS) -->
+                <!-- Operaciones -->
                 {% if nav_access.can_view_operations and vertical_features.enable_workorders_sst %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium">
-                        INGENIERÍA & OPERACIONES
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Operaciones
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'operations:workorder_list' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'orders' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'operations:workorder_list' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'orders' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"/>
                                 </svg>
-                                <span>Órdenes de Trabajo (OT)</span>
+                                <span>Órdenes de Trabajo</span>
                             </a>
                         </li>
                         {% if nav_access.can_plan_crews %}
                         <li>
-                            <a href="{% url 'operations:crew_planning' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'crews' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'operations:crew_planning' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'crews' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/>
                                 </svg>
@@ -481,15 +440,15 @@
                 </div>
                 {% endif %}
 
-                <!-- Repositorio Documental ISO (MOD-REP) -->
+                <!-- Documentos -->
                 {% if nav_access.can_view_repository %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium">
-                        DOCUMENTACIÓN & ISO
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Documentos
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'repository:browser' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'repository' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'repository:browser' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'repository' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
                                 </svg>
@@ -500,42 +459,42 @@
                 </div>
                 {% endif %}
 
-                <!-- Mesa de Ayuda Interna & SLA (MOD-TCK) -->
+                <!-- Soporte -->
                 {% if nav_access.can_view_tickets %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium">
-                        SOPORTE & MESA DE AYUDA
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Soporte
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'tickets:ticket_list' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'tickets' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'tickets:ticket_list' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'tickets' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.504-1.125-1.125-1.125h-.871a2.25 2.25 0 00-1.591.659l-.707.707a2.25 2.25 0 01-1.591.659h-.871a1.125 1.125 0 01-1.125-1.125V18.75m10.5-12.75h-10.5a2.25 2.25 0 00-2.25 2.25v7.5a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25v-7.5a2.25 2.25 0 00-2.25-2.25z"/>
                                 </svg>
-                                <span>Mesa de Ayuda (SLA)</span>
+                                <span>Mesa de Ayuda</span>
                             </a>
                         </li>
                     </ul>
                 </div>
                 {% endif %}
 
-                <!-- 3. Seguridad & Salud Ocupacional (MOD-SST) -->
+                <!-- Seguridad y Salud -->
                 {% if nav_access.can_view_sst and vertical_features.enable_workorders_sst %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium">
-                        SEGURIDAD & SALUD SST
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Seguridad y salud
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'sst:index' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'sst' in request.path and 'leaves' not in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'sst:index' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'sst' in request.path and 'leaves' not in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
                                 </svg>
-                                <span>Panel SST & Checklists</span>
+                                <span>Panel de Seguridad SST</span>
                             </a>
                         </li>
                         <li>
-                            <a href="{% url 'sst:leave_list' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'leaves' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'sst:leave_list' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'leaves' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
                                 </svg>
@@ -546,15 +505,15 @@
                 </div>
                 {% endif %}
 
-                <!-- 4. Bodegas & Kardex (MOD-INV) -->
+                <!-- Inventario -->
                 {% if nav_access.can_view_inventory %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium">
-                        LOGÍSTICA & ALMACÉN
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Inventario
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'inventory:dashboard' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'inventory' in request.path and 'batches' not in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'inventory:dashboard' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'inventory' in request.path and 'batches' not in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/>
                                 </svg>
@@ -563,11 +522,11 @@
                         </li>
                         {% if vertical_features.enable_batches_expiry %}
                         <li>
-                            <a href="{% url 'inventory:batches_fefo' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'batches-fefo' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'inventory:batches_fefo' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'batches-fefo' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
                                 </svg>
-                                <span>Control de Lotes &amp; FEFO</span>
+                                <span>Control de Lotes & FEFO</span>
                             </a>
                         </li>
                         {% endif %}
@@ -575,117 +534,98 @@
                 </div>
                 {% endif %}
 
-                <!-- Facturación Fiscal DGI & Cartera (MOD-BIL) -->
+                <!-- Facturación -->
                 {% if nav_access.can_view_billing %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium">
-                        FINANZAS &amp; FACTURACIÓN DGI
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Facturación
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'billing:invoice_list' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if request.resolver_match.url_name == 'invoice_list' or request.resolver_match.url_name == 'invoice_detail' %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'billing:invoice_list' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if request.resolver_match.url_name == 'invoice_list' or request.resolver_match.url_name == 'invoice_detail' %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
                                 </svg>
-                                <span>Facturación &amp; Cartera C$/$</span>
+                                <span>Facturas y Cobros</span>
                             </a>
                         </li>
                         <li>
-                            <a href="{% url 'billing:pos_terminal' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if request.resolver_match.url_name == 'pos_terminal' %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
-                                <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.25 2.25M12 9l3-3"/>
-                                </svg>
-                                <span>Punto de Venta (POS)</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{% url 'billing:pos_shifts' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'pos/shifts' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'billing:cash_session_list' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'cash-sessions' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                <span>Turnos &amp; Corte Z (POS)</span>
+                                <span>Arqueo de Caja</span>
                             </a>
                         </li>
                         <li>
-                            <a href="{% url 'billing:cash_session_list' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'cash-sessions' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
-                                <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <span>Arqueo de Caja (Corte Z)</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a href="{% url 'billing:vet_dgi_center' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'vet-dgi' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'billing:vet_dgi_center' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'vet-dgi' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"/>
                                 </svg>
-                                <span>Anexos Fiscales VET-DGI</span>
+                                <span>Anexos Fiscales VET</span>
                             </a>
                         </li>
                     </ul>
                 </div>
                 {% endif %}
 
-                <!-- Compras, Proveedores & Cuentas por Pagar (MOD-PUR) -->
+                <!-- Compras -->
                 {% if nav_access.can_view_purchasing %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium">
-                        COMPRAS &amp; ABASTECIMIENTO
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Compras
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'purchasing:order_list' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'purchasing' in request.path and 'suppliers' not in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'purchasing:order_list' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'purchasing' in request.path and 'suppliers' not in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
                                 </svg>
-                                <span>Compras &amp; Cuentas por Pagar</span>
+                                <span>Órdenes de Compra</span>
                             </a>
                         </li>
                         <li>
-                            <a href="{% url 'purchasing:supplier_list' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'suppliers' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'purchasing:supplier_list' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'suppliers' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/>
                                 </svg>
-                                <span>Directorio de Proveedores</span>
+                                <span>Proveedores</span>
                             </a>
                         </li>
                     </ul>
                 </div>
                 {% endif %}
 
-                <!-- 5. Tesorería & Contabilidad Fiscal (MOD-FIN) -->
+                <!-- Finanzas -->
                 {% if nav_access.can_view_finance %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium flex items-center justify-between">
-                        <span>TESORERÍA & CONTABILIDAD</span>
-                        {% if nav_access.can_view_financial_statements %}
-                        <span class="text-[9px] font-mono text-zinc-500 font-bold">NIIF · DGI</span>
-                        {% endif %}
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Finanzas
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'finance:dashboard' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'finance' in request.path and 'statements' not in request.path and 'dgi-vet' not in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'finance:dashboard' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'finance' in request.path and 'statements' not in request.path and 'dgi-vet' not in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                <span>Cajas Chicas & Bancos</span>
+                                <span>Cajas y Bancos</span>
                             </a>
                         </li>
                         {% if nav_access.can_view_financial_statements %}
                         <li>
-                            <a href="{% url 'finance:statements' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'statements' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'finance:statements' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'statements' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/>
                                 </svg>
-                                <span>Estados Financieros (P&L)</span>
+                                <span>Estados Financieros</span>
                             </a>
                         </li>
                         <li>
-                            <a href="{% url 'finance:dgi_vet' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'dgi-vet' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'finance:dgi_vet' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'dgi-vet' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/>
                                 </svg>
-                                <span>Declaración Fiscal DGI (VET)</span>
+                                <span>Declaración Fiscal DGI</span>
                             </a>
                         </li>
                         {% endif %}
@@ -693,33 +633,30 @@
                 </div>
                 {% endif %}
 
-                <!-- Módulo de Planilla & Nómina Laboral (MOD-PAY) -->
+                <!-- Nómina -->
                 {% if nav_access.can_manage_payroll or nav_access.can_view_own_payslips %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium flex items-center justify-between">
-                        <span>PLANILLA & TALENTO</span>
-                        {% if nav_access.can_manage_payroll %}
-                        <span class="text-[9px] font-mono text-zinc-500 font-bold">MITRAB</span>
-                        {% endif %}
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Nómina
                     </div>
                     <ul class="space-y-0.5">
                         {% if nav_access.can_manage_payroll %}
                         <li>
-                            <a href="{% url 'payroll:dashboard' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'payroll' in request.path and 'my-payslips' not in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'payroll:dashboard' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'payroll' in request.path and 'my-payslips' not in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 011.875 1.875v11.25a1.875 1.875 0 01-1.875 1.875H5.625A1.875 1.875 0 013.75 17.625V6.375A1.875 1.875 0 015.625 4.5z"/>
                                 </svg>
-                                <span>Planilla & Nómina INSS/IR</span>
+                                <span>Planilla y Nómina</span>
                             </a>
                         </li>
                         {% endif %}
                         {% if nav_access.can_view_own_payslips %}
                         <li>
-                            <a href="{% url 'payroll:my_payslips' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'my-payslips' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'payroll:my_payslips' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'my-payslips' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"/>
                                 </svg>
-                                <span>Mis Colillas de Pago</span>
+                                <span>Recibos de Pago</span>
                             </a>
                         </li>
                         {% endif %}
@@ -727,107 +664,90 @@
                 </div>
                 {% endif %}
 
-                <!-- 6. Tecnología & Soporte IT (MOD-TECH) -->
+                <!-- Tecnología -->
                 {% if nav_access.can_view_tech %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium">
-                        TECNOLOGÍA & ACTIVOS TI
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Tecnología
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'tenancy:tech_dashboard' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'tech' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'tenancy:tech_dashboard' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'tech' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3"/>
                                 </svg>
-                                <span>Mesa de Ayuda & Activos</span>
+                                <span>Activos de TI</span>
                             </a>
                         </li>
                     </ul>
                 </div>
                 {% endif %}
 
-                <!-- 7. Marketing Digital & Growth (MOD-MKT) -->
+                <!-- Marketing -->
                 {% if nav_access.can_view_marketing %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium">
-                        MARKETING & CRECIMIENTO
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Marketing
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'tenancy:marketing_dashboard' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'marketing' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'tenancy:marketing_dashboard' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'marketing' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/>
                                 </svg>
-                                <span>Campañas & Leads Inbound</span>
+                                <span>Campañas y Prospectos</span>
                             </a>
                         </li>
                     </ul>
                 </div>
                 {% endif %}
 
-                <!-- 8. Servidor MCP & Agentes IA (MOD-MCP) -->
+                <!-- Servidor IA -->
                 {% if nav_access.can_view_ai_mcp %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium flex items-center justify-between">
-                        <span>SERVIDORES IA & MCP</span>
-                        <span class="text-[9px] font-mono text-zinc-500 font-bold">80+</span>
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Inteligencia artificial
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'ai_agent:console' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'mcp' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'ai_agent:console' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'mcp' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"/>
                                 </svg>
-                                <span>Servidor MCP & Agentes</span>
+                                <span>Servidor MCP</span>
                             </a>
                         </li>
                     </ul>
                 </div>
                 {% endif %}
 
-                <!-- 9. Gobierno Corporativo (Exclusivo Nivel 100) -->
+                <!-- Gobierno Corporativo -->
                 {% if nav_access.can_manage_org %}
                 <div>
-                    <div class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 px-2.5 mb-1 font-medium flex items-center justify-between">
-                        <span>GOBIERNO CORPORATIVO</span>
-                        <span class="text-[9px] font-mono text-zinc-600 font-bold">100</span>
+                    <div class="text-[11px] font-medium text-zinc-400 px-3 mb-1">
+                        Administración
                     </div>
                     <ul class="space-y-0.5">
                         <li>
-                            <a href="{% url 'tenancy:team_management' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'team' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'tenancy:team_management' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'team' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/>
                                 </svg>
-                                <span>Parámetros & Personal</span>
+                                <span>Equipo y Roles</span>
                             </a>
                         </li>
                         <li>
-                            <a href="{% url 'tenancy:saas_hq' %}" class="h-8 px-2.5 rounded-[4px] text-[13px] flex items-center gap-2.5 transition-colors {% if 'saas-hq' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
+                            <a href="{% url 'tenancy:saas_hq' %}" class="h-8 px-3 rounded-md text-[13px] flex items-center gap-2.5 transition-colors font-sans {% if 'saas-hq' in request.path %}nav-item-active{% else %}text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900{% endif %}">
                                 <svg class="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6H2.25m0 0H3m-1.5 0h1.5m0 0h16.5m0 0h1.5m-1.5 0a.75.75 0 01.75-.75V4.5m0 0a.75.75 0 00-.75-.75H3.75A.75.75 0 003 4.5m18 0v1.5M3 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18V6"/>
                                 </svg>
-                                <span>Gobierno SaaS (Eternal HQ)</span>
+                                <span>Gobierno SaaS</span>
                             </a>
                         </li>
                     </ul>
                 </div>
                 {% endif %}
             </nav>
-
-            <!-- Pie del Sidebar: Metadatos Físicos -->
-            <div class="p-3 border-t border-zinc-200 bg-zinc-50 text-[11px] font-mono text-zinc-500">
-                <div class="flex items-center justify-between">
-                    <span class="text-zinc-400 font-medium">{{ current_country.tax_id_label|default:"RUC" }}:</span>
-                    <span class="text-zinc-900 font-medium tabular-nums">{{ current_org.tax_id }}</span>
-                </div>
-                <div class="flex items-center justify-between mt-0.5">
-                    <span class="text-zinc-400 font-medium">TASA FISCAL:</span>
-                    <span class="text-zinc-700 tabular-nums">{{ current_country.default_tax_name }} {{ current_country.default_tax_rate }}%</span>
-                </div>
-                <div class="mt-2 pt-2 border-t border-zinc-200/80 text-[10px] text-zinc-400 tracking-tight">
-                    ERP SAS &bull; Swiss Grid 2026
-                </div>
-            </div>
         </aside>
 
         <!-- ================================================================= -->
@@ -835,16 +755,16 @@
         <!-- ================================================================= -->
         <main class="flex-1 flex flex-col bg-white overflow-hidden" x-data>
             
-            <!-- Cabecera de Vista Superior Acoplada (48px / h-12 bg-white border-b border-zinc-200) -->
+            <!-- Cabecera de Vista Superior (48px / h-12 bg-white border-b border-zinc-200) -->
             <div class="h-12 px-6 border-b border-zinc-200 bg-white flex items-center justify-between sticky top-0 z-10 flex-shrink-0">
                 <div class="flex items-center gap-2">
-                    <div class="flex items-center gap-1.5 font-mono text-[11px] text-zinc-400 uppercase tracking-wider">
-                        <span>{% block breadcrumb_section %}ESPACIO{% endblock %}</span>
+                    <div class="flex items-center gap-1.5 font-sans text-xs text-zinc-400">
+                        <span>{% block breadcrumb_section %}Espacio{% endblock %}</span>
                         <span>/</span>
-                        <span class="text-zinc-700 font-medium">{% block breadcrumb_page %}VISTA{% endblock %}</span>
+                        <span class="text-zinc-700 font-medium">{% block breadcrumb_page %}Vista{% endblock %}</span>
                     </div>
                     <span class="text-zinc-300">|</span>
-                    <h1 class="text-sm font-semibold text-zinc-900 tracking-tight">
+                    <h1 class="text-sm font-semibold text-zinc-900 tracking-tight font-sans">
                         {% block page_title %}Consola Operativa{% endblock %}
                     </h1>
                 </div>
@@ -854,14 +774,14 @@
                 </div>
             </div>
 
-            <!-- Notificaciones Flash Estilo Toast / Línea Técnica Fina -->
+            <!-- Notificaciones Flash Estilo Toast -->
             {% if messages %}
             <div class="px-6 pt-3 flex-shrink-0">
                 {% for message in messages %}
-                <div class="border border-zinc-200 bg-zinc-50 rounded-[4px] p-2.5 text-xs font-mono flex items-center justify-between text-zinc-800">
+                <div class="border border-zinc-200 bg-zinc-50 rounded-md p-2.5 text-xs font-sans flex items-center justify-between text-zinc-800">
                     <div class="flex items-center gap-2">
                         <span class="w-1.5 h-1.5 rounded-full {% if message.tags == 'error' %}bg-red-600{% elif message.tags == 'warning' %}bg-amber-500{% else %}bg-emerald-600{% endif %}"></span>
-                        <span class="font-sans text-[12px]">{{ message }}</span>
+                        <span class="font-sans text-xs">{{ message }}</span>
                     </div>
                 </div>
                 {% endfor %}

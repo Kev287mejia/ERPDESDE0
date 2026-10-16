@@ -1,130 +1,114 @@
 {% extends "layouts/base_auth.html" %}
 
-{% block title %}Crear Cuenta Corporativa | Registro B2B{% endblock %}
+{% block title %}Crear Cuenta Corporativa{% endblock %}
 
 {% block content %}
-<div class="w-full max-w-md mx-auto">
-    <!-- Contenedor Principal Suizo: Borde Fino 1px, Cero Sombras, Blanco Puro -->
-    <div class="bg-white border border-zinc-200 rounded-[4px]">
-        
-        <!-- Cabecera del Panel -->
-        <div class="p-6 border-b border-zinc-200 bg-white">
-            <div class="flex items-center justify-between mb-2">
-                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-mono uppercase tracking-wider font-semibold bg-zinc-50 text-zinc-700 border border-zinc-200">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                    REGISTRO DE EVALUADOR
-                </span>
-                <span class="text-[10px] font-mono text-zinc-400">REG-01</span>
-            </div>
-            <h1 class="text-base font-semibold text-zinc-900 tracking-tight">Crear Cuenta Corporativa</h1>
-            <p class="text-xs text-zinc-500 mt-1 leading-relaxed">
-                Registre su identidad profesional para inicializar y configurar su nuevo espacio de trabajo operativo.
+<div class="w-full">
+    <!-- Encabezado simple -->
+    <div class="mb-6 text-center">
+        <div class="inline-flex items-center justify-center w-8 h-8 rounded-md bg-zinc-900 text-white font-semibold text-sm mb-3">
+            E
+        </div>
+        <h1 class="text-xl font-semibold text-zinc-900 tracking-tight">Crear Cuenta Corporativa</h1>
+    </div>
+
+    <!-- Errores Globales -->
+    {% if form.non_field_errors %}
+    <div class="p-3 mb-4 border border-red-200 bg-red-50/50 rounded-md text-xs font-sans text-red-700 space-y-1">
+        {% for error in form.non_field_errors %}
+        <div class="flex items-start gap-1.5">
+            <span class="font-bold text-red-600">&bull;</span>
+            <span class="leading-tight">{{ error }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Formulario de Registro -->
+    <form method="POST" action="{% url 'accounts_auth:register' %}" class="space-y-4">
+        {% csrf_token %}
+
+        <!-- Nombre Completo -->
+        <div>
+            <label for="id_full_name" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                Nombre completo
+            </label>
+            {{ form.full_name }}
+            {% if form.full_name.errors %}
+            <p class="text-xs text-red-600 mt-1 font-sans">
+                {{ form.full_name.errors.0 }}
             </p>
+            {% endif %}
         </div>
 
-        <!-- Errores Globales -->
-        {% if form.non_field_errors %}
-        <div class="p-3 mx-6 mt-4 border border-red-200 bg-red-50/50 rounded-[4px] text-xs font-mono text-red-700 space-y-1">
-            {% for error in form.non_field_errors %}
-            <div class="flex items-start gap-1.5">
-                <span class="font-bold text-red-600">&bull;</span>
-                <span class="font-sans text-[12px] leading-tight">{{ error }}</span>
-            </div>
-            {% endfor %}
+        <!-- Correo Electrónico -->
+        <div>
+            <label for="id_email" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                Correo electrónico
+            </label>
+            {{ form.email }}
+            {% if form.email.errors %}
+            <p class="text-xs text-red-600 mt-1 font-sans">
+                {{ form.email.errors.0 }}
+            </p>
+            {% endif %}
         </div>
-        {% endif %}
 
-        <!-- Formulario de Registro -->
-        <form method="POST" action="{% url 'accounts_auth:register' %}" class="p-6 space-y-4">
-            {% csrf_token %}
+        <!-- Teléfono de Contacto -->
+        <div>
+            <label for="id_phone" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                Teléfono
+            </label>
+            {{ form.phone }}
+            {% if form.phone.errors %}
+            <p class="text-xs text-red-600 mt-1 font-sans">
+                {{ form.phone.errors.0 }}
+            </p>
+            {% endif %}
+        </div>
 
-            <!-- Nombre Completo -->
+        <!-- Contraseña -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-                <label for="id_full_name" class="block text-xs font-medium text-zinc-700 mb-1.5">
-                    Nombre Completo <span class="text-red-500">*</span>
+                <label for="id_password1" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                    Contraseña
                 </label>
-                {{ form.full_name }}
-                {% if form.full_name.errors %}
-                <p class="text-[11px] font-mono text-red-600 mt-1">
-                    {{ form.full_name.errors.0 }}
+                {{ form.password1 }}
+                {% if form.password1.errors %}
+                <p class="text-xs text-red-600 mt-1 font-sans">
+                    {{ form.password1.errors.0 }}
                 </p>
                 {% endif %}
             </div>
-
-            <!-- Correo Electrónico -->
             <div>
-                <label for="id_email" class="block text-xs font-medium text-zinc-700 mb-1.5">
-                    Correo Corporativo <span class="text-red-500">*</span>
+                <label for="id_password2" class="block text-xs font-medium text-zinc-700 mb-1.5">
+                    Confirmar
                 </label>
-                {{ form.email }}
-                {% if form.email.errors %}
-                <p class="text-[11px] font-mono text-red-600 mt-1">
-                    {{ form.email.errors.0 }}
+                {{ form.password2 }}
+                {% if form.password2.errors %}
+                <p class="text-xs text-red-600 mt-1 font-sans">
+                    {{ form.password2.errors.0 }}
                 </p>
                 {% endif %}
             </div>
+        </div>
 
-            <!-- Teléfono de Contacto -->
-            <div>
-                <label for="id_phone" class="block text-xs font-medium text-zinc-700 mb-1.5">
-                    Teléfono Móvil o Corporativo
-                </label>
-                {{ form.phone }}
-                {% if form.phone.errors %}
-                <p class="text-[11px] font-mono text-red-600 mt-1">
-                    {{ form.phone.errors.0 }}
-                </p>
-                {% endif %}
-            </div>
+        <!-- Botón de Envío -->
+        <div class="pt-2">
+            <button type="submit"
+                    class="w-full h-10 bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
+                <span>Continuar</span>
+            </button>
+        </div>
 
-            <!-- Contraseña -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div>
-                    <label for="id_password1" class="block text-xs font-medium text-zinc-700 mb-1.5">
-                        Contraseña <span class="text-red-500">*</span>
-                    </label>
-                    {{ form.password1 }}
-                    {% if form.password1.errors %}
-                    <p class="text-[11px] font-mono text-red-600 mt-1">
-                        {{ form.password1.errors.0 }}
-                    </p>
-                    {% endif %}
-                </div>
-                <div>
-                    <label for="id_password2" class="block text-xs font-medium text-zinc-700 mb-1.5">
-                        Confirmación <span class="text-red-500">*</span>
-                    </label>
-                    {{ form.password2 }}
-                    {% if form.password2.errors %}
-                    <p class="text-[11px] font-mono text-red-600 mt-1">
-                        {{ form.password2.errors.0 }}
-                    </p>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Botón de Envío -->
-            <div class="pt-2">
-                <button type="submit"
-                        class="w-full h-9 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
-                    <span>Crear Cuenta & Continuar a Onboarding</span>
-                    <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
-                    </svg>
-                </button>
-            </div>
-        </form>
-
-        <!-- Pie de Página: Enlace Recíproco hacia Login -->
-        <div class="bg-zinc-50 border-t border-zinc-200 p-4 rounded-b-[4px] text-center">
-            <span class="text-xs text-zinc-600">
-                ¿Ya posee credenciales de acceso?
+        <div class="pt-1 text-center">
+            <span class="text-xs text-zinc-500 font-sans">
+                ¿Ya tienes una cuenta?
                 <a href="{% url 'accounts_auth:login' %}" class="font-medium text-zinc-900 hover:underline ml-1">
-                    Iniciar Sesión &rarr;
+                    Iniciar sesión
                 </a>
             </span>
         </div>
-
-    </div>
+    </form>
 </div>
 {% endblock %}

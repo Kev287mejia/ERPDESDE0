@@ -12,9 +12,9 @@ class EmailAuthenticationForm(forms.Form):
         widget=forms.EmailInput(
             attrs={
                 'class': (
-                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'w-full h-10 px-3 text-sm bg-white border border-zinc-200 rounded-md '
                     'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
-                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-mono'
+                    'transition-colors font-sans'
                 ),
                 'placeholder': 'colaborador@empresa.com',
                 'autocomplete': 'email',
@@ -28,9 +28,9 @@ class EmailAuthenticationForm(forms.Form):
         widget=forms.PasswordInput(
             attrs={
                 'class': (
-                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'w-full h-10 px-3 text-sm bg-white border border-zinc-200 rounded-md '
                     'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
-                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-mono'
+                    'transition-colors font-sans'
                 ),
                 'placeholder': '••••••••••••',
                 'autocomplete': 'current-password',
@@ -81,9 +81,9 @@ class CorporateSignUpForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 'class': (
-                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'w-full h-10 px-3 text-sm bg-white border border-zinc-200 rounded-md '
                     'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
-                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-sans'
+                    'transition-colors font-sans'
                 ),
                 'placeholder': 'ej: Carlos Fonseca Terán',
                 'autocomplete': 'name',
@@ -96,9 +96,9 @@ class CorporateSignUpForm(forms.Form):
         widget=forms.EmailInput(
             attrs={
                 'class': (
-                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'w-full h-10 px-3 text-sm bg-white border border-zinc-200 rounded-md '
                     'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
-                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-mono'
+                    'transition-colors font-sans'
                 ),
                 'placeholder': 'evaluador@empresa.com',
                 'autocomplete': 'email',
@@ -112,9 +112,9 @@ class CorporateSignUpForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 'class': (
-                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'w-full h-10 px-3 text-sm bg-white border border-zinc-200 rounded-md '
                     'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
-                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-mono tabular-nums'
+                    'transition-colors font-sans tabular-nums'
                 ),
                 'placeholder': '+505 8888-0000',
                 'autocomplete': 'tel',
@@ -127,9 +127,9 @@ class CorporateSignUpForm(forms.Form):
         widget=forms.PasswordInput(
             attrs={
                 'class': (
-                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'w-full h-10 px-3 text-sm bg-white border border-zinc-200 rounded-md '
                     'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
-                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-mono'
+                    'transition-colors font-sans'
                 ),
                 'placeholder': 'Mínimo 8 caracteres',
                 'autocomplete': 'new-password',
@@ -142,9 +142,9 @@ class CorporateSignUpForm(forms.Form):
         widget=forms.PasswordInput(
             attrs={
                 'class': (
-                    'w-full h-9 px-3 text-[13px] bg-white border border-zinc-200 rounded-[4px] '
+                    'w-full h-10 px-3 text-sm bg-white border border-zinc-200 rounded-md '
                     'text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 '
-                    'focus:ring-1 focus:ring-zinc-900 transition-colors font-mono'
+                    'transition-colors font-sans'
                 ),
                 'placeholder': 'Repita la contraseña',
                 'autocomplete': 'new-password',

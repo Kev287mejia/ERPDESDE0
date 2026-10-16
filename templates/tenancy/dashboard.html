@@ -1,20 +1,20 @@
 {% extends "layouts/base_erp.html" %}
 
-{% block title %}Consola Operativa & Autoridad RBAC{% endblock %}
-{% block breadcrumb_section %}GOBERNANZA{% endblock %}
-{% block breadcrumb_page %}CENTRO DE CONTROL{% endblock %}
-{% block page_title %}Consola Operativa & Matriz de Autoridad{% endblock %}
+{% block title %}Consola Operativa{% endblock %}
+{% block breadcrumb_section %}Control{% endblock %}
+{% block breadcrumb_page %}Consola{% endblock %}
+{% block page_title %}Consola Operativa{% endblock %}
 
 {% block page_actions %}
-<a href="{% url 'tenancy:dashboard' %}" class="h-8 px-3 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5">
+<a href="{% url 'tenancy:dashboard' %}" class="h-8 px-3 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5">
     <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
     </svg>
-    <span>Sincronizar Métricas</span>
+    <span>Sincronizar</span>
 </a>
 
 {% if nav_access.can_manage_org %}
-<a href="{% url 'tenancy:onboarding' %}" class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-[4px] transition-colors flex items-center gap-1.5">
+<a href="{% url 'tenancy:onboarding' %}" class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-md transition-colors flex items-center gap-1.5">
     <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
     </svg>
@@ -24,260 +24,198 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6 max-w-7xl mx-auto">
+<div class="space-y-6 max-w-7xl mx-auto font-sans">
 
     {% if request.real_role_level >= 100 %}
-    <!-- ===================================================================== -->
-    <!-- ENTORNO DE EVALUACIÓN & DATOS DE PRUEBA (SWISS GRID INDUSTRIAL)       -->
-    <!-- ===================================================================== -->
-    <div class="p-3.5 bg-zinc-50 border border-zinc-200 rounded-[4px] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div class="flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-zinc-900"></span>
-            <div>
-                <span class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider block">
-                    Entorno de Evaluación & Datos de Prueba (Sandbox)
-                </span>
-                <span class="text-[11px] text-zinc-500 font-sans block">
-                    Pueble el escenario industrial de Nicaragua (cuentas, cotizaciones, cuadrillas, OTs, almacén y tesorería) o vacíe los datos para evaluar el sistema en blanco.
-                </span>
+    <!-- Entorno de Evaluación y Datos de Prueba -->
+    <div class="p-4 bg-zinc-50 border border-zinc-200/80 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+            <div class="text-xs font-semibold text-zinc-900">
+                Datos de demostración
             </div>
+            <p class="text-xs text-zinc-500 mt-0.5">
+                Cargue datos de prueba operativos o restablezca el espacio de trabajo para comenzar desde cero.
+            </p>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
             <form method="POST" action="{% url 'tenancy:sandbox_load' %}" class="inline">
                 {% csrf_token %}
                 <button type="submit" 
-                        class="h-7 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-mono font-medium rounded-[4px] transition-colors cursor-pointer flex items-center gap-1.5">
+                        class="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-md transition-colors cursor-pointer flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
                     </svg>
-                    <span>Cargar Escenario Industrial NI</span>
+                    <span>Cargar datos de prueba</span>
                 </button>
             </form>
             <form method="POST" action="{% url 'tenancy:sandbox_reset' %}" class="inline" onsubmit="return confirm('¿Confirmar vaciado de datos de prueba del tenant? La organización y su usuario administrador se mantendrán.');">
                 {% csrf_token %}
                 <button type="submit" 
-                        class="h-7 px-2.5 bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-mono font-medium border border-zinc-200 rounded-[4px] transition-colors cursor-pointer">
-                    Vaciar Datos de Prueba
+                        class="h-8 px-3 bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-medium border border-zinc-200 rounded-md transition-colors cursor-pointer">
+                    Restablecer datos
                 </button>
             </form>
         </div>
     </div>
     {% endif %}
 
-    <!-- ===================================================================== -->
-    <!-- BANDA TELEMÉTRICA DE 4 KPIS EN VIVO (SWISS GRID MODULAR ESTRICTO)     -->
-    <!-- ===================================================================== -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-zinc-200 border border-zinc-200 rounded-[4px] bg-white">
+    <!-- Tarjetas de Métricas (KPIs) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        <!-- KPI 1: Colaboradores Activos -->
-        <div class="p-4 space-y-2">
-            <div class="flex items-center justify-between text-zinc-500">
-                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">COLABORADORES ACTIVOS</span>
-                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
-                    NOM-TENANT
-                </span>
+        <!-- KPI 1: Colaboradores -->
+        <div class="p-4 border border-zinc-200 rounded-md bg-white">
+            <div class="text-xs font-medium text-zinc-500 font-sans">
+                Colaboradores
             </div>
-            <div class="flex items-baseline justify-between pt-1">
-                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
-                    {{ total_members_count }}
-                </span>
-                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                    EN NÓMINA
-                </span>
+            <div class="text-2xl font-semibold text-zinc-900 tracking-tight tabular-nums mt-1">
+                {{ total_members_count }}
             </div>
-            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
-                <span>Personal con credenciales activas</span>
-                <a href="{% url 'tenancy:team_management' %}" class="font-mono text-[10px] text-zinc-700 hover:underline">Gestionar &rarr;</a>
+            <div class="text-xs text-zinc-400 mt-1">
+                Personal en nómina activa
             </div>
         </div>
 
-        <!-- KPI 2: Módulos Operativos Activos -->
-        <div class="p-4 space-y-2">
-            <div class="flex items-center justify-between text-zinc-500">
-                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">MÓDULOS ACTIVOS</span>
-                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
-                    CATÁLOGO
-                </span>
+        <!-- KPI 2: Módulos -->
+        <div class="p-4 border border-zinc-200 rounded-md bg-white">
+            <div class="text-xs font-medium text-zinc-500 font-sans">
+                Módulos habilitados
             </div>
-            <div class="flex items-baseline justify-between pt-1">
-                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
-                    {{ enabled_modules_list|length }} / {{ modules_catalog|length }}
-                </span>
-                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                    SUSCRIPCIÓN
-                </span>
+            <div class="text-2xl font-semibold text-zinc-900 tracking-tight tabular-nums mt-1">
+                {{ enabled_modules_list|length }} <span class="text-base font-normal text-zinc-400">/ {{ modules_catalog|length }}</span>
             </div>
-            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
-                <span class="truncate">
-                    {% for m in enabled_modules_list %}{{ m.code|upper }}{% if not forloop.last %} · {% endif %}{% empty %}Sin módulos habilitados{% endfor %}
-                </span>
-                <a href="{% url 'tenancy:team_management' %}" class="font-mono text-[10px] text-zinc-700 hover:underline flex-shrink-0 ml-1">Modulación</a>
+            <div class="text-xs text-zinc-400 mt-1">
+                Disponibles en el plan actual
             </div>
         </div>
 
-        <!-- KPI 3: Nivel de Autoridad en Sesión -->
-        <div class="p-4 space-y-2">
-            <div class="flex items-center justify-between text-zinc-500">
-                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">AUTORIDAD EN SESIÓN</span>
-                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
-                    {% if is_simulating_role %}SIMULACIÓN{% else %}VISTA REAL{% endif %}
-                </span>
+        <!-- KPI 3: Nivel de Rol -->
+        <div class="p-4 border border-zinc-200 rounded-md bg-white">
+            <div class="text-xs font-medium text-zinc-500 font-sans">
+                Rol actual
             </div>
-            <div class="flex items-baseline justify-between pt-1">
-                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
-                    LVL-{{ current_role_level }}
-                </span>
-                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
-                    <span class="w-1.5 h-1.5 rounded-full {% if is_simulating_role %}bg-amber-500{% else %}bg-emerald-600{% endif %}"></span>
-                    {{ accessible_modules_count }} OPERABLES
-                </span>
+            <div class="text-2xl font-semibold text-zinc-900 tracking-tight mt-1 truncate" title="{{ current_role_label }}">
+                {{ current_role_label }}
             </div>
-            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
-                <span class="truncate">{{ current_role_label }}</span>
-                <span class="font-mono text-[10px] text-zinc-500 flex-shrink-0">RBAC</span>
+            <div class="text-xs text-zinc-400 mt-1">
+                {{ accessible_modules_count }} módulos con acceso
             </div>
         </div>
 
-        <!-- KPI 4: Régimen Fiscal y Moneda -->
-        <div class="p-4 space-y-2">
-            <div class="flex items-center justify-between text-zinc-500">
-                <span class="text-[10px] font-mono uppercase tracking-wider font-medium text-zinc-500">RÉGIMEN & MONEDA</span>
-                <span class="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-200 px-1.5 py-0.2 rounded-[3px]">
-                    {{ current_country.code }}
-                </span>
+        <!-- KPI 4: Moneda y Régimen -->
+        <div class="p-4 border border-zinc-200 rounded-md bg-white">
+            <div class="text-xs font-medium text-zinc-500 font-sans">
+                Moneda y régimen
             </div>
-            <div class="flex items-baseline justify-between pt-1">
-                <span class="text-2xl font-semibold font-mono text-zinc-900 tabular-nums tracking-tight">
-                    {{ current_country.primary_currency_symbol }} {{ current_country.primary_currency_code }}
-                </span>
-                <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-700 bg-zinc-50 border border-zinc-200 px-2 py-0.5 rounded-[4px]">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                    {{ current_country.default_tax_name }} {{ current_country.default_tax_rate }}%
-                </span>
+            <div class="text-2xl font-semibold text-zinc-900 tracking-tight tabular-nums mt-1">
+                {{ current_country.primary_currency_code }} ({{ current_country.primary_currency_symbol }})
             </div>
-            <div class="text-[11px] text-zinc-400 font-sans pt-1 border-t border-zinc-100 flex items-center justify-between">
-                <span class="truncate">{{ current_country.tax_id_label }}: {{ current_org.tax_id }}</span>
-                <span class="font-mono text-[10px] text-zinc-500 flex-shrink-0">{{ current_country.timezone }}</span>
+            <div class="text-xs text-zinc-400 mt-1">
+                {{ current_country.default_tax_name }} {{ current_country.default_tax_rate }}%
             </div>
         </div>
 
     </div>
 
-    <!-- ===================================================================== -->
-    <!-- BANDA TÉCNICA DE IDENTIDAD FISCAL Y CONFIGURACIÓN CONTABLE EN VIVO   -->
-    <!-- ===================================================================== -->
-    <div class="border border-zinc-200 rounded-[4px] bg-zinc-50/60 p-3.5 text-xs font-mono text-zinc-600 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 divide-y sm:divide-y-0 divide-zinc-200">
+    <!-- Identidad Fiscal y Configuración Contable -->
+    <div class="border border-zinc-200 rounded-md bg-zinc-50/60 p-4 text-xs font-sans text-zinc-600 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <div>
-            <span class="text-[10px] text-zinc-400 block uppercase">EMPRESA / RAZÓN SOCIAL:</span>
-            <span class="font-medium text-zinc-900 truncate block font-sans text-xs" title="{{ current_org.legal_name }}">{{ current_org.legal_name|default:current_org.name }}</span>
+            <span class="text-[11px] text-zinc-400 block font-medium">Razón social</span>
+            <span class="font-medium text-zinc-900 truncate block mt-0.5" title="{{ current_org.legal_name }}">{{ current_org.legal_name|default:current_org.name }}</span>
         </div>
         <div>
-            <span class="text-[10px] text-zinc-400 block uppercase">{{ current_country.tax_id_label|default:"RUC" }} TRIBUTARIO:</span>
-            <span class="font-medium text-zinc-900 tabular-nums">{{ current_org.tax_id }}</span>
+            <span class="text-[11px] text-zinc-400 block font-medium">{{ current_country.tax_id_label|default:"RUC" }}</span>
+            <span class="font-medium text-zinc-900 tabular-nums font-mono block mt-0.5">{{ current_org.tax_id }}</span>
         </div>
         <div>
-            <span class="text-[10px] text-zinc-400 block uppercase">RÉGIMEN FISCAL:</span>
-            <span class="font-medium text-zinc-900 truncate block" title="{{ current_org.get_tax_regime_display }}">{{ current_org.get_tax_regime_display }}</span>
+            <span class="text-[11px] text-zinc-400 block font-medium">Régimen fiscal</span>
+            <span class="font-medium text-zinc-900 truncate block mt-0.5" title="{{ current_org.get_tax_regime_display }}">{{ current_org.get_tax_regime_display }}</span>
         </div>
         <div>
-            <span class="text-[10px] text-zinc-400 block uppercase">GIRO / RUBRO:</span>
-            <span class="font-medium text-zinc-900 truncate block" title="{{ current_org.get_industry_display }}">{{ current_org.get_industry_display }}</span>
+            <span class="text-[11px] text-zinc-400 block font-medium">Giro</span>
+            <span class="font-medium text-zinc-900 truncate block mt-0.5" title="{{ current_org.get_industry_display }}">{{ current_org.get_industry_display }}</span>
         </div>
         <div>
-            <span class="text-[10px] text-zinc-400 block uppercase">MONEDA OPERATIVA:</span>
-            <span class="font-medium text-zinc-900">{{ current_org.currency }} ({{ current_org.currency_symbol }})</span>
+            <span class="text-[11px] text-zinc-400 block font-medium">Moneda</span>
+            <span class="font-medium text-zinc-900 block mt-0.5">{{ current_org.currency }} ({{ current_org.currency_symbol }})</span>
         </div>
         <div>
-            <span class="text-[10px] text-zinc-400 block uppercase">PLAN CONTABLE:</span>
-            <span class="font-medium text-zinc-900 truncate block" title="{{ current_org.get_accounting_template_display }}">{{ current_org.get_accounting_template_display }}</span>
+            <span class="text-[11px] text-zinc-400 block font-medium">Plan contable</span>
+            <span class="font-medium text-zinc-900 truncate block mt-0.5" title="{{ current_org.get_accounting_template_display }}">{{ current_org.get_accounting_template_display }}</span>
         </div>
     </div>
 
-    <!-- ===================================================================== -->
-    <!-- ESTADO DE MÓDULOS CONTRATADOS Y ACTIVIDAD DE PERSONAL EN VIVO          -->
-    <!-- ===================================================================== -->
+    <!-- Módulos Contratados y Personal -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        <!-- Bloque 1: Módulos Contratados y Accesibilidad -->
-        <div class="border border-zinc-200 rounded-[4px] bg-white overflow-hidden">
-            <div class="p-3.5 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="w-1.5 h-1.5 rounded-full bg-zinc-900"></span>
-                    <h3 class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider">
-                        Módulos Operativos Contratados
-                    </h3>
-                </div>
-                <span class="text-[10px] font-mono text-zinc-500 font-medium">{{ enabled_modules_list|length }} ACTIVOS</span>
+        <!-- Bloque 1: Módulos Contratados -->
+        <div class="border border-zinc-200 rounded-md bg-white overflow-hidden">
+            <div class="p-4 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+                <h3 class="text-xs font-semibold text-zinc-900 font-sans">
+                    Módulos contratados
+                </h3>
+                <span class="text-xs text-zinc-400 font-sans">{{ enabled_modules_list|length }} activos</span>
             </div>
             <div class="p-4 divide-y divide-zinc-100">
                 {% for mod in enabled_modules_list %}
-                <div class="py-2.5 first:pt-0 last:pb-0 flex items-start justify-between gap-3">
-                    <div class="space-y-0.5">
-                        <div class="flex items-center gap-2">
-                            <span class="font-mono text-xs font-semibold text-zinc-900">{{ mod.tag }}</span>
-                            <span class="text-xs text-zinc-700">{{ mod.name }}</span>
-                        </div>
-                        <p class="text-[11px] text-zinc-500 leading-relaxed">{{ mod.description }}</p>
+                <div class="py-3 first:pt-0 last:pb-0 flex items-start justify-between gap-3">
+                    <div>
+                        <div class="text-xs font-medium text-zinc-900">{{ mod.name }}</div>
+                        <p class="text-xs text-zinc-500 mt-0.5 leading-relaxed">{{ mod.description }}</p>
                     </div>
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-[3px] text-[10px] font-mono border border-zinc-200 bg-zinc-50 text-zinc-700 flex-shrink-0">
-                        LVL-{{ mod.min_role_level }}+
+                    <span class="text-xs text-zinc-400 flex-shrink-0">
+                        Nivel {{ mod.min_role_level }}+
                     </span>
                 </div>
                 {% empty %}
-                <div class="py-6 text-center text-xs font-mono text-zinc-400">
-                    Sin módulos contratados activos en este Tenant.
+                <div class="py-6 text-center text-xs text-zinc-400 font-sans">
+                    Sin módulos contratados activos en este espacio.
                 </div>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Bloque 2: Actividad Reciente de Personal -->
-        <div class="border border-zinc-200 rounded-[4px] bg-white overflow-hidden">
-            <div class="p-3.5 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="w-1.5 h-1.5 rounded-full bg-zinc-900"></span>
-                    <h3 class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider">
-                        Personal y Colaboradores en Tenant
-                    </h3>
-                </div>
-                <a href="{% url 'tenancy:team_management' %}" class="text-[10px] font-mono text-zinc-700 hover:underline">
-                    Ver nómina ({{ total_members_count }}) &rarr;
+        <!-- Bloque 2: Personal y Colaboradores -->
+        <div class="border border-zinc-200 rounded-md bg-white overflow-hidden">
+            <div class="p-4 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+                <h3 class="text-xs font-semibold text-zinc-900 font-sans">
+                    Colaboradores en la empresa
+                </h3>
+                <a href="{% url 'tenancy:team_management' %}" class="text-xs text-zinc-600 hover:text-zinc-900 font-sans hover:underline">
+                    Ver todos ({{ total_members_count }}) &rarr;
                 </a>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-xs">
+                <table class="w-full text-left border-collapse text-xs font-sans">
                     <thead>
-                        <tr class="border-b border-zinc-100 bg-zinc-50 text-[10px] font-mono text-zinc-400 uppercase">
-                            <th class="py-2 px-3 font-medium">COLABORADOR</th>
-                            <th class="py-2 px-3 font-medium">CARGO</th>
-                            <th class="py-2 px-3 font-medium">NIVEL</th>
-                            <th class="py-2 px-3 font-medium text-right">ALTA</th>
+                        <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/50 border-b border-zinc-200">
+                            <th class="py-2.5 px-4">Colaborador</th>
+                            <th class="py-2.5 px-4">Cargo</th>
+                            <th class="py-2.5 px-4">Rol</th>
+                            <th class="py-2.5 px-4 text-right">Alta</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-100">
                         {% for mem in recent_members %}
-                        <tr class="hover:bg-zinc-50/60 transition-colors">
-                            <td class="py-2.5 px-3">
+                        <tr class="hover:bg-zinc-50 transition-colors">
+                            <td class="py-2.5 px-4">
                                 <div class="font-medium text-zinc-900">{{ mem.user.full_name|default:mem.user.email }}</div>
-                                <div class="text-[10px] font-mono text-zinc-400">{{ mem.user.email }}{% if mem.user.personal_id_number %} · {{ mem.user.personal_id_number }}{% endif %}</div>
+                                <div class="text-xs text-zinc-400 font-mono">{{ mem.user.email }}{% if mem.user.personal_id_number %} · {{ mem.user.personal_id_number }}{% endif %}</div>
                             </td>
-                            <td class="py-2.5 px-3 text-zinc-600 text-[11px]">
+                            <td class="py-2.5 px-4 text-zinc-600">
                                 {{ mem.job_title|default:"Colaborador Operativo" }}
                             </td>
-                            <td class="py-2.5 px-3">
-                                <span class="px-1.5 py-0.5 rounded-[3px] text-[10px] font-mono bg-zinc-100 text-zinc-800 border border-zinc-200">
-                                    LVL-{{ mem.role_level }}
+                            <td class="py-2.5 px-4">
+                                <span class="px-2 py-0.5 rounded text-xs bg-zinc-100 text-zinc-700">
+                                    Nivel {{ mem.role_level }}
                                 </span>
                             </td>
-                            <td class="py-2.5 px-3 text-right font-mono text-[11px] text-zinc-500 tabular-nums">
+                            <td class="py-2.5 px-4 text-right font-mono text-zinc-500 tabular-nums">
                                 {{ mem.created_at|date:"d/m/Y" }}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="py-6 text-center text-xs font-mono text-zinc-400">
+                            <td colspan="4" class="py-6 text-center text-xs text-zinc-400 font-sans">
                                 Sin colaboradores adicionales registrados
                             </td>
                         </tr>
@@ -289,52 +227,46 @@
 
     </div>
 
-    <!-- ===================================================================== -->
-    <!-- TABLA DE ALTA DENSIDAD: MATRIZ DE AUTORIDAD JERÁRQUICA RBAC          -->
-    <!-- ===================================================================== -->
-    <div class="border border-zinc-200 rounded-[4px] bg-white overflow-hidden">
+    <!-- Matriz de Roles y Permisos RBAC -->
+    <div class="border border-zinc-200 rounded-md bg-white overflow-hidden">
         
-        <!-- Cabecera de la Consola -->
+        <!-- Cabecera -->
         <div class="p-4 border-b border-zinc-200 bg-zinc-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-                <div class="flex items-center gap-2">
-                    <span class="w-1.5 h-1.5 rounded-full bg-zinc-900"></span>
-                    <h2 class="text-xs font-mono font-semibold text-zinc-900 uppercase tracking-wider">
-                        Matriz de Distribución Jerárquica RBAC
-                    </h2>
-                </div>
-                <p class="text-xs text-zinc-500 mt-1">
+                <h2 class="text-xs font-semibold text-zinc-900 font-sans">
+                    Roles y permisos
+                </h2>
+                <p class="text-xs text-zinc-500 mt-0.5">
                     Distribución de personal por rango de autorización para <strong class="text-zinc-800">{{ current_org.name }}</strong>.
                 </p>
             </div>
             <div class="flex items-center gap-2">
-                <span class="text-[10px] font-mono text-zinc-400 uppercase">SU NIVEL ACTIVO:</span>
-                <span class="px-2.5 py-1 rounded-[4px] text-xs font-mono font-medium bg-zinc-900 text-white">
-                    LVL-{{ current_role_level }} · {{ current_role_label|upper }}
+                <span class="px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-900 text-white font-sans">
+                    Nivel {{ current_role_level }} · {{ current_role_label }}
                 </span>
             </div>
         </div>
 
-        <!-- Tabla de Datos RBAC Estilo Hoja de Cálculo Dinámica -->
+        <!-- Tabla de Datos RBAC -->
         <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
+            <table class="w-full text-left border-collapse text-xs font-sans">
                 <thead>
-                    <tr class="border-b border-zinc-200 bg-zinc-50 text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
-                        <th class="py-2.5 px-4 font-medium w-24">NIVEL</th>
-                        <th class="py-2.5 px-4 font-medium">ROL JERÁRQUICO</th>
-                        <th class="py-2.5 px-4 font-medium">PERSONAL EN BD</th>
-                        <th class="py-2.5 px-4 font-medium text-center w-36">ESTADO AUTORIZACIÓN</th>
-                        <th class="py-2.5 px-4 font-medium text-right w-24">ACCIÓN</th>
+                    <tr class="text-xs font-medium text-zinc-500 bg-zinc-50/50 border-b border-zinc-200">
+                        <th class="py-2.5 px-4 w-24">Nivel</th>
+                        <th class="py-2.5 px-4">Rol</th>
+                        <th class="py-2.5 px-4">Colaboradores</th>
+                        <th class="py-2.5 px-4 text-center w-36">Estado</th>
+                        <th class="py-2.5 px-4 text-right w-24">Acción</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100 text-[13px] font-sans">
+                <tbody class="divide-y divide-zinc-100">
                     {% for role in rbac_distribution %}
-                    <tr class="{% if role.is_current_session_level %}bg-zinc-100/70 border-l-2 border-l-zinc-900 font-medium{% else %}hover:bg-zinc-50/70{% endif %} transition-colors">
+                    <tr class="{% if role.is_current_session_level %}bg-zinc-50 font-medium{% else %}hover:bg-zinc-50/60{% endif %} transition-colors">
                         
                         <!-- Nivel Numérico -->
-                        <td class="py-2.5 px-4 font-mono font-medium tabular-nums text-zinc-900 whitespace-nowrap">
-                            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-[4px] text-[11px] font-mono {% if role.is_current_session_level %}bg-zinc-900 text-white{% else %}bg-zinc-50 text-zinc-700 border border-zinc-200{% endif %}">
-                                LVL-{{ role.level }}
+                        <td class="py-2.5 px-4 font-mono tabular-nums text-zinc-900 whitespace-nowrap">
+                            <span class="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs {% if role.is_current_session_level %}bg-zinc-900 text-white font-sans{% else %}bg-zinc-100 text-zinc-700 font-sans{% endif %}">
+                                {{ role.level }}
                             </span>
                         </td>
 
@@ -344,39 +276,36 @@
                         </td>
 
                         <!-- Personal en BD -->
-                        <td class="py-2.5 px-4 font-mono text-[11px] tabular-nums whitespace-nowrap">
-                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] {% if role.members_count > 0 %}bg-zinc-100 text-zinc-900 font-semibold border border-zinc-200{% else %}bg-zinc-50 text-zinc-400 border border-transparent{% endif %}">
-                                {{ role.members_count }} {% if role.members_count == 1 %}colaborador{% else %}colaboradores{% endif %}
-                            </span>
+                        <td class="py-2.5 px-4 text-zinc-600 whitespace-nowrap">
+                            {{ role.members_count }} {% if role.members_count == 1 %}colaborador{% else %}colaboradores{% endif %}
                         </td>
 
                         <!-- Estado de Autorización de la Sesión -->
-                        <td class="py-2.5 px-4 text-center whitespace-nowrap font-mono text-[10px]">
+                        <td class="py-2.5 px-4 text-center whitespace-nowrap">
                             {% if role.is_current_session_level %}
-                            <span class="inline-flex items-center gap-1.5 text-white font-medium bg-zinc-900 px-2 py-0.5 rounded-[4px]">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                                SESIÓN ACTIVA
+                            <span class="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                                Activo
                             </span>
                             {% elif role.can_current_user_approve %}
-                            <span class="inline-flex items-center gap-1.5 text-zinc-700 font-medium bg-zinc-50 px-2 py-0.5 rounded-[4px] border border-zinc-200">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                                AUTORIZADO
+                            <span class="inline-flex items-center gap-1.5 text-xs text-zinc-700 bg-zinc-100 px-2 py-0.5 rounded">
+                                Autorizado
                             </span>
                             {% else %}
-                            <span class="text-zinc-400 font-medium">
-                                RESTRINGIDO
+                            <span class="text-xs text-zinc-400">
+                                Restringido
                             </span>
                             {% endif %}
                         </td>
 
                         <!-- Acción Directa -->
-                        <td class="py-2.5 px-4 text-right whitespace-nowrap font-mono text-xs">
+                        <td class="py-2.5 px-4 text-right whitespace-nowrap">
                             {% if nav_access.can_manage_org %}
-                            <a href="{% url 'tenancy:team_management' %}" class="text-zinc-700 hover:text-zinc-900 underline text-[11px]">
+                            <a href="{% url 'tenancy:team_management' %}" class="text-zinc-700 hover:text-zinc-900 underline text-xs">
                                 Gestionar
                             </a>
                             {% else %}
-                            <span class="text-zinc-400 text-[11px]">Solo lectura</span>
+                            <span class="text-zinc-400 text-xs">Lectura</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -385,17 +314,13 @@
             </table>
         </div>
 
-        <!-- Pie de Tabla con Respaldo Normativo -->
+        <!-- Pie de Tabla -->
         <div class="p-3 border-t border-zinc-200 bg-zinc-50/50 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 gap-2">
-            <div class="flex items-center gap-2">
-                <span class="font-medium text-zinc-700">Marco Normativo:</span>
-                <span class="text-zinc-500 text-[11px]">{{ current_country.name }} &bull; Código Tributario {{ current_country.code }}</span>
+            <div>
+                {{ current_country.name }} · Código {{ current_country.code }}
             </div>
-            <div class="flex items-center gap-2 font-mono text-[11px]">
-                <span class="text-zinc-400">{{ current_country.tax_id_label|default:"RUC" }} TENANT:</span>
-                <span class="text-zinc-900 font-medium tabular-nums">{{ current_org.tax_id }}</span>
-                <span class="text-zinc-300">/</span>
-                <span class="text-zinc-600">Jurisdicción {{ current_country.name }} ({{ current_country.code }})</span>
+            <div>
+                {{ current_country.tax_id_label|default:"RUC" }}: <span class="font-mono tabular-nums text-zinc-700 font-medium">{{ current_org.tax_id }}</span>
             </div>
         </div>
     </div>
